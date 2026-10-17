@@ -291,8 +291,13 @@ pair is shared per provider and comes from deploy-time configuration rather
 than per-connection entry.
 
 Administration is open to every account that completes DTC sign-in — the DTC
-identity provider only issues datatalks.club accounts. To restrict it to a
-subset, configure an allowlist at deploy time:
+identity provider only issues datatalks.club accounts. One exception is an
+operator agent: `orin@datatalks.club` is role `agent` (workflows, runs, and
+agent tasks it owns; no credentials, grants, or tokens). See
+[docs/operator-agents.md](docs/operator-agents.md). A full operator can
+still read that work with `dapier runs list --owner orin` or the console
+View as control. To restrict everyone else to a subset, configure an
+allowlist at deploy time:
 
 ```bash
 sam deploy --config-env sandbox --parameter-overrides OperatorEmails=you@datatalks.club ...

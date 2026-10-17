@@ -5,17 +5,21 @@ from urllib.parse import quote
 
 from .. import api
 from .. import config
+from .shared import owner_query
 
 __all__ = ["agent_tasks_list", "agent_tasks_show", "worker_run", "workers_list"]
 
 
-def agent_tasks_list(api_url, debug=False, limit=None, status=None):
+def agent_tasks_list(api_url, debug=False, limit=None, status=None,
+                     owner=None, as_id=None, assignee=None):
     """Host jobs the agent action enqueued, as `dapier worker` leaves them."""
     params = []
     if limit:
         params.append(f"limit={quote(str(limit), safe='')}")
     if status:
         params.append(f"status={quote(status, safe='')}")
+    for key, value in owner_query(owner, as_id, assignee).items():
+        params.append(f"{key}={quote(str(value), safe='')}")
     path = "/api/agent/agent-tasks" + ("?" + "&".join(params) if params else "")
     data = api.call(api_url, "GET", path, debug=debug)
     items = data.get("tasks") or []

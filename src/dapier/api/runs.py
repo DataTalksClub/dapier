@@ -561,8 +561,35 @@ def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
     return payload["runs"] if status_code == 200 else []
 
 
+def _actor_match(owner=None, as_id=None, assignee=None):
+    """The owner-filter match set, or ``(None, error_payload)``."""
+    from ..auth import actors
+
+    match, error = actors.resolve_filter(owner, as_id, assignee)
+    if error:
+        return None, (400, {"error": error})
+    return match, None
+
+
+def _keep_actor(rows, match):
+    """Drop rows outside an owner filter. Operators still see every owner
+    until they ask; the filter then uses the published-workflow owner."""
+    if match is None:
+        return rows
+    from ..auth import actors
+
+    owners = visibility.workflow_owners()
+    return [row for row in rows if actors.row_visible(
+        match,
+        workflow_owner=owners.get(str(row.get("workflow_id") or "")),
+        fields=(row.get("owner"), row.get("actor"), row.get("assignee"),
+                row.get("subject")),
+    )]
+
+
 def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
-             q=None, next_token=None, visible=None):
+             q=None, next_token=None, visible=None, owner=None, as_id=None,
+             assignee=None):
     """The list response: runs plus a ``paging`` block.
 
     ``next`` carries the last returned row's sort key; the follow-up call
@@ -591,13 +618,16 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     no owner and stays visible (the audit duty), as does any run when the
     owner stamp is missing.
     """
+    match, denied = _actor_match(owner, as_id, assignee)
+    if denied:
+        return denied
     limit = max(1, min(_int(limit) or DEFAULT_LIMIT, MAX_LIMIT))
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
     query = str(q or "").strip().lower()
     owners = visibility.owners_for(visible)
-    narrowed = bool(workflow_id or status or since or before or query)
+    narrowed = bool(workflow_id or status or since or before or query or match)
     items, clipped = _scan_items(filtered=narrowed)
     grouped = _grouped(items)
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
@@ -611,6 +641,7 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     if query:
         runs = [run for run in runs
                 if query in _search_blob(run["run_id"], grouped[run["run_id"]])]
+    runs = _keep_actor(runs, match)
     runs.sort(key=_sort_key, reverse=True)
     if token_key is not None:
         runs = [run for run in runs if _sort_key(run) < token_key]
@@ -647,7 +678,8 @@ def runs_to_csv(rows):
 
 
 def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
-               since=None, before=None, q=None, now=None, visible=None):
+               since=None, before=None, q=None, now=None, visible=None,
+               owner=None, as_id=None, assignee=None):
     """The filtered run history as CSV: ``(status, payload)``.
 
     Same filters as api_list (including content search and resolution),
@@ -657,6 +689,9 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
     trail's export. ``visible`` applies the same G17 read filter as the
     list, so the CSV cannot see past it.
     """
+    match, denied = _actor_match(owner, as_id, assignee)
+    if denied:
+        return denied
     try:
         max_rows = max(1, min(int(max_rows), EXPORT_MAX_ROWS))
     except (TypeError, ValueError):
@@ -675,6 +710,7 @@ def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
     if query:
         rows = [row for row in rows
                 if query in _search_blob(row["run_id"], grouped[row["run_id"]])]
+    rows = _keep_actor(rows, match)
     rows.sort(key=_sort_key, reverse=True)
     truncated = len(rows) > max_rows
     page = rows[:max_rows]

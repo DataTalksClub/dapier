@@ -11,7 +11,7 @@ import re
 from urllib.parse import unquote
 
 from ... import http
-from ...auth import authz, session, visibility
+from ...auth import actors, authz, session, visibility
 from ...connections import oauth_flow
 from ...connections.oauth_flow import oauth_start
 from .. import agent, overview
@@ -55,11 +55,17 @@ def _pre_routes(event, method, path):
         # session's sub is the sign-in email, and the name is the ID
         # token's name claim when the identity provider sent one.
         email = username if isinstance(username, str) and "@" in username else ""
+        actor = actors.match_session(payload)
+        full_operator = authz.is_operator(payload) and actor is None
         return http._json_response(200, {
             "username": username,
             "email": email,
             "name": str(payload.get("name") or ""),
-            "operator": authz.is_operator(payload),
+            # An operator agent may open the console. `role` says how much
+            # of it they get; `view_as` is only for a full operator.
+            "operator": bool(full_operator or actor),
+            "role": actor["role"] if actor else ("operator" if full_operator else ""),
+            "view_as": actors.public_directory() if full_operator else [],
         })
     if not session._csrf_ok(event, method):
         return http._json_response(403, {"error": "Cross-site request rejected"})
@@ -118,7 +124,7 @@ def _route_usage_errors(event, method, path, operator_payload, operator_subject)
                                  operator_subject, event)
     run_cancel_match = re.fullmatch(r"/api/admin/runs/([^/]+)/cancel", path)
     if method == "POST" and run_cancel_match:
-        return routes.cancel_run(unquote(run_cancel_match.group(1)), operator_subject)
+        return routes.cancel_run(unquote(run_cancel_match.group(1)), operator_subject, event)
     run_resolve_match = re.fullmatch(r"/api/admin/runs/([^/]+)/resolve", path)
     if method == "POST" and run_resolve_match:
         return routes.resolve_run(unquote(run_resolve_match.group(1)),
@@ -300,6 +306,10 @@ def route(event, method, path):
     response, operator_payload, operator_subject = _gate(event, method, path)
     if response is not None:
         return response
+    if actors.is_agent(operator_payload) and not actors.console_allowed(method, path):
+        session._audit_event("unknown", "role", operator_subject or "unknown",
+                             outcome="denied-not-operator")
+        return http._json_response(403, {"error": "Not available for this role"})
     # The operator gate passed, so a crash in the domain routers can carry
     # its traceback in the body — the evidence the Lambda log holds,
     # reachable from the console without log access. Pre-gate paths (login,

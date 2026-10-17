@@ -3,7 +3,41 @@ replays, cancel, resolve, and the replay-failed bulk op."""
 from ... import http
 import json
 from .. import runs
-from ...auth import session
+from ...auth import actors, session, visibility
+
+
+def _actor_scope(event):
+    """The owner scope when the caller is an operator agent, else None.
+
+    Full operators are not narrowed here. An agent may replay, cancel, or
+    resolve only a run of a workflow it owns; anything else reads as missing.
+    """
+    if not event:
+        return None
+    payload = session._session_payload(event)
+    if not actors.is_agent(payload):
+        return None
+    return visibility.for_session(payload)
+
+
+def _hidden_run(event, run_id):
+    scope = _actor_scope(event)
+    if scope is None:
+        return None
+    status, payload = runs.api_get(run_id, visible=scope)
+    if status != 200:
+        return http._json_response(status, payload)
+    return None
+
+
+def _hidden_workflow(event, workflow_id):
+    scope = _actor_scope(event)
+    if scope is None:
+        return None
+    denied = scope.can_write(workflow_id)
+    if denied:
+        return http._json_response(*denied)
+    return None
 
 
 def list_runs(event, visible=None):
@@ -21,6 +55,9 @@ def list_runs(event, visible=None):
         q=query.get("q") or None,
         next_token=query.get("next") or None,
         visible=visible,
+        owner=query.get("owner") or None,
+        as_id=query.get("as") or None,
+        assignee=query.get("assignee") or None,
     )
     return http._json_response(status, payload)
 
@@ -44,6 +81,9 @@ def export_runs(event, operator, visible=None):
         before=query.get("before") or None,
         q=query.get("q") or None,
         visible=visible,
+        owner=query.get("owner") or None,
+        as_id=query.get("as") or None,
+        assignee=query.get("assignee") or None,
     )
     if status == 200:
         session._audit_event("runs", "runs.export", operator or "unknown",
@@ -74,6 +114,9 @@ def replay_run(run_id, operator, event=None):
         body = json.loads(event.get("body") or "{}") if event else {}
     except (ValueError, json.JSONDecodeError):
         return http._json_response(400, {"error": "Invalid request"})
+    hidden = _hidden_run(event, run_id)
+    if hidden:
+        return hidden
     from_step = str((body or {}).get("from_step") or "").strip()
     status, payload = runs.api_replay(run_id, from_step=from_step or None)
     if status == 202:
@@ -82,9 +125,12 @@ def replay_run(run_id, operator, event=None):
     return http._json_response(status, payload)
 
 
-def cancel_run(run_id, operator):
+def cancel_run(run_id, operator, event=None):
     """Cancel a suspended run: its parked steps close out cancelled and the
     parked continuation is dropped (the worker consumes the envelope)."""
+    hidden = _hidden_run(event, run_id)
+    if hidden:
+        return hidden
     status, payload = runs.api_cancel(run_id)
     if status == 200:
         session._audit_event(run_id, "runs.cancel", operator or "unknown", outcome="ok")
@@ -99,6 +145,9 @@ def replay_failed_runs(event, operator):
     except (ValueError, json.JSONDecodeError):
         return http._json_response(400, {"error": "Invalid request"})
     workflow_id = str((body or {}).get("workflow_id") or "").strip()
+    hidden = _hidden_workflow(event, workflow_id)
+    if hidden:
+        return hidden
     status, payload = runs.api_replay_failed(workflow_id)
     if status == 202:
         session._audit_event(workflow_id, "runs.replay-failed",
@@ -118,6 +167,9 @@ def resolve_run(run_id, operator, event=None):
         body = json.loads(event.get("body") or "{}") if event else {}
     except (ValueError, json.JSONDecodeError):
         return http._json_response(400, {"error": "Invalid request"})
+    hidden = _hidden_run(event, run_id)
+    if hidden:
+        return hidden
     status, payload = runs.api_resolve(run_id, note=(body or {}).get("note"),
                                        by=operator or "unknown")
     if status == 200 and not payload.get("already_resolved"):

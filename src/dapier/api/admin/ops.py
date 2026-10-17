@@ -15,7 +15,9 @@ def agent_tasks_list(event):
         status, payload = host_tasks.api_get(query["task_id"])
     else:
         status, payload = host_tasks.api_list(
-            limit=query.get("limit"), status=query.get("status"))
+            limit=query.get("limit"), status=query.get("status"),
+            owner=query.get("owner"), as_id=query.get("as"),
+            assignee=query.get("assignee"))
     return http._json_response(status, payload)
 
 

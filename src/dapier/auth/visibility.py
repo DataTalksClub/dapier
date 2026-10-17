@@ -173,8 +173,16 @@ def owners_for(visible):
 def for_session(payload, table_ref=None):
     """The scope of a console cookie / CLI bearer session payload: the
     subject it names, with the operator allowlist (authz) deciding the
-    reach."""
+    reach.
+
+    An operator agent is owner-scoped to its DTC subject even when the
+    allowlist would otherwise treat every DTC account as an operator.
+    """
+    from . import actors
+
     payload = payload or {}
+    if actors.is_agent(payload):
+        return Visibility(actors.stable_subject(payload), is_operator=False)
     subject = payload.get("subject") or payload.get("sub")
     return Visibility(str(subject) if subject else "",
                       is_operator=authz.is_operator(payload))

@@ -11,7 +11,7 @@ import boto3
 
 from .. import audit as audit_log
 from .. import http
-from . import authz
+from . import actors, authz
 
 SESSION_COOKIE = "dapier_session"
 OAUTH_COOKIE = "dapier_oauth_state"
@@ -87,7 +87,9 @@ def require_operator(event):
     payload = _session_payload(event)
     if not payload:
         return None, http._json_response(401, {"error": "Authentication required"})
-    if not authz.is_operator(payload):
+    # An operator agent passes the session gate. The dispatcher then
+    # refuses routes outside workflows, runs, and agent tasks.
+    if actors.gate(payload) is None:
         _audit_event("unknown", audit_log.CONNECT, subject_fallback(payload),
                      outcome="denied-not-operator")
         return None, http._json_response(403, {"error": "Operator authorization required"})

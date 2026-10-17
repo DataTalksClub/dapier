@@ -36,6 +36,12 @@ def register(sub):
                                   help="How many to show (default 50, max 200)")
     agent_tasks_list.add_argument("--status", default=None,
                                   help="Only rows with this status: queued, running, succeeded, failed, timed_out, interrupted")
+    agent_tasks_list.add_argument("--owner",
+                                  help="Only this person's tasks (alias or email, for example orin)")
+    agent_tasks_list.add_argument("--as", dest="as_id",
+                                  help="Only tasks for this subject id")
+    agent_tasks_list.add_argument("--assignee",
+                                  help="Only tasks assigned to this subject id")
     agent_tasks_show = agent_tasks_sub.add_parser("show", help="Show one agent task and its recorded logs")
     agent_tasks_show.add_argument("task_id")
     workers_p = sub.add_parser(
@@ -84,7 +90,10 @@ def run(args, api_url, debug, child=None):
             return commands.agent_tasks_show(api_url, args.task_id, debug)
         return commands.agent_tasks_list(api_url, debug,
                                          limit=getattr(args, "limit", None),
-                                         status=getattr(args, "status", None))
+                                         status=getattr(args, "status", None),
+                                         owner=getattr(args, "owner", None),
+                                         as_id=getattr(args, "as_id", None),
+                                         assignee=getattr(args, "assignee", None))
     if args.group == "workers":
         return commands.workers_list(api_url, debug)
     if args.group == "worker":

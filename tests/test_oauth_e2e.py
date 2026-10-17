@@ -240,9 +240,14 @@ def test_me_names_the_signed_in_person_from_the_id_token(monkeypatch):
     me = invoke(http_event(
         "GET", "/api/admin/me", cookies=[f"dapier_session={session}"],
     ))
-    assert json.loads(me["body"]) == {
-        "username": EMAIL, "email": EMAIL, "name": "Alexey Grigorev", "operator": True,
-    }
+    body = json.loads(me["body"])
+    assert body["username"] == EMAIL
+    assert body["email"] == EMAIL
+    assert body["name"] == "Alexey Grigorev"
+    assert body["operator"] is True
+    assert body["role"] == "operator"
+    assert any(person["alias"] == "orin" and person["role"] == "agent"
+               for person in body["view_as"])
 
 
 def test_display_name_prefers_the_name_claim_and_tidies_it():
@@ -263,9 +268,13 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
         "GET", "/api/admin/me", cookies=[f"dapier_session={session}"],
     ))
     assert me["statusCode"] == 200
-    assert json.loads(me["body"]) == {
-        "username": EMAIL, "email": EMAIL, "name": "", "operator": True,
-    }
+    body = json.loads(me["body"])
+    assert body["username"] == EMAIL
+    assert body["email"] == EMAIL
+    assert body["name"] == ""
+    assert body["operator"] is True
+    assert body["role"] == "operator"
+    assert body["view_as"]
 
     seed_youtube_connection(dynamo.tables["connections"])
 

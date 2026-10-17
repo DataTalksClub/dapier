@@ -4,6 +4,18 @@ import json
 import sys
 
 
+def owner_query(owner=None, as_id=None, assignee=None):
+    """Query params for the read-only owner filter. Writes are not affected."""
+    params = {}
+    if owner:
+        params["owner"] = owner
+    if as_id:
+        params["as"] = as_id
+    if assignee:
+        params["assignee"] = assignee
+    return params
+
+
 def read_json_file(path):
     """Return the parsed JSON body, or ``(None, error_message)``."""
     try:

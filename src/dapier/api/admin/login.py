@@ -5,7 +5,7 @@ import os
 import time
 import urllib.parse
 
-from ...auth import dtc_auth
+from ...auth import actors, dtc_auth
 from ...auth import session
 from ... import http
 from ...auth.session import SESSION_COOKIE, AUTH_STATE_COOKIE, SESSION_TTL_SECONDS
@@ -64,6 +64,7 @@ def auth_callback(event):
     if not isinstance(email, str) or not email:
         return _auth_error_redirect(clear_state)
     payload = {"sub": email.lower(), "subject": claims["sub"], "exp": int(time.time()) + SESSION_TTL_SECONDS}
+    actors.remember(email, claims.get("sub"))
     name = _display_name(claims)
     if name:
         payload["name"] = name

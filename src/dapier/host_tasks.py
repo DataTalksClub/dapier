@@ -40,12 +40,19 @@ def api_get(task_id, table_ref=None):
     return 200, {"task": task}
 
 
-def api_list(table_ref=None, limit=DEFAULT_LIMIT, status=None):
+def api_list(table_ref=None, limit=DEFAULT_LIMIT, status=None,
+             owner=None, as_id=None, assignee=None):
     """Recent host tasks, newest first: ``(status_code, payload)``.
 
     A paginated scan; ``status`` narrows to one stored state and
     ``limit`` clips the newest rows. Rows project to PUBLIC_FIELDS only.
     """
+    from .auth import actors
+    from .auth import visibility
+
+    match, error = actors.resolve_filter(owner, as_id, assignee)
+    if error:
+        return 400, {"error": error}
     try:
         size = max(1, min(int(limit), MAX_LIMIT))
     except (TypeError, ValueError):
@@ -67,6 +74,14 @@ def api_list(table_ref=None, limit=DEFAULT_LIMIT, status=None):
     if wanted:
         items = [item for item in items
                  if str(item.get("status") or "").strip().lower() == wanted]
+    if match is not None:
+        owners = visibility.workflow_owners()
+        items = [item for item in items if actors.row_visible(
+            match,
+            workflow_owner=owners.get(workflow_of(item.get("task_id"))),
+            fields=(item.get("owner"), item.get("actor"), item.get("assignee"),
+                    item.get("subject")),
+        )]
     tasks = []
     for item in items[:size]:
         view = {key: item.get(key) for key in PUBLIC_FIELDS}

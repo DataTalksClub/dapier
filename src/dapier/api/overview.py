@@ -32,11 +32,12 @@ def _workflows(visible=None, owners=None):
                 continue
             result[str(workflow["id"])] = _workflow_view(
                 workflow, item.get("file"), published=True,
-                failures=counts.get(str(workflow["id"]), 0))
+                failures=counts.get(str(workflow["id"]), 0),
+                owner=visibility.owner_of_item(item))
     return sorted(result.values(), key=lambda workflow: str(workflow["id"]))
 
 
-def _workflow_view(workflow, source, *, published, failures=0):
+def _workflow_view(workflow, source, *, published, failures=0, owner=""):
     """One overview row; the primary trigger stays in ``trigger`` for the
     console, with ``triggerCount`` covering multi-trigger workflows. The
     auto-pause fields are engine-stamped runtime state (designer_store.
@@ -57,6 +58,7 @@ def _workflow_view(workflow, source, *, published, failures=0):
         "source": source,
         "actions": _action_views(workflow.get("actions")),
         "published": published,
+        "owner": str(owner or ""),
         # Zapier-style labels (designer_store._tags_of semantics): [] for
         # hand-written YAML that carries something else under ``tags``.
         "tags": [

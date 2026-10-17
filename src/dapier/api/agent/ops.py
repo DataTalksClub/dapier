@@ -5,6 +5,7 @@ workflow storage, and the trigger inbox."""
 
 import json
 
+from ...auth import actors
 from ... import error_digest, host_jobs, host_tasks, host_workers
 from ...engine import usage
 from .. import errors as errors_api, runs
@@ -63,6 +64,9 @@ def runs_api(event, run_id=None):
         q=query.get("q") or None,
         next_token=query.get("next") or None,
         visible=_visibility(event, subject),
+        owner=query.get("owner") or None,
+        as_id=query.get("as") or None,
+        assignee=query.get("assignee") or None,
     )
     return _no_store(_json_response(status, payload))
 
@@ -84,7 +88,9 @@ def agent_tasks_api(event):
         status, payload = host_tasks.api_get(query["task_id"])
     else:
         status, payload = host_tasks.api_list(
-            limit=query.get("limit"), status=query.get("status"))
+            limit=query.get("limit"), status=query.get("status"),
+            owner=query.get("owner"), as_id=query.get("as"),
+            assignee=query.get("assignee"))
     return _no_store(_json_response(status, payload))
 
 
@@ -129,6 +135,31 @@ def host_jobs_api(event, operation):
     return _no_store(_json_response(status, payload))
 
 
+def _agent_payload(event, subject):
+    claims = event.get("_dtc_claims") or {}
+    email = claims.get("email", "")
+    return {"subject": subject, "sub": email, "email": email}
+
+
+def _hidden_from_agent(event, subject, run_id):
+    """404 when an operator agent asks to change a run it does not own."""
+    if not actors.is_agent(_agent_payload(event, subject)):
+        return None
+    status, body = runs.api_get(run_id, visible=_visibility(event, subject))
+    if status != 200:
+        return _no_store(_json_response(status, body))
+    return None
+
+
+def _hidden_workflow(event, subject, workflow_id):
+    if not actors.is_agent(_agent_payload(event, subject)):
+        return None
+    denied = _visibility(event, subject).can_write(workflow_id)
+    if denied:
+        return _no_store(_json_response(*denied))
+    return None
+
+
 def _request_body(event):
     try:
         body = json.loads(event.get("body") or "{}")
@@ -157,6 +188,9 @@ def runs_export_api(event):
         before=query.get("before") or None,
         q=query.get("q") or None,
         visible=_visibility(event, subject),
+        owner=query.get("owner") or None,
+        as_id=query.get("as") or None,
+        assignee=query.get("assignee") or None,
     )
     if status == 200:
         audit.emit("runs", "runs.export", subject, outcome="ok")
@@ -341,6 +375,9 @@ def runs_replay_api(event, run_id):
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
+    hidden = _hidden_from_agent(event, subject, run_id)
+    if hidden:
+        return hidden
     from_step = str((body or {}).get("from_step") or "").strip()
     status, payload = runs.api_replay(run_id, from_step=from_step or None)
     if status == 202:
@@ -360,6 +397,9 @@ def runs_cancel_api(event, run_id):
     subject, error = require_operator(event, "runs.cancel")
     if error:
         return error
+    hidden = _hidden_from_agent(event, subject, run_id)
+    if hidden:
+        return hidden
     status, payload = runs.api_cancel(run_id)
     if status == 200:
         audit.emit(run_id, "runs.cancel", subject, outcome="ok")
@@ -378,6 +418,9 @@ def runs_resolve_api(event, run_id):
     subject, error = require_operator(event, "runs.resolve")
     if error:
         return error
+    hidden = _hidden_from_agent(event, subject, run_id)
+    if hidden:
+        return hidden
     status, payload = runs.api_resolve(run_id, note=_request_body(event).get("note"),
                                        by=subject)
     if status == 200 and not payload.get("already_resolved"):
@@ -402,6 +445,9 @@ def runs_replay_failed_api(event):
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
     workflow_id = str((body or {}).get("workflow_id") or "").strip()
+    hidden = _hidden_workflow(event, subject, workflow_id)
+    if hidden:
+        return hidden
     status, payload = runs.api_replay_failed(workflow_id)
     if status == 202:
         audit.emit(workflow_id, "runs.replay-failed", subject, outcome="ok")

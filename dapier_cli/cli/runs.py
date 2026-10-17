@@ -8,6 +8,16 @@ OUTCOME_HELP = ("Only events with this outcome: handled, failed, refused, unmatc
                 "pending (comma-separate several)")
 
 
+def _owner_filter(parser):
+    """Read-only filter. It does not change the account a write runs as."""
+    parser.add_argument("--owner",
+                        help="Only this person's rows (alias or email, for example orin)")
+    parser.add_argument("--as", dest="as_id",
+                        help="Only rows for this subject id")
+    parser.add_argument("--assignee",
+                        help="Only rows assigned to this subject id")
+
+
 def register(sub):
     runs_p = sub.add_parser("runs", help="Workflow executions and incoming trigger events")
     runs_sub = runs_p.add_subparsers(dest="command", required=True)
@@ -34,6 +44,7 @@ def register(sub):
                                   "(inputs, outputs, errors) and ids")
     runs_list_p.add_argument("--next", dest="next_token",
                              help="Page token from the previous call's `next page:` footer")
+    _owner_filter(runs_list_p)
     runs_show_p = runs_sub.add_parser("show", help="Show one run's step-by-step flow")
     runs_show_p.add_argument("run_id", help="Run ID from `dapier runs list` (or the console)")
     runs_replay_p = runs_sub.add_parser("replay", help="Re-run a past run by re-injecting its original trigger event")
@@ -78,6 +89,7 @@ def register(sub):
                                help="Cap the export (default 1000, max 5000)")
     runs_export_p.add_argument("--out",
                                help="Write the CSV here (default: the suggested filename)")
+    _owner_filter(runs_export_p)
     inbox_p = sub.add_parser("inbox", help="Trigger inbox: every inbound trigger event, matched or not")
     inbox_sub = inbox_p.add_subparsers(dest="command", required=True)
     inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
@@ -116,7 +128,9 @@ def run(args, api_url, debug, child=None):
                                   status=args.status, since=args.since,
                                   before=args.before, query=args.search,
                                   next_token=args.next_token,
-                                  resolved=args.resolved, debug=debug)
+                                  resolved=args.resolved, debug=debug,
+                                  owner=args.owner, as_id=args.as_id,
+                                  assignee=args.assignee)
     if args.command == "show":
         return commands.runs_show(api_url, args.run_id, debug)
     if args.command == "replay":
@@ -132,7 +146,8 @@ def run(args, api_url, debug, child=None):
                                     workflow=args.workflow, status=args.status,
                                     since=args.since, before=args.before,
                                     query=args.search, resolved=args.resolved,
-                                    debug=debug)
+                                    debug=debug, owner=args.owner,
+                                    as_id=args.as_id, assignee=args.assignee)
     return 2
 
 

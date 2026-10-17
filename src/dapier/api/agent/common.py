@@ -29,7 +29,7 @@ class _LateBinding:
         return getattr(importlib.import_module(__package__), self._name)(*args, **kwargs)
 
 
-from ...auth import api_tokens, authz, device_sessions, visibility
+from ...auth import actors, api_tokens, authz, device_sessions, visibility
 from ...auth.dtc_auth import auth_config
 from .. import designer_store
 
@@ -192,11 +192,15 @@ def require_operator(event, action):
         audit.emit("unknown", action, subject, outcome="denied-not-operator")
         return None, _json_response(403, {"error": "Operator authorization required"})
     claims = event.get("_dtc_claims") or {}
-    payload = {"subject": subject, "sub": claims.get("email", "")}
-    if authz.is_operator(payload):
-        return subject, None
-    audit.emit("unknown", action, subject, outcome="denied-not-operator")
-    return None, _json_response(403, {"error": "Operator authorization required"})
+    email = claims.get("email", "")
+    payload = {"subject": subject, "sub": email, "email": email}
+    actors.remember(email, subject)
+    if not actors.action_allowed(payload, action):
+        audit.emit("unknown", action, subject, outcome="denied-not-operator")
+        error = ("Not available for this role" if actors.is_agent(payload)
+                 else "Operator authorization required")
+        return None, _json_response(403, {"error": error})
+    return subject, None
 
 
 def _visibility(event, subject):

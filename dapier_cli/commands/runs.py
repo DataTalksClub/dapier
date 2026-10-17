@@ -5,6 +5,7 @@ from urllib.parse import quote
 from urllib.parse import urlencode
 
 from .. import api
+from .shared import owner_query
 
 __all__ = ["print_runs", "runs_cancel", "runs_export", "runs_list", "runs_replay",
            "runs_replay_failed", "runs_resolve", "runs_show"]
@@ -44,8 +45,10 @@ def print_runs(items):
 
 
 def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=None,
-              next_token=None, query=None, resolved=None, debug=False):
+              next_token=None, query=None, resolved=None, debug=False,
+              owner=None, as_id=None, assignee=None):
     params = {"limit": int(limit)}
+    params.update(owner_query(owner, as_id, assignee))
     if workflow:
         params["workflow_id"] = workflow
     # --resolved / --unresolved are the two halves of the failure set, which
@@ -74,7 +77,7 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
     clipped = bool(paging.get("bounded"))
     if not items:
         filtered = (workflow or status or since or before or next_token or query
-                    or resolved is not None)
+                    or resolved is not None or owner or as_id or assignee)
         print("No runs match these filters." if filtered else
               "No runs recorded yet. Runs appear once a workflow handles a trigger event.")
         if clipped:
@@ -92,11 +95,12 @@ def runs_list(api_url, limit=25, workflow=None, status=None, since=None, before=
 
 
 def runs_export(api_url, out=None, max_rows=None, workflow=None, status=None,
-                since=None, before=None, query=None, resolved=None, debug=False):
+                since=None, before=None, query=None, resolved=None, debug=False,
+                owner=None, as_id=None, assignee=None):
     """Run history as CSV (thin client over the agent export route): the
     list's filters, one bounded export, written to --out or the server's
     suggested filename."""
-    params = {}
+    params = owner_query(owner, as_id, assignee)
     if workflow:
         params["workflow_id"] = workflow
     if resolved is True:
