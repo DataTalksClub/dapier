@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { $, icons, notice, openWhenReady } from '../ui.js';
 import { api } from '../api.js';
 import { escapeHtml, statusLine, runStatusLine, resolvedLine, formatTimestamp, formatDuration, dataBlock, triggerEventLabel, sentenceCase } from '../format.js';
+import { withOwner } from '../view-as.js';
 import { workflowName, workflowLabelHtml } from '../workflow-names.js';
 
 const STEP_ICONS = {
@@ -158,6 +159,7 @@ async function fetchRunsPage({ append = false } = {}) {
   runsPage.date = date;
   runsPage.search = search;
   const params = new URLSearchParams({ limit: '25' });
+  withOwner(params);
   if (workflow) params.set('workflow_id', workflow);
   if (status) params.set('status', status);
   if (since) params.set('since', since);
@@ -276,6 +278,7 @@ $('#runs-search-filter').addEventListener('input', () => {
   clearTimeout(runsSearchTimer);
   runsSearchTimer = setTimeout(fetchRunsPage, 300);
 });
+window.addEventListener('dapier-view-as', () => fetchRunsPage());
 
 /* Export the filtered run history as CSV (the audit view's export button,
    over /api/admin/runs/export): the same server filters the list applies,
@@ -287,6 +290,7 @@ $('#runs-export').addEventListener('click', async (event) => {
     const { workflow, status, date, search } = selectedFilters();
     const since = sinceFor(date);
     const params = new URLSearchParams({ max_rows: '5000' });
+    withOwner(params);
     if (workflow) params.set('workflow_id', workflow);
     if (status) params.set('status', status);
     if (since) params.set('since', since);

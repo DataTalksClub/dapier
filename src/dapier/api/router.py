@@ -93,6 +93,7 @@ def _static(path):
         "/assets/js/views/activity.js": ("js/views/activity.js", "text/javascript; charset=utf-8"),
         "/assets/js/theme.js": ("js/theme.js", "text/javascript; charset=utf-8"),
         "/assets/js/account.js": ("js/account.js", "text/javascript; charset=utf-8"),
+        "/assets/js/view-as.js": ("js/view-as.js", "text/javascript; charset=utf-8"),
         "/assets/designer.js": ("designer.js", "text/javascript; charset=utf-8"),
         "/assets/designer.css": ("designer.css", "text/css; charset=utf-8"),
         "/assets/favicon.svg": ("favicon.svg", "image/svg+xml"),

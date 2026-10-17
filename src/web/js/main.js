@@ -11,6 +11,7 @@ import { openDesigner, designerFromLocation } from './views/designer.js';
 import { showOAuthResult, openEditConnection } from './views/connections.js';
 import { refreshAudit } from './views/audit.js';
 import { applyAccountIdentity, bindAccountChrome } from './account.js';
+import { bindViewAs } from './view-as.js';
 
 ['copy', 'cut', 'dragstart'].forEach((type) => document.addEventListener(type, (event) => {
   if (event.target instanceof Element && event.target.closest('.secret-input')) event.preventDefault();
@@ -267,6 +268,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   if (!me.operator) { showForbidden(); return; }
   applyAccountIdentity(me);
+  bindViewAs(me);
   const initialView = viewFromPath(window.location.pathname);
   await setView(initialView, false);
   if (initialView === 'designer') await designerFromLocation();

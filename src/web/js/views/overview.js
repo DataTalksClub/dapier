@@ -15,6 +15,7 @@ import { renderEmails, renderEmailFrom, renderReceivedEmail } from './emails.js'
 import { renderAgentTasks } from './agents.js';
 import { renderWorkers } from './workers.js';
 import { renderRuns, openRun } from './runs.js';
+import { viewAsIdentities } from '../view-as.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
 import { renderTriggers } from './triggers.js';
@@ -178,6 +179,10 @@ export function renderWorkflows() {
   whenMenusClosed($('.view[data-page="workflows"]'), paintWorkflows);
 }
 
+window.addEventListener('dapier-view-as', () => {
+  if (state.data) renderWorkflows();
+});
+
 function paintWorkflows() {
   const all = state.data?.workflows || [];
   const scheduled = all.filter(workflowIsScheduleOnly);
@@ -187,7 +192,11 @@ function paintWorkflows() {
   // (state.workflowSearchIds); while that call is in flight or has failed,
   // the loaded payload filters client-side.
   const serverIds = query ? state.workflowSearchIds : null;
-  const shown = listed.filter((workflow) => workflowMatchesSearch(workflow, query, serverIds));
+  const identities = viewAsIdentities();
+  const shown = listed.filter((workflow) => {
+    if (identities && !identities.has(String(workflow.owner || '').toLowerCase())) return false;
+    return workflowMatchesSearch(workflow, query, serverIds);
+  });
   $('#workflow-count').textContent = `${shown.length} of ${listed.length} shown`
     + (scheduled.length ? ` · ${scheduled.length} scheduled live under Schedules` : '');
   const runs = state.data?.runs || [];

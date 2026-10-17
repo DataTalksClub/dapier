@@ -10,6 +10,7 @@ import { renderMarkdown } from '../md.js';
 import { state } from '../state.js';
 import { workflowName } from '../workflow-names.js';
 import { ago } from './activity.js';
+import { withOwner } from '../view-as.js';
 
 const ACTIVE = new Set(['queued', 'running', 'claimed', 'starting', 'started']);
 const FAILED = new Set(['failed', 'timed_out', 'interrupted']);
@@ -176,7 +177,8 @@ async function renderWorkerNote(tasks, seq) {
 export async function renderAgentTasks({ quiet = false } = {}) {
   const seq = ++listSeq;
   try {
-    const data = await api('/api/admin/agent-tasks?limit=200');
+    const params = withOwner(new URLSearchParams({ limit: '200' }));
+    const data = await api(`/api/admin/agent-tasks?${params}`);
     if (seq !== listSeq) return;
     tasks = data.tasks || []; fetched = true; renderList();
     renderWorkerNote(tasks, seq);
@@ -196,6 +198,7 @@ export async function renderAgentTasks({ quiet = false } = {}) {
   }
 }
 $('#agent-runs-search').addEventListener('input', event => { search = event.target.value.trim().toLowerCase(); renderList(); });
+window.addEventListener('dapier-view-as', () => { void renderAgentTasks(); });
 /* Back (phones): the list returns where it was, focus on the row it came
    from. The selection leaves the URL, so a reload lands on the list too. */
 function closeTask() {

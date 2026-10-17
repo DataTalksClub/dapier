@@ -1950,6 +1950,43 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
   .setup-table:has(.credential-test[data-provider="openrouter"]) .col-action { width: 14rem; }
 }
 .credential-test-result { white-space: normal; overflow-wrap: anywhere; }
+
+/* View as: a full operator narrows lists to one agent. Read-only, so the
+   write controls on those lists stay out of the way. */
+.view-as {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dk-space-2);
+  color: var(--dk-text-muted);
+  font-size: var(--dk-text-sm);
+}
+.view-as select {
+  font: inherit;
+  color: var(--dk-text-primary);
+  background: var(--dk-bg-page);
+  border: 1px solid var(--dk-border-default);
+  border-radius: var(--dk-radius-md);
+  padding: var(--dk-space-1) var(--dk-space-2);
+}
+body[data-view-as] .run-replay,
+body[data-view-as] .run-cancel,
+body[data-view-as] .run-resolve,
+body[data-view-as] .run-replay-from-step,
+body[data-view-as] #runs-replay-failed,
+body[data-view-as] .workflow-toggle,
+body[data-view-as] .workflow-resume,
+body[data-view-as] .workflow-tags,
+body[data-view-as] .workflow-folder,
+body[data-view-as] .workflow-duplicate,
+body[data-view-as] .workflow-delete,
+body[data-view-as] #import-yaml,
+body[data-view-as] #workflow-bulk-bar,
+body[data-view-as] #new-workflow,
+body[data-view-as] #home-new-workflow,
+body[data-view-as] [data-new-workflow] { display: none !important; }
+body[data-role="agent"] [data-view="tokens"],
+body[data-role="agent"] [data-view="costs"],
+body[data-role="agent"] [data-view="audit"] { display: none; }
 @media (max-width: 560px) {
   .setup-table tr:has(.credential-test-result:not([hidden])) .cell-title { grid-column: 1 / -1; }
   .setup-table tr:has(.credential-test-result:not([hidden])) .action-cell { grid-column: 1 / -1; grid-row: 2; }

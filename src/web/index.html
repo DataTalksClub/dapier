@@ -93,6 +93,11 @@
           <p id="view-description" class="dk-page-header__subtitle"></p>
         </div>
         <div class="dk-page-header__actions page-header-actions">
+          <label id="view-as-label" class="view-as" hidden>
+            <span class="view-as__label">View as</span>
+            <select id="view-as" aria-label="View as" aria-describedby="view-as-note"></select>
+            <span id="view-as-note" class="visually-hidden">Read-only. Shows that person's workflows, runs, and agent tasks. Your account still performs any write, and those controls are hidden.</span>
+          </label>
           <span id="last-updated" class="dk-page-header__meta"></span>
           <button id="refresh" class="dk-button dk-button--secondary dk-button--sm" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 3 12 a9 9 0 0 1 9 -9 9.75 9.75 0 0 1 6.74 2.75 L 21 8'/><path d='M 21 3 v 5 h -5'/><path d='M 21 12 a9 9 0 0 1 -9 9 9.75 9.75 0 0 1 -6.74 -2.75 L 3 16'/><path d='M 8 16 H 3 v 5'/></svg><span>Refresh</span></button>
         </div>
