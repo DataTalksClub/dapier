@@ -1,4 +1,4 @@
-# Built-in per-bot mailboxes + webhooks (dev / tofu)
+# Built-in per-bot mailboxes + webhooks (dev / tofu / orin)
 
 Alexey (t526u–t527u): create addresses and connect webhooks through **dapier
 built-ins**, not terraform SES / shared aws-infra.

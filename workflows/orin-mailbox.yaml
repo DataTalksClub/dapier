@@ -1,0 +1,38 @@
+id: orin-mailbox
+enabled: true
+description: Built-in mailbox orin@dtcdev.click + webhook /hooks/webhook/orin -> Hub orin via worker
+triggers:
+  - connector: email
+    event: message.received
+    filters:
+      route:
+        equals: orin
+  - connector: webhook
+    event: request.received
+    filters:
+      hook:
+        equals: orin
+actions:
+  - id: notify-hub
+    type: agent
+    engine: claude
+    notify_from: agents@dtcdev.click
+    prompt: |
+      File ONE Hub intake task for project orin using hub CLI on this machine.
+
+      Write a text file then create:
+        hub intake create --project orin --title "TITLE" --text-file /tmp/dapier-orin-intake.txt --source-type forwarded --source-reference "dapier:orin" --key "KEY"
+
+      TITLE: "orin@ / webhook: {subject}{body.subject}"
+      KEY: prefer non-empty of {message_id}{body.message_id}; else "orin-{hook}-{trigger.event_id}"
+
+      Put this in the text file:
+      Subject: {subject}{body.subject}
+      From: {from}{body.from}
+      Message-ID: {message_id}{body.message_id}
+      Hook: {hook}
+      Route: {route}
+      Text: {text}{body.text}
+      Email body: {body.text.value}
+
+      Do not ask questions. Report the Hub task id and stop.
