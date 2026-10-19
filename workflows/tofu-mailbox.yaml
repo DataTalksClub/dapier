@@ -1,29 +1,38 @@
-# Per-bot mailbox: mail to tofu@dtcdev.click -> Hub intake for tofu bot.
-# Requires SES route "tofu" (aws-infra main/email-intake) and Hub token secret.
 id: tofu-mailbox
 enabled: true
-description: Route tofu@dtcdev.click into Hub intake for the tofu bot
+description: Built-in mailbox tofu@dtcdev.click + webhook /hooks/webhook/tofu -> Hub tofu via worker
 triggers:
   - connector: email
     event: message.received
     filters:
       route:
         equals: tofu
+  - connector: webhook
+    event: request.received
+    filters:
+      hook:
+        equals: tofu
 actions:
-  - id: notify-tofu
-    type: hub_intake
-    title: "tofu@ mail: {subject}"
-    text: |
-      Per-bot mailbox tofu@dtcdev.click
+  - id: notify-hub
+    type: agent
+    engine: claude
+    notify_from: agents@dtcdev.click
+    prompt: |
+      File ONE Hub intake task for project tofu using hub CLI on this machine.
 
-      From: {from}
-      Subject: {subject}
+      Write a text file then create:
+        hub intake create --project tofu --title "TITLE" --text-file /tmp/dapier-tofu-intake.txt --source-type forwarded --source-reference "dapier:tofu" --key "KEY"
+
+      TITLE: "tofu@ / webhook: {subject}{body.subject}"
+      KEY: prefer non-empty of {message_id}{body.message_id}; else "tofu-{hook}-{trigger.event_id}"
+
+      Put this in the text file:
+      Subject: {subject}{body.subject}
+      From: {from}{body.from}
+      Message-ID: {message_id}{body.message_id}
+      Hook: {hook}
       Route: {route}
-      Message-ID: {message_id}
+      Text: {text}{body.text}
+      Email body: {body.text.value}
 
-      {body.text.value}
-    project: tofu
-    key: "tofu-mail-{message_id}"
-    source_type: forwarded
-    source_reference: "email:{message_id}"
-    wake: true
+      Do not ask questions. Report the Hub task id and stop.

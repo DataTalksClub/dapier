@@ -1,29 +1,38 @@
-# Per-bot mailbox: mail to dev@dtcdev.click -> Hub intake for Developer.
-# Requires SES route "dev" (aws-infra main/email-intake) and Hub token secret.
 id: dev-mailbox
 enabled: true
-description: Route dev@dtcdev.click into Hub intake and wake Developer
+description: Built-in mailbox dev@dtcdev.click + webhook /hooks/webhook/dev -> Hub dapier via worker
 triggers:
   - connector: email
     event: message.received
     filters:
       route:
         equals: dev
+  - connector: webhook
+    event: request.received
+    filters:
+      hook:
+        equals: dev
 actions:
-  - id: notify-developer
-    type: hub_intake
-    title: "dev@ mail: {subject}"
-    text: |
-      Per-bot mailbox dev@dtcdev.click
+  - id: notify-hub
+    type: agent
+    engine: claude
+    notify_from: agents@dtcdev.click
+    prompt: |
+      File ONE Hub intake task for project dapier using hub CLI on this machine.
 
-      From: {from}
-      Subject: {subject}
+      Write a text file then create:
+        hub intake create --project dapier --title "TITLE" --text-file /tmp/dapier-dev-intake.txt --source-type forwarded --source-reference "dapier:dev" --key "KEY"
+
+      TITLE: "dev@ / webhook: {subject}{body.subject}"
+      KEY: prefer non-empty of {message_id}{body.message_id}; else "dev-{hook}-{trigger.event_id}"
+
+      Put this in the text file:
+      Subject: {subject}{body.subject}
+      From: {from}{body.from}
+      Message-ID: {message_id}{body.message_id}
+      Hook: {hook}
       Route: {route}
-      Message-ID: {message_id}
+      Text: {text}{body.text}
+      Email body: {body.text.value}
 
-      {body.text.value}
-    project: dapier
-    key: "dev-mail-{message_id}"
-    source_type: forwarded
-    source_reference: "email:{message_id}"
-    wake: true
+      Do not ask questions. Report the Hub task id and stop.

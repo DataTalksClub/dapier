@@ -71,3 +71,6 @@ SES recipient map lives in `aws-infra` / `aws-infra-opmcp` `main/email-intake` `
 2. `python -c` HMAC of `{"title":"ping","text":"hi","wake":false}` and POST to `/hooks/developer`.
 3. Confirm Hub task appears: `hub intake list --project dapier`.
 4. After SES routes apply: mail `dev@dtcdev.click` / `tofu@dtcdev.click` and confirm Hub tasks.
+
+
+See also [builtin-mailboxes-webhooks.md](builtin-mailboxes-webhooks.md) for the t526/t527 built-in path (preferred over custom /hooks/developer + terraform SES).
