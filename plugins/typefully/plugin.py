@@ -198,5 +198,14 @@ def social_set_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
         provider="typefully", credential_fallback="typefully")
 
 
+def draft_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
+    if connection_id == "typefully":
+        connection_id = None
+    return options_from_registry("typefully.drafts", connection_id, limit,
+        provider="typefully", credential_fallback="typefully")
+
+
 register_trigger_discovery(TriggerDiscovery(connector="typefully", label="Typefully",
     kind="options", resource="typefully.social_sets", fetch=social_set_options))
+register_trigger_discovery(TriggerDiscovery(connector="typefully", label="Typefully",
+    kind="options", resource="typefully.drafts", fetch=draft_options))
