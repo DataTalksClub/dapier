@@ -101,8 +101,8 @@ def test_attachment_branch_builds_and_archives_one_document():
     assert make_document["type"] == "merge_pdfs"
     assert make_document["plan_step"] == "triage"
     # DataOps runs before the archive so its invoice preview can name the
-    # file. The archive requires the company preview; it must never silently
-    # fall back to an email subject that looks like a successful filing.
+    # file; the archive takes the builder's filename, falling back to the
+    # subject/checksum form when the intake returns no preview.
     assert intake["document_step"] == "route.then.make-document"
     assert intake["connection_id"] == "dataops"
     assert "steps.route.then.build-filename" in archive["filename"]
@@ -163,3 +163,24 @@ def test_missing_body_never_turns_into_a_blank_pdf():
     for body in ({}, {"html": None, "text": {"value": "  "}}):
         with pytest.raises(RuntimeError, match="refusing a blank PDF"):
             run_code(strip_forwarded, {"data": {"body": body}})
+
+
+def test_missing_company_falls_back_to_subject_without_crashing():
+    from src.dapier.engine.actions.code import run_code
+
+    build_filename = find_action(shipped_workflow(), "build-filename")
+    event = {"data": {}}
+    steps = {
+        "route.then.email-date": {"output": {"formatted": "2026-10-19"}},
+        "route.then.clean-subject": {"output": {"result": {"subject": "Invoice F-0007-2026"}}},
+        "triage": {"output": {"result": {"document_key": "f763650d2764"}}},
+        "route.then.file-to-dataops": {
+            "output": {
+                "status": "accepted",
+                "invoices": [{"invoiceNumber": "F-0007-2026"}],
+            }
+        },
+    }
+    result = run_code(build_filename, event, steps=steps)
+    assert result["result"]["filename"] == "2026-10-19-Invoice F-0007-2026-F-0007-2026-f763650d2764.pdf"
+

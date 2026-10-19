@@ -291,9 +291,7 @@ actions:
       tx_date = str(preview.get("transactionDate") or preview.get("transaction_date") or "").strip()
       use_date = tx_date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", tx_date) \
           else (str(date or "").strip() or "undated")
-      vendor = _slug(preview.get("counterparty"))
-      if not vendor:
-          raise ValueError("DataOps has no extracted company; refusing an email-subject archive name")
+      vendor = _slug(preview.get("counterparty")) or _slug(subject) or "Invoice"
       inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
       key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
       parts = [use_date, vendor]
@@ -303,7 +301,7 @@ actions:
           parts.append(key)
       output = {"filename": "-".join(parts) + ".pdf"}
     tests:
-    - name: a missing company stops archival
+    - name: no DataOps preview falls back to subject and checksum
       steps:
         route.then.email-date:
           output:
@@ -319,7 +317,29 @@ actions:
         route.then.file-to-dataops:
           output:
             status: accepted
-      expected_error: no extracted company
+      expected:
+        filename: 2026-10-04-Acme-abcdef123456.pdf
+    - name: a preview without company falls back to subject
+      steps:
+        route.then.email-date:
+          output:
+            formatted: '2026-10-19'
+        route.then.clean-subject:
+          output:
+            result:
+              subject: Invoice F-0007-2026
+        triage:
+          output:
+            result:
+              document_key: f763650d2764
+        route.then.file-to-dataops:
+          output:
+            status: accepted
+            invoices:
+            - extractionMethod: deterministic-text
+              invoiceNumber: F-0007-2026
+      expected:
+        filename: 2026-10-19-Invoice F-0007-2026-F-0007-2026-f763650d2764.pdf
     - name: a DataOps preview names vendor, invoice date and number
       steps:
         route.then.email-date:
