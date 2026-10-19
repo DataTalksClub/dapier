@@ -25,3 +25,4 @@ from .storage import *
 from .oauth_clients import *
 from .emails import *
 from .tasks import *
+from .typefully import *

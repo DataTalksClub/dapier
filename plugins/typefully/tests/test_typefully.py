@@ -61,3 +61,35 @@ def test_health_never_echoes_transport_secrets(monkeypatch):
 def test_discovery_and_console_share_registered_provider():
     from src.dapier.api.discovery import _pseudo_connection
     assert _pseudo_connection("typefully")["provider"] == "typefully"
+
+
+def test_list_drafts_maps_items_and_defaults_social_set(monkeypatch):
+    seen = []
+    def request(path, connection, **kwargs):
+        seen.append(path)
+        return {"results": [{"id": 9, "preview": "Hello", "status": "draft"}], "next": None}
+    monkeypatch.setattr(plugin, "request", request)
+    items = plugin.list_drafts({}, {})
+    assert items[0]["id"] == "9" and items[0]["name"] == "Hello"
+    assert "/social-sets/182343/drafts?" in seen[0]
+
+
+def test_create_unscheduled_rejects_publish(monkeypatch):
+    monkeypatch.setattr(plugin, "request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    try:
+        plugin.create_unscheduled_draft({}, {"body": {"platforms": {"x": {"enabled": True, "posts": [{"text": "hi"}]}}, "publish_at": "now"}})
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "publish_at" in str(exc)
+
+
+def test_create_unscheduled_posts(monkeypatch):
+    calls = []
+    def request(path, connection, **kwargs):
+        calls.append((path, kwargs))
+        return {"id": 1, "status": "draft"}
+    monkeypatch.setattr(plugin, "request", request)
+    body = {"platforms": {"x": {"enabled": True, "posts": [{"text": "hi"}]}}}
+    assert plugin.create_unscheduled_draft({}, {"body": body})["id"] == 1
+    assert calls[0][0] == "/social-sets/182343/drafts"
+    assert calls[0][1]["method"] == "POST"

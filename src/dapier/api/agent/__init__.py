@@ -9,7 +9,7 @@ shared request plumbing late-binds through it too (see common._LateBinding).
 import re
 from urllib.parse import unquote
 
-from . import access, common, connections, designer, device, ops, triggers
+from . import access, common, connections, designer, device, ops, triggers, typefully
 
 # A workflow ref: the managed file name, or a bare id — hook-backed
 # workflows (webhook/telegram/... triggers) have no file and are addressed
@@ -73,6 +73,9 @@ def route(event, method, path):
 
 
 def _route(event, method, path):
+    typed = typefully.route_typefully(event, method, path)
+    if typed is not None:
+        return typed
     if method == "GET" and path == "/api/agent/config":
         return public_config()
     if method == "POST" and path == "/api/agent/device/start":
