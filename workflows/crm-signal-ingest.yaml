@@ -1,0 +1,28 @@
+id: crm-signal-ingest
+enabled: true
+description: Company signal ingest (Sources A+B+C) into CRM org notes (2x/day Europe/Berlin)
+trigger:
+  connector: schedule
+  event: schedule.triggered
+  filters:
+    schedule:
+      equals: crm-signal-ingest
+actions:
+  - id: run-signal-ingest
+    type: agent
+    engine: claude
+    notify_from: agents@dtcdev.click
+    prompt: |
+      Run the company signal CRM ingest job on this machine:
+
+      python3 -m dapier.crm_signals.cli ingest --config config/crm-signal-feeds.yaml
+
+      This job:
+      1. Pulls curated RSS feeds and processes funding/sponsor signals.
+      2. Evaluates ICP allow/deny lists (data/ML/AI education buyers).
+      3. Normalizes domains and deduplicates via source-key.
+      4. Clear company -> match or create org in DataOps CRM + write P1 signal note (with sourceKey).
+      5. Unclear company -> append to unmatched hold file (TTL 14d) and file Hub intake task for project orin.
+      6. Prints batch summary (counts: created, deduped, unmatched, filtered).
+
+      Report the batch summary and stop.

@@ -1,0 +1,6 @@
+{
+  "name": "crm-signal-ingest",
+  "expression": "cron(0 8,16 ? * * * Europe/Berlin)",
+  "description": "2x/day company signal ingest into CRM org notes (08:00 and 16:00 Berlin)",
+  "enabled": true
+}
