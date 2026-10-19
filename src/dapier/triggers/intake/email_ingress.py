@@ -44,12 +44,21 @@ def parse_message(raw):
     return BytesParser(policy=policy.default).parsebytes(raw)
 
 
+def _route_label(route):
+    name = str(route or "").strip().lower()
+    if "@" in name:
+        name = name.split("@", 1)[0].strip()
+    return name
+
+
 def data_from_message(message, pointer, limit=BODY_LIMIT):
     """The event data dict for a parsed message and its s3 pointer — the
     shape the intake envelope and the replay paths both carry."""
+    to = message.get("To", "")
     return {
         "from": message.get("From"),
-        "to": message.get("To", ""),
+        "to": to,
+        "route": _route_label(to),
         "subject": message.get("Subject"),
         "message_id": message.get("Message-ID"),
         "text": _body(message, "plain", limit=limit),
@@ -176,11 +185,12 @@ def handler(event, _context):
                                MessageBody=json.dumps(envelope))
             continue
         pointer = {"bucket": bucket, "key": key}
+        to = message.get("To", "")
         envelope = {
             "id": f"email:{message.get('Message-ID', key)}",
             "connector": "email",
             "event": "message.received",
-            "source": message.get("To", ""),
+            "source": _route_label(to),
             "occurred_at": message.get("Date"),
             "data": data_from_message(message, pointer),
         }

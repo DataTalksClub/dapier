@@ -45,10 +45,11 @@ def test_publishes_headers_decoded_body_and_the_s3_pointer(monkeypatch):
                                           Key="raw/m-4137")
     assert envelope["id"] == "email:<m-4137@example.test>"
     assert envelope["connector"] == "email"
-    assert envelope["event"] == "message.received"
+    assert envelope["source"] == "todo"
     data = envelope["data"]
     assert data["from"] == "Acme Billing <billing@example.test>"
     assert data["to"] == "todo@dtcdev.click"
+    assert data["route"] == "todo"
     assert data["subject"] == "Invoice #4137 - September"
     assert data["message_id"] == "<m-4137@example.test>"
     assert data["text"] == "Invoice #4137 for September is attached.\n"
@@ -159,6 +160,55 @@ def test_stager_keys_live_under_the_intake_skip_prefix(monkeypatch):
         + "replay-4b689feb/attachments/")
     assert staged[0]["s3"]["key"].endswith("-Rechnung_1.pdf")
 
+
+
+def test_inbound_email_dev_and_tofu_match_bot_mailbox_triggers(monkeypatch):
+    from src.dapier.engine import matching
+
+    dev_msg = EmailMessage()
+    dev_msg["From"] = "alexey@datatalks.club"
+    dev_msg["To"] = "dev@dtcdev.click"
+    dev_msg["Subject"] = "dev mailbox test"
+    dev_msg["Message-ID"] = "<dev-msg-1@example.com>"
+    dev_msg.set_content("ping dev")
+
+    envelope, _ = _deliver(monkeypatch, dev_msg.as_bytes(), key="raw/dev-1")
+    assert envelope["source"] == "dev"
+    assert envelope["data"]["route"] == "dev"
+    assert envelope["data"]["to"] == "dev@dtcdev.click"
+
+    dev_workflow = {
+        "id": "dev-mailbox",
+        "enabled": True,
+        "triggers": [{
+            "connector": "email",
+            "event": "message.received",
+            "filters": {"route": {"equals": "dev"}},
+        }],
+    }
+    assert matching.matches(dev_workflow, envelope) is True
+
+    tofu_msg = EmailMessage()
+    tofu_msg["From"] = "alexey@datatalks.club"
+    tofu_msg["To"] = "tofu@dtcdev.click"
+    tofu_msg["Subject"] = "tofu mailbox test"
+    tofu_msg["Message-ID"] = "<tofu-msg-1@example.com>"
+    tofu_msg.set_content("ping tofu")
+
+    tofu_env, _ = _deliver(monkeypatch, tofu_msg.as_bytes(), key="raw/tofu-1")
+    assert tofu_env["source"] == "tofu"
+    assert tofu_env["data"]["route"] == "tofu"
+
+    tofu_workflow = {
+        "id": "tofu-mailbox",
+        "enabled": True,
+        "triggers": [{
+            "connector": "email",
+            "event": "message.received",
+            "filters": {"route": {"equals": "tofu"}},
+        }],
+    }
+    assert matching.matches(tofu_workflow, tofu_env) is True
 
 
 if __name__ == "__main__":
