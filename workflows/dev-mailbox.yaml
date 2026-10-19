@@ -1,0 +1,29 @@
+# Per-bot mailbox: mail to dev@dtcdev.click -> Hub intake for Developer.
+# Requires SES route "dev" (aws-infra main/email-intake) and Hub token secret.
+id: dev-mailbox
+enabled: true
+description: Route dev@dtcdev.click into Hub intake and wake Developer
+triggers:
+  - connector: email
+    event: message.received
+    filters:
+      route:
+        equals: dev
+actions:
+  - id: notify-developer
+    type: hub_intake
+    title: "dev@ mail: {subject}"
+    text: |
+      Per-bot mailbox dev@dtcdev.click
+
+      From: {from}
+      Subject: {subject}
+      Route: {route}
+      Message-ID: {message_id}
+
+      {body.text.value}
+    project: dapier
+    key: "dev-mail-{message_id}"
+    source_type: forwarded
+    source_reference: "email:{message_id}"
+    wake: true

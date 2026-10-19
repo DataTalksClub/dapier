@@ -787,6 +787,13 @@ def handler(event, _context):
         if prefix == "/hooks/telegram/":
             return _telegram_hook(event, name, body)
         return _webhook_hook(event, name, body, query)
+    elif path == "/hooks/developer":
+        from ..triggers.intake import developer_webhook
+
+        if len(body) > MAX_HOOK_BODY_BYTES:
+            return _response(413, {"error": "body too large"})
+        status, payload = developer_webhook.handle(event.get("headers"), body)
+        return _response(status, payload)
     elif path.startswith("/hooks/custom/"):
         source = (event.get("pathParameters") or {}).get("source", "custom")
         _publish("custom", "received", json.loads(body or b"{}"), source=source)

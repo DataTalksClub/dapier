@@ -12,6 +12,19 @@ Parameters:
   DomainName:
     Type: String
     Default: dapier.dtcdev.click
+  DeveloperWebhookSecret:
+    Type: String
+    Default: ""
+    Description: Optional Secrets Manager name/ARN for /hooks/developer shared secret (empty disables)
+  HubIntakeTokenSecret:
+    Type: String
+    Default: ""
+    Description: Optional Secrets Manager name/ARN for Hub intake Bearer token (empty disables Hub notify)
+  HubIntakeUrl:
+    Type: String
+    Default: https://hub.dtcdev.click/api/intake/tasks
+    Description: Hub intake create URL used by /hooks/developer and hub_intake action
+
   DomainCertificateArn:
     Type: String
   HostedZoneId:
@@ -268,6 +281,8 @@ Resources:
                   - !Ref YouTubeWebhookSecret
                   - !Ref DapierAdminSecret
                   - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*'
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/hub-intake-*'
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/developer-webhook-*'
         - !If
           - HasGithubWorkflowsToken
           - PolicyName: dapier-api-github-token-read
@@ -450,6 +465,11 @@ Resources:
           # (triggers.intake.ses_notifications); empty accepts any topic.
           SES_NOTIFICATION_TOPICS: !Ref SesNotificationTopics
           ADMIN_SECRET_ID: !Ref DapierAdminSecret
+          # Optional Developer notify hook (/hooks/developer) + Hub intake.
+          # Secrets created out-of-band; empty IDs leave the hook 503.
+          DEVELOPER_WEBHOOK_SECRET_ID: !Ref DeveloperWebhookSecret
+          HUB_INTAKE_TOKEN_SECRET_ID: !Ref HubIntakeTokenSecret
+          HUB_INTAKE_URL: !Ref HubIntakeUrl
           DAPIER_EMAIL_SENDER: !Ref EmailSender
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
           WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
@@ -616,6 +636,12 @@ Resources:
             ApiId: !Ref Api
             Path: '/hooks/telegram/{proxy+}'
             Method: POST
+        DeveloperHook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /hooks/developer
+            Method: POST
 
   # Standalone (not inline) because the grant exists only when the token
   # secret is configured; AWS::NoValue inside the function's Policies list
@@ -698,7 +724,6 @@ Resources:
       GenerateSecretString:
         PasswordLength: 48
         ExcludePunctuation: true
-
   DapierAdminSecret:
     Type: AWS::SecretsManager::Secret
     DeletionPolicy: Retain
@@ -726,6 +751,9 @@ Resources:
       Environment:
         Variables:
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
+          DEVELOPER_WEBHOOK_SECRET_ID: !Ref DeveloperWebhookSecret
+          HUB_INTAKE_TOKEN_SECRET_ID: !Ref HubIntakeTokenSecret
+          HUB_INTAKE_URL: !Ref HubIntakeUrl
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
           # Configuration set attached to every workflow send

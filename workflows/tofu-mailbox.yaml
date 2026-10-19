@@ -1,0 +1,29 @@
+# Per-bot mailbox: mail to tofu@dtcdev.click -> Hub intake for tofu bot.
+# Requires SES route "tofu" (aws-infra main/email-intake) and Hub token secret.
+id: tofu-mailbox
+enabled: true
+description: Route tofu@dtcdev.click into Hub intake for the tofu bot
+triggers:
+  - connector: email
+    event: message.received
+    filters:
+      route:
+        equals: tofu
+actions:
+  - id: notify-tofu
+    type: hub_intake
+    title: "tofu@ mail: {subject}"
+    text: |
+      Per-bot mailbox tofu@dtcdev.click
+
+      From: {from}
+      Subject: {subject}
+      Route: {route}
+      Message-ID: {message_id}
+
+      {body.text.value}
+    project: tofu
+    key: "tofu-mail-{message_id}"
+    source_type: forwarded
+    source_reference: "email:{message_id}"
+    wake: true
