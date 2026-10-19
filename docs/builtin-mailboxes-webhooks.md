@@ -43,6 +43,7 @@ trigger:
 | --- | --- | --- | --- |
 | `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | `dapier` |
 | `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | `tofu` |
+| `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | `orin` |
 
 Notify path: workflow `agent` step on the Hetzner dapier worker runs
 `hub intake create` (direct Lambda → Hub HTTP is blocked by Cloudflare 403).
