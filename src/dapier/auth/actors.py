@@ -34,6 +34,9 @@ AGENT_ACTIONS = frozenset({
     "triggers.sample",
     "connections.list", "connections.discover",
     "catalog",
+    # Typefully agent proxy (write-only credential stays server-side).
+    "typefully.social_sets", "typefully.drafts", "typefully.draft",
+    "typefully.queue", "typefully.create_draft",
 })
 
 # The directory is the user record. Email is the stable key until the

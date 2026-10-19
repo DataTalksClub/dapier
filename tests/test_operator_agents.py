@@ -28,6 +28,7 @@ def test_orin_is_an_agent_and_not_a_full_operator():
     assert actors.action_allowed(payload, "runs")
     assert actors.action_allowed(payload, "agent-tasks")
     assert actors.action_allowed(payload, "workflow.publish")
+    assert actors.action_allowed(payload, "typefully.social_sets")
     assert not actors.action_allowed(payload, "credential")
     assert not actors.action_allowed(payload, "quota.set")
     assert actors.console_allowed("GET", "/api/admin/runs")
