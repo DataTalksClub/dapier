@@ -51,7 +51,7 @@ Then `hub intake assign <id> …` to queue a Developer session.
 | --- | --- |
 | Explicit POST to `/hooks/developer` | Hub intake (+ assign when `wake`) |
 | Workflow action `hub_intake` | Same Hub path from any workflow |
-| `dev@dtcdev.click` | SES route `dev` → dapier email event → `dev-mailbox` workflow → Hub |
+| `dev@dtcdev.click` | SES route `dev` → dapier email event → `dev-mailbox` workflow → Developer bot webhook |
 | `tofu@dtcdev.click` | SES route `tofu` → dapier email event → `tofu-mailbox` workflow → Hub |
 
 Existing shared routes (`newsletter@`, `invoice@`, `todo@`, `agents@`) are unchanged.
@@ -60,7 +60,7 @@ Existing shared routes (`newsletter@`, `invoice@`, `todo@`, `agents@`) are uncha
 
 | Address | SES route label | Hub project (workflow) | Lands how |
 | --- | --- | --- | --- |
-| `dev@dtcdev.click` | `dev` | `dapier` | MX → SES main → S3 → processor → SNS → dapier EventQueue → `dev-mailbox` → Hub intake |
+| `dev@dtcdev.click` | `dev` | Developer bot webhook | MX → SES main → S3 → processor → SNS → dapier EventQueue → `dev-mailbox` → Developer bot webhook |
 | `tofu@dtcdev.click` | `tofu` | `tofu` | same chain → `tofu-mailbox` → Hub intake |
 
 SES recipient map lives in `aws-infra` / `aws-infra-opmcp` `main/email-intake` `locals.routes`. Add the two addresses there and apply (does not change MX). Publish the workflows with `dapier workflows save` / `publish` after deploy.

@@ -1,6 +1,6 @@
 id: dev-mailbox
 enabled: true
-description: Built-in mailbox dev@dtcdev.click + webhook /hooks/webhook/dev -> Hub dapier via worker
+description: Developer mailbox dev@dtcdev.click -> Developer bot webhook
 triggers:
   - connector: email
     event: message.received
@@ -13,26 +13,80 @@ triggers:
       hook:
         equals: dev
 actions:
-  - id: notify-hub
-    type: agent
-    engine: claude
-    notify_from: agents@dtcdev.click
-    prompt: |
-      File ONE Hub intake task for project dapier using hub CLI on this machine.
+  - id: get-url
+    type: storage_get
+    key: webhook_url
+  - id: get-token
+    type: storage_get
+    key: webhook_token
+  - id: format-email
+    type: code
+    code: |
+      sender = input.get("sender") or {}
+      from_addr = input.get("from") or (sender.get("header") if isinstance(sender, dict) else str(sender))
 
-      Write a text file then create:
-        hub intake create --project dapier --title "TITLE" --text-file /tmp/dapier-dev-intake.txt --source-type forwarded --source-reference "dapier:dev" --key "KEY"
+      recipients = input.get("recipients") or {}
+      to_addr = input.get("to") or (recipients.get("to") if isinstance(recipients, dict) else "")
+      if not to_addr and isinstance(recipients, dict) and recipients.get("addresses"):
+          to_addr = recipients["addresses"][0]
+      if not to_addr:
+          to_addr = input.get("route_address") or "dev@dtcdev.click"
 
-      TITLE: "dev@ / webhook: {subject}{body.subject}"
-      KEY: prefer non-empty of {message_id}{body.message_id}; else "dev-{hook}-{trigger.event_id}"
+      hook_body = input.get("body") if isinstance(input.get("body"), dict) else {}
+      if not from_addr and hook_body.get("from"):
+          from_addr = hook_body.get("from")
+      if not to_addr and hook_body.get("to"):
+          to_addr = hook_body.get("to")
 
-      Put this in the text file:
-      Subject: {subject}{body.subject}
-      From: {from}{body.from}
-      Message-ID: {message_id}{body.message_id}
-      Hook: {hook}
-      Route: {route}
-      Text: {text}{body.text}
-      Email body: {body.text.value}
+      subject = input.get("subject") or hook_body.get("subject") or ""
+      date = input.get("date") or hook_body.get("date") or ""
+      message_id = input.get("message_id") or hook_body.get("message_id") or ""
 
-      Do not ask questions. Report the Hub task id and stop.
+      body = input.get("body") or {}
+      text = ""
+      if isinstance(body, dict):
+          t = body.get("text")
+          if isinstance(t, dict):
+              text = t.get("value") or t.get("text") or ""
+          elif isinstance(t, str):
+              text = t
+      if not text and isinstance(input.get("text"), str):
+          text = input.get("text")
+      elif not text and isinstance(input.get("text"), dict):
+          text = input.get("text").get("value") or input.get("text").get("text") or ""
+      if not text and hook_body.get("text"):
+          text = str(hook_body.get("text"))
+
+      attachments = []
+      for att in (input.get("attachments") or hook_body.get("attachments") or []):
+          if isinstance(att, dict):
+              meta = {
+                  "filename": att.get("filename") or "attachment",
+                  "content_type": att.get("content_type") or "application/octet-stream",
+                  "size": att.get("size") or 0,
+              }
+              if att.get("checksum"):
+                  meta["checksum"] = att["checksum"]
+              if att.get("content_id"):
+                  meta["content_id"] = att["content_id"]
+              attachments.append(meta)
+
+      output = {
+          "from": from_addr,
+          "to": to_addr,
+          "subject": subject,
+          "date": date,
+          "message_id": message_id,
+          "message-id": message_id,
+          "text": text,
+          "text_body": text,
+          "attachments": attachments,
+      }
+  - id: post-webhook
+    type: http_request
+    method: POST
+    url: "{steps.get-url.output.value}"
+    auth_type: bearer
+    auth_token: "{steps.get-token.output.value}"
+    content_type: application/json
+    body: "{steps.format-email.output.result}"
