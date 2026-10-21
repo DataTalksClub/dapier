@@ -9,7 +9,7 @@ shared request plumbing late-binds through it too (see common._LateBinding).
 import re
 from urllib.parse import unquote
 
-from . import access, common, connections, designer, device, ops, triggers, typefully
+from . import access, common, connections, designer, device, ops, triggers, typefully, slack
 
 # A workflow ref: the managed file name, or a bare id — hook-backed
 # workflows (webhook/telegram/... triggers) have no file and are addressed
@@ -311,4 +311,7 @@ def _route(event, method, path):
         return storage_write_api(event, unquote(storage_match.group(1)))
     if storage_match and method == "DELETE":
         return storage_delete_api(event, unquote(storage_match.group(1)))
+    typed_slack = slack.route_slack(event, method, path)
+    if typed_slack is not None:
+        return typed_slack
     return _json_response(404, {"error": "Not found"})
