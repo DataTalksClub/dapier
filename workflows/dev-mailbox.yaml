@@ -22,6 +22,27 @@ actions:
   - id: format-email
     type: code
     code: |
+      # The Developer bot webhook URL/token live in this workflow's storage
+      # (keys webhook_url / webhook_token, set once by the operator). A
+      # storage_get for a never-provisioned key returns an empty value, and
+      # POSTing to an empty URL would fail every dev@ email through five
+      # queue redeliveries into the dead-letter queue. Fail here instead,
+      # naming the missing keys, so the failure notice says what to fix.
+      if isinstance(steps, dict):
+          _missing_keys = []
+          for _step_id, _key in (("get-url", "webhook_url"), ("get-token", "webhook_token")):
+              if _step_id in steps:
+                  _output = ((steps.get(_step_id) or {}).get("output") or {})
+                  if not str(_output.get("value") or "").strip():
+                      _missing_keys.append(_key)
+          if _missing_keys:
+              raise ValueError(
+                  "dev-mailbox is not configured: storage key(s) "
+                  + ", ".join(_missing_keys)
+                  + " are empty. Set them with: dapier storage set"
+                    " --workflow dev-mailbox --key <name> --value <value>"
+              )
+
       sender = input.get("sender") or {}
       from_addr = input.get("from") or (sender.get("header") if isinstance(sender, dict) else str(sender))
 

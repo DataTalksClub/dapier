@@ -77,6 +77,16 @@ def run_http_request(action, event, *, steps=None, transport=None):
     auth_type = str(action.get("auth_type") or "none").lower()
     if auth_type not in AUTH_TYPES:
         raise ValueError(f"http_request auth_type must be one of: {', '.join(AUTH_TYPES)}")
+    if not url.strip():
+        # A storage_get for a never-provisioned key (or an unresolvable
+        # steps reference) renders to "": urllib would fail later with an
+        # opaque "unknown url type", and the worker would redrive the event
+        # into the DLQ five times before anyone learns the workflow was
+        # never configured. Fail here with the actionable reason instead.
+        raise ValueError(
+            "http_request needs a non-empty url: the rendered URL is empty "
+            "(a storage key or steps reference it is built from may be unset)"
+        )
     if auth_type == "none":
         if action.get("connection_id"):
             headers.setdefault("authorization", f"Bearer {_connection_token(action['connection_id'])}")

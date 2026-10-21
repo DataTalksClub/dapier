@@ -199,3 +199,72 @@ def test_tofu_mailbox_remains_as_is():
     assert tofu_wf["id"] == "tofu-mailbox"
     action_types = [a.get("type") for a in tofu_wf.get("actions", [])]
     assert "agent" in action_types
+
+
+def test_dev_mailbox_guard_missing_storage_keys():
+    """Unprovisioned webhook_url/webhook_token fail fast with a clear error.
+
+    Regression test for the EventDeadLetterAlarm: with the storage keys
+    never set, storage_get returns "", and without this guard the workflow
+    POSTed to an empty URL — every dev@ email failed five redeliveries
+    into the DLQ. The guard names the missing keys so the failure notice
+    says what to provision.
+    """
+    import pytest
+
+    from src.dapier.engine.actions.code import run_code
+
+    wf_path = Path(__file__).parent.parent / "workflows/dev-mailbox.yaml"
+    wf = yaml.safe_load(wf_path.read_text())
+    code_action = next(a for a in wf["actions"] if a.get("type") == "code")
+
+    event = {
+        "connector": "email",
+        "data": {"from": "a@example.com", "subject": "hi", "body": {"text": "hi"}},
+    }
+    steps = {
+        "get-url": {"status": "completed", "output": {"key": "webhook_url", "value": "", "found": False}},
+        "get-token": {"status": "completed", "output": {"key": "webhook_token", "value": "", "found": False}},
+    }
+    with pytest.raises(RuntimeError, match="webhook_url.*webhook_token"):
+        run_code(code_action, event, steps=steps)
+
+
+def test_dev_mailbox_guard_configured_keys_pass():
+    """Provisioned keys let the format step run (guard only fires when set)."""
+    from src.dapier.engine.actions.code import run_code
+
+    wf_path = Path(__file__).parent.parent / "workflows/dev-mailbox.yaml"
+    wf = yaml.safe_load(wf_path.read_text())
+    code_action = next(a for a in wf["actions"] if a.get("type") == "code")
+
+    event = {
+        "connector": "email",
+        "data": {"from": "a@example.com", "subject": "hi", "body": {"text": "hi"}},
+    }
+    steps = {
+        "get-url": {"status": "completed", "output": {"key": "webhook_url", "value": "https://example.invalid/hook", "found": True}},
+        "get-token": {"status": "completed", "output": {"key": "webhook_token", "value": "secret", "found": True}},
+    }
+    result = run_code(code_action, event, steps=steps)["result"]
+    assert result["from"] == "a@example.com"
+    assert result["subject"] == "hi"
+
+
+def test_http_request_empty_url_fails_fast():
+    """An unrendered/empty http_request URL raises a clear error, not a
+    downstream urllib failure after the event is already mid-flight."""
+    import pytest
+
+    wf_path = Path(__file__).parent.parent / "workflows/dev-mailbox.yaml"
+    wf = yaml.safe_load(wf_path.read_text())
+    http_action = next(a for a in wf["actions"] if a.get("type") == "http_request")
+
+    event = {"connector": "email", "data": {}}
+    steps = {
+        "get-url": {"status": "completed", "output": {"value": ""}},
+        "get-token": {"status": "completed", "output": {"value": ""}},
+        "format-email": {"status": "completed", "output": {"result": {}}},
+    }
+    with pytest.raises(ValueError, match="non-empty url"):
+        run_http_request(http_action, event, steps=steps)

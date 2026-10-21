@@ -61,6 +61,15 @@ dapier workflows save workflows/dev-mailbox.yaml
 dapier workflows publish dev-mailbox.yaml
 dapier emails list          # expect dev@ and tofu@
 
+# 2b) Provision the Developer bot webhook config dev-mailbox reads.
+# The workflow's storage_get steps return "" for keys that were never set,
+# and an empty webhook URL fails every dev@ email through five queue
+# redeliveries into the dead-letter queue (EventDeadLetterAlarm). Set once,
+# re-set after a storage TTL expiry or when rotating the token:
+dapier storage set --workflow dev-mailbox --key webhook_url --value "https://api2.cursor.sh/automations/webhook/<target-id>"
+dapier storage set --workflow dev-mailbox --key webhook_token --value "<developer-bot-bearer-token>"
+dapier storage get --workflow dev-mailbox --key webhook_url   # expect found
+
 # 3) Test webhook
 curl -sS -X POST https://dapier.dtcdev.click/hooks/webhook/dev \
   -H "authorization: Bearer $(dapier webhooks show dev | awk -FBearer {print })" \
