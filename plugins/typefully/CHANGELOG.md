@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+Fix media S3 PUT: urllib re-added Content-Type application/x-www-form-urlencoded
+on send (breaking Typefully presigned signatures). Use http.client with only
+Content-Length.
+
 ## 1.2.0
 
 Media upload (presigned URL + headerless PUT + bounded ready poll), media

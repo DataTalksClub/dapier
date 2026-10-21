@@ -211,22 +211,44 @@ def test_upload_media_put_failure_stays_generic(monkeypatch):
 
 
 def test_raw_put_sends_no_credential_headers(monkeypatch):
+    """Regression: urllib Request(data=...) re-adds Content-Type on send.
+
+    _raw_put must use http.client with only Content-Length so the Typefully
+    S3 signature (calculated without Content-Type) still matches.
+    """
     captured = {}
+
     class FakeResponse:
         status = 200
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-    def fake_urlopen(request, timeout=None):
-        captured["headers"] = dict(request.header_items())
-        captured["unredirected"] = dict(request.unredirected_hdrs)
-        captured["method"] = request.get_method()
-        captured["body"] = request.data
-        return FakeResponse()
-    monkeypatch.setattr(plugin.urllib.request, "urlopen", fake_urlopen)
-    assert plugin._raw_put("https://signed.example.test/u", b"bytes") == 200
+        def read(self):
+            return b""
+
+    class FakeConn:
+        def __init__(self, host, port=None, timeout=60):
+            captured["host"] = host
+            captured["port"] = port
+            captured["timeout"] = timeout
+        def request(self, method, path, body=None, headers=None):
+            captured["method"] = method
+            captured["path"] = path
+            captured["body"] = body
+            captured["headers"] = dict(headers or {})
+        def getresponse(self):
+            return FakeResponse()
+        def close(self):
+            captured["closed"] = True
+
+    import http.client as http_client_mod
+    monkeypatch.setattr(http_client_mod, "HTTPSConnection", FakeConn)
+    assert plugin._raw_put("https://signed.example.test/upload?sig=TOPSECRET", b"bytes") == 200
     assert captured["method"] == "PUT" and captured["body"] == b"bytes"
-    lowered = {k.lower() for k in list(captured["headers"]) + list(captured["unredirected"])}
-    assert "authorization" not in lowered and "content-type" not in lowered
+    assert captured["path"].startswith("/upload?")
+    assert "TOPSECRET" in captured["path"]  # query preserved
+    assert captured["headers"] == {"Content-Length": "5"}
+    assert "Content-Type" not in captured["headers"]
+    assert "Authorization" not in captured["headers"]
+    assert captured.get("closed") is True
+
 
 
 def test_media_status_validates_id(monkeypatch):

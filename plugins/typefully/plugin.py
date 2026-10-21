@@ -2,7 +2,6 @@
 import json
 import re
 import time
-import urllib.request
 from urllib.parse import urlencode
 
 from src.dapier.connections import credentials
@@ -250,18 +249,32 @@ def _raw_put(url, content):
     """PUT raw bytes to a presigned URL with no extra headers.
 
     The signature was calculated without Content-Type/Authorization, so adding
-    them fails with 403. Failures stay generic: the URL carries a signature
-    and must never appear in errors.
+    them fails with 403. urllib.request.Request(data=...) re-adds
+    Content-Type: application/x-www-form-urlencoded on send even after
+    remove_header, so use http.client with only Content-Length.
+    Failures stay generic: the URL carries a signature and must never appear
+    in errors.
     """
+    import http.client
+    from urllib.parse import urlparse
     if not isinstance(url, str) or not url.startswith("https://"):
         raise ValueError("media upload failed")
-    pending = urllib.request.Request(url, data=bytes(content), method="PUT")
-    for header in ("Content-type", "Content-Type", "Authorization"):
-        if pending.has_header(header):
-            pending.remove_header(header)
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        raise ValueError("media upload failed")
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    body = bytes(content)
     try:
-        with urllib.request.urlopen(pending, timeout=60) as response:
+        conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=60)
+        try:
+            conn.request("PUT", path, body=body, headers={"Content-Length": str(len(body))})
+            response = conn.getresponse()
             status = response.status
+            response.read()
+        finally:
+            conn.close()
     except Exception:
         raise ValueError("media upload failed") from None
     if status not in (200, 201, 204):

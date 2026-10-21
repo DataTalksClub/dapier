@@ -1,5 +1,5 @@
 name: typefully
-version: 1.2.0
+version: 1.2.1
 core_compat: ">=1.0"
 provides:
   providers: [typefully]
