@@ -1,5 +1,8 @@
 """Typefully v2 ops using the write-only Dapier credential (never echoed)."""
 import json
+import re
+import time
+import urllib.request
 from urllib.parse import urlencode
 
 from src.dapier.connections import credentials
@@ -8,6 +11,11 @@ from src.dapier.engine.actions import base
 
 API_ROOT = "https://api.typefully.com/v2"
 DEFAULT_SOCIAL_SET_ID = 182343
+
+ALLOWED_MEDIA_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mov", ".pdf")
+MAX_MEDIA_BYTES = 100 * 1024 * 1024
+MEDIA_POLL_ATTEMPTS = 10
+MEDIA_POLL_INTERVAL_SECONDS = 2.0
 
 
 def request(path, connection=None, *, method="GET", body=None, transport=None):
@@ -159,6 +167,166 @@ def create_unscheduled_draft(connection, params):
     if "platforms" not in body or not isinstance(body.get("platforms"), dict):
         raise ValueError("platforms object is required")
     return request(f"/social-sets/{social_set_id}/drafts", connection, method="POST", body=body)
+
+
+def _validate_schedule_value(name, value):
+    """Validate a publish_at/plan_at value (ISO8601 with tz, next-free-slot, or now)."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a string")
+    text = value.strip()
+    if text in ("next-free-slot",):
+        return text
+    if text == "now":
+        if name != "publish_at":
+            raise ValueError('plan_at does not accept "now"')
+        return text
+    candidate = text[:-1] + "+00:00" if text.endswith(("Z", "z")) else text
+    from datetime import datetime
+    try:
+        moment = datetime.fromisoformat(candidate)
+    except ValueError:
+        raise ValueError(f"{name} must be ISO8601 with timezone, next-free-slot"
+                         + (", or now" if name == "publish_at" else "")) from None
+    if moment.tzinfo is None:
+        raise ValueError(f"{name} must include a timezone offset")
+    return text
+
+
+def create_scheduled_draft(connection, params):
+    """Create a scheduled/planned draft. Requires exactly one of publish_at/plan_at.
+
+    Explicit opt-in path (WRITE plans; PUBLISH schedules are enforced by the
+    provider key permissions). Unscheduled creation stays on
+    :func:`create_unscheduled_draft`.
+    """
+    social_set_id = _social_set_id(params)
+    body = (params or {}).get("body")
+    if not isinstance(body, dict):
+        raise ValueError("schedule-draft requires a JSON body with platforms")
+    publish = body.get("publish_at")
+    plan = body.get("plan_at")
+    if publish is not None and plan is not None:
+        raise ValueError("publish_at and plan_at are mutually exclusive")
+    if publish is None and plan is None:
+        raise ValueError("schedule-draft requires publish_at or plan_at")
+    if publish is not None:
+        body = {**body, "publish_at": _validate_schedule_value("publish_at", publish)}
+    if plan is not None:
+        body = {**body, "plan_at": _validate_schedule_value("plan_at", plan)}
+    if "platforms" not in body or not isinstance(body.get("platforms"), dict):
+        raise ValueError("platforms object is required")
+    return request(f"/social-sets/{social_set_id}/drafts", connection, method="POST", body=body)
+
+
+def patch_draft(connection, params):
+    """PATCH an existing draft (attach media_ids, edit content, schedule/unschedule)."""
+    social_set_id = _social_set_id(params)
+    try:
+        draft_id = int((params or {}).get("draft_id"))
+    except (TypeError, ValueError):
+        raise ValueError("draft_id must be a positive integer") from None
+    if draft_id < 1:
+        raise ValueError("draft_id must be a positive integer")
+    body = (params or {}).get("body")
+    if not isinstance(body, dict) or not body:
+        raise ValueError("patch-draft requires a non-empty JSON body")
+    if body.get("publish_at") is not None and body.get("plan_at") is not None:
+        raise ValueError("publish_at and plan_at are mutually exclusive")
+    if body.get("publish_at") is not None:
+        body = {**body, "publish_at": _validate_schedule_value("publish_at", body["publish_at"])}
+    if body.get("plan_at") is not None:
+        body = {**body, "plan_at": _validate_schedule_value("plan_at", body["plan_at"])}
+    return request(f"/social-sets/{social_set_id}/drafts/{draft_id}", connection,
+                   method="PATCH", body=body)
+
+
+def _validate_media_id(media_id):
+    if not isinstance(media_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,64}", media_id.strip()):
+        raise ValueError("media_id must be a non-empty id string")
+    return media_id.strip()
+
+
+def _raw_put(url, content):
+    """PUT raw bytes to a presigned URL with no extra headers.
+
+    The signature was calculated without Content-Type/Authorization, so adding
+    them fails with 403. Failures stay generic: the URL carries a signature
+    and must never appear in errors.
+    """
+    if not isinstance(url, str) or not url.startswith("https://"):
+        raise ValueError("media upload failed")
+    pending = urllib.request.Request(url, data=bytes(content), method="PUT")
+    for header in ("Content-type", "Content-Type", "Authorization"):
+        if pending.has_header(header):
+            pending.remove_header(header)
+    try:
+        with urllib.request.urlopen(pending, timeout=60) as response:
+            status = response.status
+    except Exception:
+        raise ValueError("media upload failed") from None
+    if status not in (200, 201, 204):
+        raise ValueError("media upload failed")
+    return status
+
+
+def _poll_media_status(connection, social_set_id, media_id, sleep=None):
+    """Poll the media endpoint until ready/failed (bounded; returns last state)."""
+    pause = sleep or time.sleep
+    data = {}
+    for _ in range(MEDIA_POLL_ATTEMPTS):
+        data = request(f"/social-sets/{social_set_id}/media/{media_id}", connection)
+        if data.get("status") in ("ready", "failed"):
+            return data
+        pause(MEDIA_POLL_INTERVAL_SECONDS)
+    return data
+
+
+def upload_media(connection, params, sleep=None):
+    """Full media flow: presigned URL -> raw PUT -> bounded status poll.
+
+    Returns only identifier/status fields; the presigned upload URL (signed
+    material) is never returned or echoed.
+    """
+    social_set_id = _social_set_id(params)
+    file_name = str((params or {}).get("file_name") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._()\-]*", file_name) or "." not in file_name:
+        raise ValueError("file_name is required (letters, numbers, -, _, ., (, )) with an extension")
+    ext = "." + file_name.rsplit(".", 1)[-1].lower()
+    if ext not in ALLOWED_MEDIA_EXTENSIONS:
+        raise ValueError(f"unsupported media extension {ext}")
+    content = (params or {}).get("content")
+    if not isinstance(content, (bytes, bytearray)) or not content:
+        raise ValueError("media content is required")
+    if len(content) > MAX_MEDIA_BYTES:
+        raise ValueError("media file is too large")
+    alt_text = (params or {}).get("alt_text")
+    upload_body = {"file_name": file_name}
+    if alt_text is not None:
+        if not isinstance(alt_text, str):
+            raise ValueError("alt_text must be a string")
+        upload_body["alt_text"] = alt_text
+    data = request(f"/social-sets/{social_set_id}/media/upload", connection,
+                   method="POST", body=upload_body)
+    media_id = data.get("media_id")
+    upload_url = data.get("upload_url")
+    if not isinstance(media_id, str) or not media_id:
+        raise ValueError("Typefully returned an invalid media upload")
+    try:
+        _raw_put(upload_url, bytes(content))
+    except ValueError:
+        # Never leak the signed URL; keep the failure generic.
+        raise ValueError("media upload failed") from None
+    final = _poll_media_status(connection, social_set_id, media_id, sleep=sleep)
+    result = {"media_id": media_id, "file_name": file_name, "status": final.get("status")}
+    if final.get("error_reason") is not None:
+        result["error_reason"] = final.get("error_reason")
+    return result
+
+
+def media_status(connection, params):
+    social_set_id = _social_set_id(params)
+    media_id = _validate_media_id((params or {}).get("media_id"))
+    return request(f"/social-sets/{social_set_id}/media/{media_id}", connection)
 
 
 def health(connection):

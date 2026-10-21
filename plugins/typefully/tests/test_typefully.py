@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 import pytest
 from plugins.typefully import plugin
@@ -93,3 +94,282 @@ def test_create_unscheduled_posts(monkeypatch):
     assert plugin.create_unscheduled_draft({}, {"body": body})["id"] == 1
     assert calls[0][0] == "/social-sets/182343/drafts"
     assert calls[0][1]["method"] == "POST"
+
+
+PLATFORMS = {"x": {"enabled": True, "posts": [{"text": "hi"}]}}
+
+
+def test_create_scheduled_requires_exactly_one_schedule_field(monkeypatch):
+    monkeypatch.setattr(plugin, "request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    with pytest.raises(ValueError):
+        plugin.create_scheduled_draft({}, {"body": {"platforms": PLATFORMS}})
+    with pytest.raises(ValueError) as exc:
+        plugin.create_scheduled_draft({}, {"body": {"platforms": PLATFORMS,
+            "publish_at": "2030-01-01T10:00:00+00:00", "plan_at": "2030-01-02T10:00:00+00:00"}})
+    assert "mutually exclusive" in str(exc.value)
+
+
+def test_create_scheduled_validates_values(monkeypatch):
+    monkeypatch.setattr(plugin, "request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    for bad in ["now", "", "tomorrow", "2030-01-01T10:00:00"]:
+        with pytest.raises(ValueError):
+            plugin.create_scheduled_draft({}, {"body": {"platforms": PLATFORMS, "plan_at": bad}})
+    with pytest.raises(ValueError):
+        plugin.create_scheduled_draft({}, {"body": {"platforms": PLATFORMS, "publish_at": "2030-01-01T10:00:00"}})
+
+
+def test_create_scheduled_posts_with_schedule(monkeypatch):
+    calls = []
+    def request(path, connection, **kwargs):
+        calls.append((path, kwargs))
+        return {"id": 3, "status": "scheduled"}
+    monkeypatch.setattr(plugin, "request", request)
+    body = {"platforms": PLATFORMS, "publish_at": "2030-01-01T10:00:00+00:00"}
+    assert plugin.create_scheduled_draft({}, {"body": body})["status"] == "scheduled"
+    assert calls[0][0] == "/social-sets/182343/drafts"
+    assert calls[0][1]["method"] == "POST"
+    assert calls[0][1]["body"]["publish_at"] == "2030-01-01T10:00:00+00:00"
+
+
+def test_patch_draft_uses_patch_and_rejects_both_schedule_fields(monkeypatch):
+    calls = []
+    def request(path, connection, **kwargs):
+        calls.append((path, kwargs))
+        return {"id": 9, "status": "draft"}
+    monkeypatch.setattr(plugin, "request", request)
+    body = {"platforms": PLATFORMS, "publish_at": "next-free-slot"}
+    assert plugin.patch_draft({}, {"draft_id": 9, "body": body})["id"] == 9
+    assert calls[0][0] == "/social-sets/182343/drafts/9"
+    assert calls[0][1]["method"] == "PATCH"
+    with pytest.raises(ValueError):
+        plugin.patch_draft({}, {"draft_id": 9, "body": {"publish_at": "now", "plan_at": "now"}})
+    with pytest.raises(ValueError):
+        plugin.patch_draft({}, {"draft_id": 9, "body": {}})
+    with pytest.raises(ValueError):
+        plugin.patch_draft({}, {"draft_id": "x", "body": body})
+
+
+def _upload_stubs(monkeypatch, statuses, put_status=200):
+    seen = []
+    polls = []
+    def request(path, connection, **kwargs):
+        seen.append(path)
+        if path.endswith("/media/upload"):
+            return {"media_id": "mid-1", "upload_url": "https://signed.example.test/put?sig=SECRET"}
+        polls.append(path)
+        return {"media_id": "mid-1", "status": statuses[min(len(polls) - 1, len(statuses) - 1)]}
+    puts = []
+    monkeypatch.setattr(plugin, "request", request)
+    monkeypatch.setattr(plugin, "_raw_put", lambda url, content: puts.append((url, content)) or put_status)
+    return seen, puts
+
+
+def test_upload_media_full_flow(monkeypatch):
+    seen, puts = _upload_stubs(monkeypatch, ["processing", "ready"])
+    result = plugin.upload_media({}, {"file_name": "pic.png", "content": b"\x89PNG-data",
+                                       "alt_text": "a plot"}, sleep=lambda s: None)
+    assert result == {"media_id": "mid-1", "file_name": "pic.png", "status": "ready"}
+    assert seen[0] == "/social-sets/182343/media/upload"
+    assert puts[0] == ("https://signed.example.test/put?sig=SECRET", b"\x89PNG-data")
+    assert "SECRET" not in str(result)
+
+
+def test_upload_media_reports_failed_with_reason(monkeypatch):
+    _upload_stubs(monkeypatch, ["failed"])
+    monkeypatch.setattr(plugin, "request", lambda path, connection, **k:
+        {"media_id": "mid-1", "upload_url": "https://signed.example.test/u"}
+        if path.endswith("/media/upload")
+        else {"media_id": "mid-1", "status": "failed", "error_reason": "bad pixels"})
+    result = plugin.upload_media({}, {"file_name": "a.jpg", "content": b"bytes"}, sleep=lambda s: None)
+    assert result["status"] == "failed" and result["error_reason"] == "bad pixels"
+
+
+def test_upload_media_rejects_bad_inputs(monkeypatch):
+    monkeypatch.setattr(plugin, "request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    monkeypatch.setattr(plugin, "_raw_put", lambda *a: (_ for _ in ()).throw(AssertionError("no put")))
+    for params in [{"file_name": "pic.exe", "content": b"x"},
+                   {"file_name": "noext", "content": b"x"},
+                   {"file_name": "pic.png", "content": b""},
+                   {"file_name": "pic.png", "content": "not-bytes"},
+                   {"file_name": "../pic.png", "content": b"x"}]:
+        with pytest.raises(ValueError):
+            plugin.upload_media({}, params, sleep=lambda s: None)
+
+
+def test_upload_media_put_failure_stays_generic(monkeypatch):
+    def request(path, connection, **kwargs):
+        if path.endswith("/media/upload"):
+            return {"media_id": "mid-1", "upload_url": "https://signed.example.test/u?sig=TOPSECRET"}
+        return {"status": "ready"}
+    monkeypatch.setattr(plugin, "request", request)
+    def fail(url, content):
+        raise ValueError("media upload failed")
+    monkeypatch.setattr(plugin, "_raw_put", fail)
+    with pytest.raises(ValueError) as exc:
+        plugin.upload_media({}, {"file_name": "pic.png", "content": b"x"}, sleep=lambda s: None)
+    assert "TOPSECRET" not in str(exc.value) and "signed.example.test" not in str(exc.value)
+
+
+def test_raw_put_sends_no_credential_headers(monkeypatch):
+    captured = {}
+    class FakeResponse:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    def fake_urlopen(request, timeout=None):
+        captured["headers"] = dict(request.header_items())
+        captured["unredirected"] = dict(request.unredirected_hdrs)
+        captured["method"] = request.get_method()
+        captured["body"] = request.data
+        return FakeResponse()
+    monkeypatch.setattr(plugin.urllib.request, "urlopen", fake_urlopen)
+    assert plugin._raw_put("https://signed.example.test/u", b"bytes") == 200
+    assert captured["method"] == "PUT" and captured["body"] == b"bytes"
+    lowered = {k.lower() for k in list(captured["headers"]) + list(captured["unredirected"])}
+    assert "authorization" not in lowered and "content-type" not in lowered
+
+
+def test_media_status_validates_id(monkeypatch):
+    monkeypatch.setattr(plugin, "request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
+    with pytest.raises(ValueError):
+        plugin.media_status({}, {"media_id": "../../etc"})
+    calls = []
+    monkeypatch.setattr(plugin, "request", lambda p, c, **k: calls.append(p) or {"status": "ready"})
+    assert plugin.media_status({}, {"media_id": "550e8400-e29b-41d4-a716-446655440000"})["status"] == "ready"
+    assert calls[0] == "/social-sets/182343/media/550e8400-e29b-41d4-a716-446655440000"
+
+
+def test_new_paths_never_echo_credential(monkeypatch):
+    secret = "Bearer-" + "k" * 48
+    monkeypatch.setattr(credentials, "get_credential", lambda _: {"api_key": secret})
+    def fail(*args, **kwargs):
+        raise RuntimeError("boom-" + secret)
+    monkeypatch.setattr(plugin.base, "_default_transport", fail)
+    for call in [lambda: plugin.upload_media({}, {"file_name": "a.png", "content": b"x"}),
+                 lambda: plugin.media_status({}, {"media_id": "m-1"}),
+                 lambda: plugin.patch_draft({}, {"draft_id": 1, "body": {"publish_at": "now"}}),
+                 lambda: plugin.create_scheduled_draft(
+                     {}, {"body": {"platforms": PLATFORMS, "publish_at": "now"}})]:
+        try:
+            call()
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert secret not in str(exc)
+
+
+def _agent_event(method, path, body=None, query=None):
+    return {"requestContext": {"http": {"method": method, "path": path}},
+            "queryStringParameters": query, "body": body}
+
+
+def _operator(monkeypatch):
+    from src.dapier.api import agent as agent_api
+    monkeypatch.setattr(agent_api, "require_operator", lambda event, action: ("tester", None))
+    monkeypatch.setattr(agent_api, "audit", type("A", (), {"emit": staticmethod(lambda *a, **k: None)}))
+
+
+def test_agent_routes_cover_media_and_patch(monkeypatch):
+    from src.dapier.api.agent import typefully as agent_typefully
+    _operator(monkeypatch)
+    calls = []
+    def upload(connection, params):
+        calls.append(("upload", params))
+        return {"media_id": "m-9", "file_name": "a.png", "status": "ready",
+                "upload_url": "https://signed.example.test/u?sig=HIDDEN"}
+    import base64 as _b64
+    monkeypatch.setattr(agent_typefully._plugin(), "upload_media", upload)
+    event = _agent_event("POST", "/api/agent/typefully/social-sets/182343/media",
+                         json.dumps({"file_name": "a.png",
+                                     "content_base64": _b64.b64encode(b"img").decode()}))
+    response = agent_typefully.route_typefully(event, "POST", "/api/agent/typefully/social-sets/182343/media")
+    assert response["statusCode"] == 201
+    payload = json.loads(response["body"])
+    assert payload["media_id"] == "m-9" and payload["status"] == "ready"
+    assert "upload_url" not in payload and "HIDDEN" not in response["body"]
+    assert calls[0][1]["content"] == b"img"
+
+    monkeypatch.setattr(agent_typefully._plugin(), "media_status", lambda c, p: {"status": "processing"})
+    event = _agent_event("GET", "/api/agent/typefully/social-sets/182343/media/m-9")
+    response = agent_typefully.route_typefully(
+        event, "GET", "/api/agent/typefully/social-sets/182343/media/m-9")
+    assert response["statusCode"] == 200
+
+    patched = []
+    monkeypatch.setattr(agent_typefully._plugin(), "patch_draft",
+                        lambda c, p: patched.append(p) or {"id": 5})
+    event = _agent_event("PATCH", "/api/agent/typefully/social-sets/182343/drafts/5",
+                         json.dumps({"publish_at": "now"}))
+    response = agent_typefully.route_typefully(
+        event, "PATCH", "/api/agent/typefully/social-sets/182343/drafts/5")
+    assert response["statusCode"] == 200 and patched[0]["draft_id"] == "5"
+
+    scheduled = []
+    monkeypatch.setattr(agent_typefully._plugin(), "create_scheduled_draft",
+                        lambda c, p: scheduled.append(p) or {"id": 6})
+    monkeypatch.setattr(agent_typefully._plugin(), "create_unscheduled_draft",
+                        lambda c, p: (_ for _ in ()).throw(AssertionError("wrong path")))
+    event = _agent_event("POST", "/api/agent/typefully/social-sets/182343/drafts",
+                         json.dumps({"platforms": PLATFORMS, "publish_at": "now"}),
+                         query={"allow_schedule": "true"})
+    response = agent_typefully.route_typefully(
+        event, "POST", "/api/agent/typefully/social-sets/182343/drafts")
+    assert response["statusCode"] == 201 and scheduled
+
+
+def test_agent_upload_rejects_bad_base64(monkeypatch):
+    from src.dapier.api.agent import typefully as agent_typefully
+    _operator(monkeypatch)
+    event = _agent_event("POST", "/api/agent/typefully/social-sets/182343/media",
+                         json.dumps({"file_name": "a.png", "content_base64": "!!!"}))
+    response = agent_typefully.route_typefully(
+        event, "POST", "/api/agent/typefully/social-sets/182343/media")
+    assert response["statusCode"] == 400
+
+
+def test_cli_upload_media_prints_ids_only(monkeypatch, capsys, tmp_path):
+    from dapier_cli.commands import typefully as cli_typefully
+    target = tmp_path / "pic.png"
+    target.write_bytes(b"\x89PNG-bytes")
+    calls = []
+    def fake_call(api_url, method, path, body=None, debug=False):
+        calls.append((method, path, body))
+        return {"media_id": "m-1", "file_name": "pic.png", "status": "ready",
+                "upload_url": "https://signed.example.test/u?sig=HIDDEN"}
+    monkeypatch.setattr(cli_typefully.api, "call", fake_call)
+    assert cli_typefully.typefully_upload_media("https://api.test", str(target)) == 0
+    out = capsys.readouterr().out
+    assert "m-1" in out and "HIDDEN" not in out and "signed.example.test" not in out
+    import base64 as _b64
+    assert "PNG-bytes" not in out and _b64.b64encode(b"\x89PNG-bytes").decode() not in out
+    assert calls[0][0] == "POST" and calls[0][1].endswith("/social-sets/182343/media")
+    assert calls[0][2]["file_name"] == "pic.png"
+
+
+def test_cli_create_draft_schedule_opt_in(monkeypatch, capsys, tmp_path):
+    from dapier_cli.commands import typefully as cli_typefully
+    draft = tmp_path / "draft.json"
+    draft.write_text(json.dumps({"platforms": PLATFORMS, "publish_at": "now"}), encoding="utf-8")
+    monkeypatch.setattr(cli_typefully.api, "call", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("must reject before HTTP")))
+    assert cli_typefully.typefully_create_draft("https://api.test", str(draft)) == 2
+    assert "allow-schedule" in capsys.readouterr().err
+    calls = []
+    monkeypatch.setattr(cli_typefully.api, "call",
+                        lambda *a, **k: calls.append((a[1], a[2])) or {"id": 1})
+    assert cli_typefully.typefully_create_draft(
+        "https://api.test", str(draft), allow_schedule=True) == 0
+    assert calls[0][1].endswith("/drafts?allow_schedule=true")
+
+
+def test_cli_patch_draft_and_media_status(monkeypatch, capsys, tmp_path):
+    from dapier_cli.commands import typefully as cli_typefully
+    patch = tmp_path / "patch.json"
+    patch.write_text(json.dumps({"publish_at": "now"}), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(cli_typefully.api, "call",
+                        lambda *a, **k: calls.append((a[1], a[2], k.get("body"))) or {"id": 5})
+    assert cli_typefully.typefully_patch_draft("https://api.test", 5, str(patch)) == 0
+    assert calls[0][0] == "PATCH" and calls[0][1].endswith("/drafts/5")
+    assert calls[0][2] == {"publish_at": "now"}
+    assert cli_typefully.typefully_media_status("https://api.test", "m-1") == 0
+    assert calls[1][0] == "GET" and calls[1][1].endswith("/media/m-1")
