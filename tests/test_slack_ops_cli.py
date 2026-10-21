@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from dapier.api.agent import slack as slack_api
-from dapier.api.agent import slack_ops
+from src.dapier.api.agent import slack as slack_api
+from src.dapier.api.agent import slack_ops
 
 
 class FakeTokens:
