@@ -22,9 +22,27 @@ def register(sub):
     queue.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
     create = sub_p.add_parser(
         "create-draft",
-        help="Create an unscheduled draft from JSON (no publish_at/plan_at)")
+        help="Create an unscheduled draft from JSON (no publish_at/plan_at unless --allow-schedule)")
     create.add_argument("--file", required=True, help="JSON file, or - for stdin")
     create.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
+    create.add_argument("--allow-schedule", action="store_true",
+                        help="Allow publish_at/plan_at in the body (needs PUBLISH key permission)")
+    patch = sub_p.add_parser(
+        "patch-draft",
+        help="PATCH an existing draft from JSON (attach media_ids, edit, schedule)")
+    patch.add_argument("draft_id", type=int)
+    patch.add_argument("--file", required=True, help="JSON patch body file, or - for stdin")
+    patch.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
+    upload = sub_p.add_parser(
+        "upload-media",
+        help="Upload an image/video/GIF/PDF and poll until ready (prints media_id + status only)")
+    upload.add_argument("--file", required=True, help="Media file to upload")
+    upload.add_argument("--alt-text", default=None, help="Accessibility description")
+    upload.add_argument("--file-name", default=None, help="Override the uploaded file name")
+    upload.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
+    status = sub_p.add_parser("media-status", help="Processing status for an uploaded media id (JSON)")
+    status.add_argument("media_id")
+    status.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
 
 
 def run(args, api_url, debug, child=None):
@@ -42,5 +60,16 @@ def run(args, api_url, debug, child=None):
             social_set_id=args.social_set_id, debug=debug)
     if args.command == "create-draft":
         return commands.typefully_create_draft(
-            api_url, args.file, social_set_id=args.social_set_id, debug=debug)
+            api_url, args.file, social_set_id=args.social_set_id,
+            allow_schedule=args.allow_schedule, debug=debug)
+    if args.command == "patch-draft":
+        return commands.typefully_patch_draft(
+            api_url, args.draft_id, args.file, social_set_id=args.social_set_id, debug=debug)
+    if args.command == "upload-media":
+        return commands.typefully_upload_media(
+            api_url, args.file, alt_text=args.alt_text, file_name=args.file_name,
+            social_set_id=args.social_set_id, debug=debug)
+    if args.command == "media-status":
+        return commands.typefully_media_status(
+            api_url, args.media_id, social_set_id=args.social_set_id, debug=debug)
     return 2
