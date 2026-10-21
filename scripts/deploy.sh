@@ -60,6 +60,12 @@ AuthIssuer: "$AUTH_ISSUER"
 AuthJwksUrl: "$AUTH_JWKS_URL"
 AuthCliClientId: "$AUTH_CLI_CLIENT_ID"
 OperatorEmails: "$OPERATOR_EMAILS"
+# Alarm/failure-notice/digest recipient (template.yaml NotifyEmail): dev@
+# so CloudWatch alarms and run failures reach Developer directly instead
+# of Alexey's inbox. CloudFormation keeps the previous value for any
+# parameter omitted here, so the template default alone would not reroute
+# the live stack — this override is what performs the reroute.
+NotifyEmail: "${NOTIFY_EMAIL:-dev@dtcdev.click}"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
 ${github_token_lines}
 EOF

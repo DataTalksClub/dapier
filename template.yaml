@@ -97,10 +97,12 @@ Parameters:
     Description: From address for email_send workflow actions (must be SES-verified)
   NotifyEmail:
     Type: String
-    Default: alexey.s.grigoriev@gmail.com
+    Default: dev@dtcdev.click
     Description: >
       Operator inbox for failed-run notices, CloudWatch alarms, and the
-      daily error digest. Distinct from EmailSender, which is the SES
+      daily error digest. Alarms go to the dev@ mailbox so they reach
+      Developer directly (dev-mailbox forwards them to the Developer bot
+      webhook). Distinct from EmailSender, which is the SES
       From identity and is not a mailbox anyone reads.
   EmailSendRegion:
     Type: String
