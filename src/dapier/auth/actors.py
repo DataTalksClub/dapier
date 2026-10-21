@@ -36,7 +36,8 @@ AGENT_ACTIONS = frozenset({
     "catalog",
     # Typefully agent proxy (write-only credential stays server-side).
     "typefully.social_sets", "typefully.drafts", "typefully.draft",
-    "typefully.queue", "typefully.create_draft",
+    "typefully.queue", "typefully.create_draft", "typefully.schedule_draft",
+    "typefully.patch_draft", "typefully.upload_media", "typefully.media_status",
 })
 
 # The directory is the user record. Email is the stable key until the
