@@ -46,7 +46,9 @@ def _row(connection):
 
 def test_public_view_says_whether_setup_uses_oauth_consent():
     assert public_view(ZOOM_WEBHOOK)["oauth_consent"] is False
-    assert public_view(SLACK)["oauth_consent"] is False
+    # Slack connects through OAuth user-scope consent now; the paste path
+    # stays only for legacy bot tokens.
+    assert public_view(SLACK)["oauth_consent"] is True
     assert public_view(ZOOM_API)["oauth_consent"] is True
     assert public_view(GOOGLE)["oauth_consent"] is True
 
@@ -61,7 +63,8 @@ def test_zoom_webhook_finish_setup_opens_manage_not_oauth():
 
 
 def test_oauth_connections_still_finish_or_reconnect_through_consent():
-    for connection, label in ((ZOOM_API, "Finish setup"), (GOOGLE, "Finish setup"), (DROPBOX, "Reconnect")):
+    for connection, label in ((ZOOM_API, "Finish setup"), (GOOGLE, "Finish setup"), (DROPBOX, "Reconnect"),
+                              (SLACK, "Reconnect")):
         for view in (connection, public_view(connection)):
             markup = _row(view)
             assert "connection-oauth" in markup and label in markup
@@ -72,7 +75,8 @@ def test_oauth_connections_still_finish_or_reconnect_through_consent():
 def test_token_connections_get_no_consent_button():
     plugin_token = {"connection_id": "dataops", "provider": "dataops", "status": "revoked",
                     "oauth_consent": False}
-    for connection in (SLACK, public_view(SLACK), plugin_token):
+    telegram = {"connection_id": "telegram-bot", "provider": "telegram", "status": "revoked"}
+    for connection in (telegram, public_view(telegram), plugin_token):
         markup = _row(connection)
         assert "connection-oauth" not in markup
         assert "connection-finish" not in markup

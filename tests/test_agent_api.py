@@ -379,10 +379,18 @@ def test_create_connection_rejects_duplicate_and_token_provider(monkeypatch):
     )
     assert duplicate["statusCode"] == 409
     token_provider = agent_api.route(
-        event({"connection_id": "slack-team", "provider": "slack"}),
+        event({"connection_id": "telegram-bot", "provider": "telegram"}),
         "PUT", "/api/agent/connections",
     )
     assert token_provider["statusCode"] == 400
+    # Slack connects through OAuth now: creation provisions a scope-defaulted
+    # record awaiting consent instead of rejecting the provider.
+    slack_oauth = agent_api.route(
+        event({"connection_id": "slack-team", "provider": "slack"}),
+        "PUT", "/api/agent/connections",
+    )
+    assert slack_oauth["statusCode"] == 200
+    assert json.loads(slack_oauth["body"])["oauth_consent"] is True
 
 
 def test_operator_endpoints_reject_non_operators(monkeypatch):
@@ -535,14 +543,22 @@ def test_oauth_clients_roundtrip_over_bearer(monkeypatch):
     listed = agent_api.route(event(), "GET", "/api/agent/oauth-clients")
     assert listed["statusCode"] == 200
     clients = {item["provider"]: item for item in json.loads(listed["body"])["clients"]}
-    assert set(clients) == {"dropbox", "google", "zoom"}
+    assert set(clients) == {"dropbox", "google", "zoom", "slack"}
     assert clients["dropbox"]["source"] == "config"
     assert clients["google"]["client_id"] == "g-id"
+
+    stored = agent_api.route(
+        event({"client_id": "slack-app-id", "client_secret": "slack-secret-value"}),
+        "PUT", "/api/agent/oauth-clients/slack",
+    )
+    assert stored["statusCode"] == 200
+    assert json.loads(stored["body"])["provider"] == "slack"
+    assert "slack-secret-value" not in stored["body"]
 
     missing = agent_api.route(event({"client_id": "only-id"}), "PUT", "/api/agent/oauth-clients/google")
     assert missing["statusCode"] == 400
     unknown = agent_api.route(
-        event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/slack",
+        event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/mailchimp",
     )
     assert unknown["statusCode"] == 404
 

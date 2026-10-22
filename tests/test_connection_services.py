@@ -180,10 +180,10 @@ def test_console_groups_rows_by_service():
     assert "openSamplePuller" not in JS
 
 
-def test_zoom_oauth_rows_offer_reconnect():
-    """Zoom meetings use OAuth start, same as YouTube; Slack/Telegram paste a token."""
+def test_oauth_rows_offer_reconnect():
+    """Zoom meetings, YouTube and Slack use OAuth start; Telegram pastes a token."""
     assert "usesOAuthConsent" in JS
-    assert "connection.provider !== 'slack' && connection.provider !== 'telegram'" in JS
+    assert "connection.provider !== 'telegram'" in JS
     assert "usesOAuthConsent(connection) && status !== 'connected'" in JS
 
 

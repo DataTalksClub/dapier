@@ -45,10 +45,10 @@ def test_validate_new_connection_keeps_current_error_messages():
     assert "provider must be one of" in str(exc.value).lower()
 
 
-def test_validate_new_connection_allows_slack_without_scopes():
+def test_validate_new_connection_defaults_slack_user_scopes():
     fields = validate_new_connection(body(connection_id="slack", provider="slack", scopes=[]))
     assert fields["provider"] == "slack"
-    assert fields["scopes"] == []
+    assert fields["scopes"] == ["im:history", "im:write", "search:read", "users:read"]
     assert build_item(fields, owner_subject="op")["credential_id"] == "oauth#slack"
 
 

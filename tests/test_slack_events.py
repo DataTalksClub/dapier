@@ -218,7 +218,7 @@ def test_agent_reimport_without_a_new_token_still_requires_one(monkeypatch):
     status, payload = import_slack({"connection_id": "slack-conn", "provider": "slack"},
                                    table, monkeypatch, stored)
     assert status == 400
-    assert payload["error"] == "This provider imports with a token, not an authorized-user file"
+    assert "OAuth consent" in payload["error"]
     # Nothing moved: same item version, same stored credential value.
     assert table.items["slack-conn"]["version"] == 1
     assert stored["oauth#slack-conn"] == {"token": "xoxb-" + "t" * 20,

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from src.dapier.api import admin
 from src.dapier.connections import credentials as credentials_module
+from src.dapier.connections import records as connection_model
 from src.dapier.api import router as ingress
 
 
@@ -217,7 +218,9 @@ def test_save_slack_connection_verifies_and_stores_token(monkeypatch):
     assert token not in response["body"]
 
 
-def test_save_slack_connection_requires_token_without_stored_secret(monkeypatch):
+def test_save_slack_connection_without_token_creates_oauth_record(monkeypatch):
+    """Slack connects through OAuth now: a token-less save provisions a
+    scope-defaulted record awaiting consent instead of demanding a paste."""
     records = []
     _fake_connections_table(monkeypatch, records)
 
@@ -232,9 +235,10 @@ def test_save_slack_connection_requires_token_without_stored_secret(monkeypatch)
         "display_name": "DataTalks Slack",
     }))
 
-    assert response["statusCode"] == 400
-    assert "token is required" in response["body"]
-    assert records == []
+    assert response["statusCode"] == 200
+    assert records[0]["status"] == "ready"
+    assert records[0]["scopes"] == ["im:history", "im:write", "search:read", "users:read"]
+    assert connection_model.uses_oauth_consent(records[0]) is True
 
 
 def _connected_slack_table(records, connection_id="slack"):
@@ -378,10 +382,10 @@ def test_save_telegram_connection_ignores_retired_display_name(monkeypatch):
 
 def test_oauth_start_rejects_token_provider(monkeypatch):
     monkeypatch.setattr(oauth_flow, "_connection", lambda connection_id: {
-        "connection_id": "slack", "provider": "slack", "status": "connected",
+        "connection_id": "telegram-bot", "provider": "telegram", "status": "connected",
     })
 
-    response = oauth_flow.oauth_start(request("GET", "/api/admin/oauth/slack/start"), "slack")
+    response = oauth_flow.oauth_start(request("GET", "/api/admin/oauth/telegram-bot/start"), "telegram-bot")
 
     assert response["statusCode"] == 400
     assert "directly provided token" in response["body"]
