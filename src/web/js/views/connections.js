@@ -63,10 +63,10 @@ const CONNECT_SERVICES = {
   },
   slack: {
     label: 'Slack',
-    blurb: 'Connect a Slack account for agent access with a bot or user token. Workflow Slack actions can also use the shared Service credential.',
+    blurb: 'Connect a Slack account with OAuth user scopes for agent access (DM export, search). A legacy bot or user token can still be pasted from Manage. Workflow Slack actions can also use the shared Service credential.',
     provider: 'slack',
     connectionId: 'slack',
-    scopes: [],
+    scopes: ['im:history', 'im:write', 'users:read', 'search:read'],
   },
   telegram: {
     label: 'Telegram',
@@ -183,7 +183,7 @@ const SERVICE_HELP = {
   sheets: 'Read and write the spreadsheets this account can access, including row triggers.',
   youtube: 'Start workflows when the channel publishes a video, and read channel data within the permissions granted.',
   dropbox: "Watch folders, read files, and upload under the connection's root path.",
-  slack: 'Agent access to a Slack workspace with a bot or user token. Workflow Slack actions can also use the shared Slack Service credential.',
+  slack: 'Agent access to a Slack workspace through OAuth user scopes (DM export, search); a legacy bot or user token can still be pasted from Manage. Workflow Slack actions can also use the shared Slack Service credential.',
   telegram: 'A Telegram bot: start workflows from the messages it receives and post messages from actions.',
   cmp: 'Manage access to a production CMP API token. Course data stays in CMP.',
   dataops: 'Forward events into DataOps (documents or leads) and read invoices with the invoice-reader credential. Set the API origin on this connection. Invoice parsing and bookkeeping stay in DataOps.',
@@ -260,11 +260,13 @@ function productList(connection) {
 }
 
 /* Slack and Telegram paste a credential. Zoom meetings are OAuth (Reconnect
-   starts consent); the webhook secret is a Manage field, not the reconnect path. */
+   starts consent); the webhook secret is a Manage field, not the reconnect path.
+   Slack adds accounts through OAuth; pasting stays for the legacy bot token. */
 const TOKEN_PROVIDERS = ['slack', 'telegram', 'cmp', 'zoom', 'llm'];
 /* A Zoom API service or connection is OAuth; only the webhook kind pastes
    its secret like the token providers. */
-const metaPastesToken = (meta) => TOKEN_PROVIDERS.includes(meta.provider) && meta.kind !== 'api';
+const metaPastesToken = (meta) => meta.provider !== 'slack'
+  && TOKEN_PROVIDERS.includes(meta.provider) && meta.kind !== 'api';
 const isZoomWebhook = (connection) => connection.provider === 'zoom' && !(connection.scopes || []).length;
 const pastesToken = (connection) => TOKEN_PROVIDERS.includes(connection.provider)
   && (connection.provider !== 'zoom' || isZoomWebhook(connection));
@@ -272,7 +274,7 @@ const pastesToken = (connection) => TOKEN_PROVIDERS.includes(connection.provider
    (oauth_consent): pasted-token providers — plugins add their own — and
    Zoom webhook connections never do. The fallback covers older payloads. */
 const usesOAuthConsent = (connection) => connection.oauth_consent ?? (
-  connection.provider !== 'slack' && connection.provider !== 'telegram'
+  connection.provider !== 'telegram'
   && !isZoomWebhook(connection));
 /* Google, YouTube, and Zoom API grants verify an account (email, channel,
    Zoom user) during consent; one without a verified identity never

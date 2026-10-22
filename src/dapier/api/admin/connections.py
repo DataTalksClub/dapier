@@ -65,7 +65,28 @@ def _save_special_connection(fields, body, operator, connections_table, zoom_kin
             body, operator_subject=operator, connections_table=connections_table,
             audit_event=session._audit_event, action=audit_log.CONNECT,
             reuse_stored_token=True)
+    if fields["provider"] == "slack" and _slack_saves_a_token(fields, body):
+        # Slack connects through OAuth now, but the legacy paste path stays:
+        # a supplied token (new paste or replacement) — or a Manage save on
+        # a connection whose stored credential is a pasted token — verifies
+        # and stores like before instead of minting an OAuth record.
+        return importing.save_token_connection(
+            body, operator_subject=operator, connections_table=connections_table,
+            audit_event=session._audit_event, action=audit_log.CONNECT,
+            reuse_stored_token=True)
     return None
+
+
+def _slack_saves_a_token(fields, body):
+    """Whether a console Slack save carries (or re-verifies) a pasted token."""
+    if str(body.get("token") or "").strip():
+        return True
+    try:
+        stored = credentials.get_credential(
+            connection_model.credential_id_for(fields["connection_id"]))
+    except KeyError:
+        return False
+    return bool(stored.get("token"))
 
 
 def save_connection(event):

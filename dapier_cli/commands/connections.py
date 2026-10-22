@@ -213,10 +213,15 @@ def connections_create(api_url, connection_id, provider, scopes, *,
                        root_path=None, kind=None, debug=False):
     """Provision an OAuth connection before consent. Zoom names its kind
     explicitly (``api`` unless told otherwise); with no scopes the API
-    fills the Zoom API defaults — the same rule the console's Add account
-    goes through."""
+    fills the Zoom API defaults — and the Slack user-scope defaults — the same
+    rule the console's Add account goes through."""
     if provider == "zoom":
         kind = kind or "api"
+    elif provider == "slack":
+        # The API defaults a scopeless Slack connection to the user scopes
+        # a DM-export connection needs (im:history, im:write, users:read,
+        # search:read); an explicit --scopes overrides them.
+        pass
     elif not scopes:
         print("Provide --scopes for this provider.")
         return 2

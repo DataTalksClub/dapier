@@ -44,7 +44,7 @@ def register(sub):
     oac_sub = oac_p.add_subparsers(dest="command", required=True)
     oac_sub.add_parser("list", help="Show the configured shared OAuth clients (no secrets)")
     oac_set_p = oac_sub.add_parser("set", help="Store the shared OAuth client for a provider")
-    oac_set_p.add_argument("provider", help="dropbox, google, youtube, or zoom")
+    oac_set_p.add_argument("provider", help="dropbox, google, youtube, zoom, or slack")
     oac_set_p.add_argument("--client-id", required=True)
     oac_set_p.add_argument("--client-secret-file", required=True,
                            help="File with the client secret, or - for stdin")

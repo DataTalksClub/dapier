@@ -47,7 +47,8 @@ def _token_for(action):
     if not credential_id:
         raise ValueError("Slack action needs a connection_id or credential_id")
     secret = credentials.get_credential(credential_id)
-    token = (secret.get("token") or secret.get("bot_token")
+    token = (secret.get("token") or secret.get("access_token")
+             or secret.get("bot_token")
              or secret.get("user_token") or secret.get("SLACK_BOT_TOKEN"))
     if not token:
         raise ValueError("Slack secret does not contain a bot token")

@@ -32,10 +32,11 @@ def register(sub):
     create_p.add_argument("connection_id", nargs="?", default=None,
                           help="optional internal id; generated when omitted")
     create_p.add_argument("--provider", required=True,
-                          choices=("google", "youtube", "dropbox", "zoom"))
+                          choices=("google", "youtube", "dropbox", "zoom", "slack"))
     create_p.add_argument("--scopes", nargs="+", default=None, metavar="SCOPE",
                           help="Requested scopes (required except for Zoom, which "
-                               "defaults to the read scopes its actions use)")
+                               "defaults to the read scopes its actions use, and Slack, "
+                               "which defaults to the user scopes a DM-export connection needs)")
     create_p.add_argument("--kind", choices=("api", "webhook"), default=None,
                           help="Zoom only: connection kind (default api; a webhook "
                                "is created with `connections import --token-file`)")
