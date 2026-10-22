@@ -6,7 +6,7 @@ Provider-specific setup and verified account details live in separate guides:
 |----------|-------|---------------------|----------------|
 | Google | [Google Calendar, YouTube, Drive, Docs, Sheets, and Gmail](../../plugins/google/README.md) (plugin) | `google-calendar`, `google-sheets`, `youtube` | OAuth |
 | Dropbox | [Dropbox](../../plugins/dropbox/README.md) (plugin) | `dropbox` | OAuth |
-| Slack | [Slack](../../plugins/slack/README.md) (plugin) | `slack` | Pasted bot or user token |
+| Slack | [Slack](../../plugins/slack/README.md) (plugin) | `slack` (bot paste), `slack-user` (OAuth user token) | OAuth user scopes for the user connection; pasted bot or user token for the legacy bot connection |
 | Zoom | [Zoom](../../plugins/zoom/README.md) (plugin) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
 | Telegram | [Telegram](../../plugins/telegram/README.md) (plugin) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
 | Mailchimp | [Mailchimp](../../plugins/mailchimp/README.md) (plugin) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |
@@ -22,9 +22,9 @@ token and checks the agent's grant before using it.
 
 ## Shared OAuth client credentials
 
-Google connectors share one Google OAuth client; Dropbox and Zoom each have a
-separate OAuth client. Configure each client once in its provider console,
-then save its ID and secret with `dapier oauth-clients set`. The values are
+Google connectors share one Google OAuth client; Dropbox, Zoom, and Slack
+each have a separate OAuth client. Configure each client once in its
+provider console, then save its ID and secret with `dapier oauth-clients set`. The values are
 stored in the credentials table and take effect immediately; no redeploy is
 needed.
 
@@ -35,9 +35,11 @@ https://dapier.dtcdev.click/oauth/callback
 ```
 
 For client creation, scope requirements, and the verified state of each
-provider app, see the [Google](../../plugins/google/README.md), [Dropbox](../../plugins/dropbox/README.md), and
-[Zoom](../../plugins/zoom/README.md) guides. YouTube uses the shared Google client. Slack uses a
-pasted token. Zoom's recording webhook uses a separate signing token in
+provider app, see the [Google](../../plugins/google/README.md), [Dropbox](../../plugins/dropbox/README.md),
+[Slack](../../plugins/slack/README.md), and
+[Zoom](../../plugins/zoom/README.md) guides. YouTube uses the shared Google client.
+A legacy Slack bot connection still pastes its token instead of OAuth.
+Zoom's recording webhook uses a separate signing token in
 addition to its OAuth client for Zoom API access. Telegram also uses a
 pasted token, while Mailchimp and Amazon S3 use stored provider
 credentials rather than connections — see their guides.

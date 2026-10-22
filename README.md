@@ -255,15 +255,20 @@ expires, click the card again. OAuth client IDs and secrets are shared per
 provider and deploy with the stack (see below); provider tokens land in the
 same write-only DynamoDB credentials table.
 
-Slack connects without OAuth: click **Paste bot token** on the Slack card and
-save a bot (`xoxb-`) or user (`xoxp-`) token — Dapier
+Slack user connections use OAuth: click **Add account** on the Slack card,
+approve the user scopes on the consent screen, and the `xoxp-` user token is
+stored — no tokens to paste. (`auth.test` verifies it, and the connection
+shows who it acts as.) A legacy bot connection still pastes its token:
+open Manage on the Slack card and save a bot (`xoxb-`) or user (`xoxp-`)
+token — Dapier
 verifies it with Slack's `auth.test`, stores it in the credentials table under
 the connection's ID, and marks the connection connected. Workflows reference it
 by `connection_id` (the `youtube-slack` workflow posts with `connection_id:
 slack`); actions may still use a raw `credential_id` for global credentials.
 
 OAuth clients are created once in each provider console (Google Cloud project
-`dtcdev-click` for Calendar/YouTube, Dropbox App Console for Dropbox, and Zoom
+`dtcdev-click` for Calendar/YouTube, Dropbox App Console for Dropbox, Slack
+app console for Slack user tokens, and Zoom
 App Marketplace for Zoom API access) with the redirect URI
 `https://dapier.dtcdev.click/oauth/callback`. Store them with
 `uv run dapier oauth-clients set` or in the console under

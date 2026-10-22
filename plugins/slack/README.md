@@ -1,25 +1,43 @@
 # Slack connector
 
-Slack does not use Dapier's OAuth client. Paste a Slack bot or user token;
-Dapier validates it with `auth.test` before storing it write-only under the
-connection's credential ID.
+Slack connects through OAuth user scopes, like the other OAuth providers.
+A dedicated user-token connection (separate from the Au-Tomator bot app)
+backs DM export and search:
 
-1. Create or select an app at [api.slack.com/apps](https://api.slack.com/apps).
-2. Under **OAuth & Permissions**, grant the bot at least `chat:write`; add
-   `channels:read` or `groups:read` if the workflow needs to inspect those
-   channels, and `search:read` if it uses the Find Message action
-   (`slack_find_message`).
-3. Install the app to the workspace and copy the **Bot User OAuth Token**
-   (`xoxb-…`). A user token (`xoxp-…`) also works.
-4. Invite the bot to channels where it should post, for example
-   `/invite @your-bot`.
-5. In Dapier, open **Connectors → Slack → Create new**, paste the token, and
-   save. The connection should show **connected** with the workspace identity.
+1. Create an app at [api.slack.com/apps](https://api.slack.com/apps) (or open
+   the existing workspace app).
+2. Under **OAuth & Permissions → Scopes → User Token Scopes**, add
+   `im:history`, `im:write`, `users:read`, `search:read` (plus
+   `users:read.email` only if email lookup is needed).
+3. Under **OAuth & Permissions → Redirect URLs**, add the Dapier callback
+   `https://dapier.dtcdev.click/oauth/callback` and save.
+4. In **Basic Information**, copy the **Client ID** and **Client Secret**
+   and store them as the shared Slack OAuth client (no redeploy needed):
+   `dapier oauth-clients set slack --client-id <id> --client-secret-file <file>`
+   or console **Credentials → OAuth clients**.
+5. Create the connection and consent (no scopes needed — the DM-export
+   user scopes are the default):
+   ```sh
+   dapier connections create slack-user --provider slack
+   dapier connections connect slack-user --agent <agent-name>
+   ```
+   Approve on the Slack consent screen. `dapier connections test slack-user`
+   verifies as the consenting user (User identity, not App).
 
-A bad or revoked token is rejected before it is stored. Slack scopes are
-carried by the token, so the requested-scopes editor is hidden for Slack.
-Replace a token by editing the connection or importing a new token using the
-CLI. See the [shared connector guide](README.md#cli-parity-grants-and-lifecycle)
+Legacy bot tokens still work: paste a bot (`xoxb-…`) or user (`xoxp-…`)
+token in the console's Manage dialog, or import one:
+
+```sh
+dapier connections import <connection-id> --provider slack \
+    --token-file /path/to/slack-token
+```
+
+Dapier validates it with `auth.test` before storing it write-only under
+the connection's credential ID. A bad or revoked token is rejected before
+it is stored. Slack scopes are carried by a pasted token, so the
+requested-scopes editor is hidden for pasted-token Slack connections.
+Replace a pasted token by editing the connection or importing a new one.
+See the [shared connector guide](README.md#cli-parity-grants-and-lifecycle)
 for the common connection commands.
 
 ## Event triggers: signing secret and Request URL
