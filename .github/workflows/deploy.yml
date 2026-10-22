@@ -26,6 +26,9 @@ jobs:
       - name: Point the CLI at the shared device login
         run: echo DTC_AUTH_HOME=/tmp/dtc-auth >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: aws-actions/setup-sam@v2
       - name: Install Chromium for the console boot test
         run: uv run --with playwright python -m playwright install --with-deps chromium
@@ -67,6 +70,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: aws-actions/setup-sam@v2
       - uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
