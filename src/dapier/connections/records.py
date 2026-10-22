@@ -41,10 +41,13 @@ STATUS_CONNECTED = "connected"
 STATUS_REVOKED = "revoked"
 
 # Providers that authenticate with a directly supplied token instead of an
-# OAuth consent round-trip (see importing.save_token_connection). Zoom's meeting
+# OAuth consent round-trip (see importing.save_token_connection). Slack used
+# to be one of these; since the user-token OAuth flow (see oauth_providers)
+# Slack connects through consent like every other OAuth provider, while the
+# paste path stays for legacy bot tokens. Zoom's meeting
 # connections are regular OAuth; its webhook signing token is not a provider
 # credential — the console's webhook setup has its own provider=="zoom" path.
-TOKEN_PROVIDERS = {"slack", "telegram"}
+TOKEN_PROVIDERS = {"telegram"}
 
 
 def is_zoom_webhook(item):
@@ -315,7 +318,8 @@ def account_identity(item, stored=None):
     """
     identity = item.get("account_identity")
     if not isinstance(identity, dict) and item.get("provider") == "slack":
-        kind = slack_tokens.token_kind((stored or {}).get("token"))
+        kind = slack_tokens.token_kind((stored or {}).get("token")
+                                       or (stored or {}).get("access_token"))
         identity = {"kind": kind, "name": None} if kind else None
     if not isinstance(identity, dict) or not identity.get("kind"):
         return None

@@ -24,6 +24,33 @@ STATUS_REVOKED = connections.STATUS_REVOKED
 PROVIDER_TOKEN_HANDLERS = {}
 
 
+def _slack_access_token(connection, stored, *, transport=None):
+    """The connection's workspace token, verified on every issuance.
+
+    Either shape works: an OAuth user token (``access_token``, from the
+    consent flow) or a legacy pasted token (``token``). Slack tokens are
+    long-lived with no refresh grant, so there is nothing to renew — the
+    issuance re-verifies against ``auth.test`` (the same check the legacy
+    path ran) and enforces the workspace binding before returning it.
+    """
+    from .providers import slack_tokens
+
+    token = stored.get("access_token") or stored.get("token")
+    if not token:
+        raise TokenError(
+            f"Connection {connection['connection_id']} has no stored Slack token")
+    try:
+        account_id, account_title = slack_tokens.verify_account(
+            token, transport=transport)
+    except slack_tokens.SlackTokenError as exc:
+        raise TokenError(str(exc)) from None
+    connections.check_binding(connection, account_id)
+    return token, {"expires_at": None,
+                   "scope": " ".join(connection.get("granted_scopes") or []),
+                   "provider_account_id": account_id,
+                   "account_title": account_title, "refreshed": False}
+
+
 def register_token_handler(provider, handler):
     """Plugin-owned token issuance for non-OAuth credential lifecycles."""
     PROVIDER_TOKEN_HANDLERS[provider] = handler
@@ -129,6 +156,8 @@ def get_access_token(connection, *, transport=None, _retry=True):
     handler = PROVIDER_TOKEN_HANDLERS.get(connection.get("provider"))
     if handler:
         return handler(connection, stored, transport=transport)
+    if connection.get("provider") == "slack":
+        return _slack_access_token(connection, stored, transport=transport)
     if connection.get("provider") in connections.TOKEN_PROVIDERS:
         from .importing import verify_token_provider
         token = stored.get("token")

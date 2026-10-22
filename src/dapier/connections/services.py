@@ -101,7 +101,12 @@ CATALOG = (
         "provider": "slack",
         "connection_id": "slack",
         "standalone": True,
-        "default_scopes": (),
+        "default_scopes": (
+            "im:history",
+            "im:write",
+            "users:read",
+            "search:read",
+        ),
     },
     {
         "id": "telegram",

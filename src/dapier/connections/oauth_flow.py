@@ -196,6 +196,12 @@ def oauth_callback(event):
     stored = oauth_providers.normalize_token_data(
         token_data, previous_refresh_token=previous.get("refresh_token"),
     )
+    if connection["provider"] == "slack":
+        # Slack user tokens are long-lived with no refresh grant: no expiry
+        # is stored, so health stays ok and issuance verifies instead of
+        # refreshing (see tokens._slack_access_token).
+        stored.pop("expires_at", None)
+        stored.pop("refresh_token", None)
     credentials.put_credential(connection["credential_id"], stored, provider=connection["provider"])
     try:
         updated = connection_model.mark_connected(

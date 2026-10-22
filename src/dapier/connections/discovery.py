@@ -156,7 +156,7 @@ def clamp_limit(value):
 def access_token(connection, *, transport=None):
     """The connection's bearer token: refreshed OAuth or stored static token."""
     provider = connection.get("provider")
-    if provider in records.TOKEN_PROVIDERS:
+    if provider in records.TOKEN_PROVIDERS or provider == "slack":
         try:
             secret = credentials.get_credential(connection["credential_id"])
         except KeyError:

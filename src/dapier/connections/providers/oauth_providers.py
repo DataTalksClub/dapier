@@ -40,6 +40,22 @@ ZOOM_TOKEN_URL = "https://zoom.us/oauth/token"
 ZOOM_ACCOUNT_URL = "https://zoom.us/v2/users/me"
 ZOOM_REVOKE_URL = "https://zoom.us/oauth/revoke"
 
+SLACK_AUTHORIZATION_URL = "https://slack.com/oauth/v2/authorize"
+SLACK_TOKEN_URL = "https://slack.com/api/oauth.v2.access"
+SLACK_REVOKE_URL = "https://slack.com/api/auth.revoke"
+
+# User Token scopes a Slack DM-export connection asks for at consent. These
+# ride the authorize URL's ``user_scope`` parameter; the granted user token
+# (``xoxp-``) lands on the connection. ``users:read.email`` stays optional:
+# request it only when the app needs email lookup — asking for a scope the
+# Slack app did not declare fails consent.
+SLACK_USER_SCOPES = (
+    "im:history",
+    "im:write",
+    "users:read",
+    "search:read",
+)
+
 # Scopes sufficient for the account-identity check of each provider. A
 # connection whose granted scopes fall outside these sets cannot be verified
 # and must fail closed (see verify_account).
@@ -81,6 +97,13 @@ PROVIDERS = {
         # credentials; the client secret never travels in the body.
         "auth": "basic",
     },
+    "slack": {
+        "authorization_url": SLACK_AUTHORIZATION_URL,
+        "token_url": SLACK_TOKEN_URL,
+        # Slack's user-token flow carries its scopes in ``user_scope``
+        # (see authorization_url) and authenticates the code exchange with
+        # the client pair in the form body (see exchange_code).
+    },
 }
 
 # Fields that must never appear in logs, audit records, or error responses.
@@ -107,6 +130,10 @@ def normalize_scopes(provider_name, scopes):
     cleaned = sorted({str(scope).strip() for scope in scopes or [] if str(scope).strip()})
     if provider_name in ("youtube", "google") and not cleaned:
         raise ProviderError("Google connections require at least one scope")
+    if provider_name == "slack" and not cleaned:
+        # The consent screen must ask for something: a scope-less Slack
+        # connection means the DM-export user scopes.
+        return sorted(SLACK_USER_SCOPES)
     return cleaned
 
 
@@ -175,6 +202,20 @@ def connection_grant_scopes(provider_name, scopes):
 def authorization_url(provider_name, *, client_id, redirect_uri, scopes, state, code_challenge=None):
     """Build the provider consent URL for an authorization-code + PKCE flow."""
     spec = get(provider_name)
+    if provider_name == "slack":
+        # Slack OAuth v2 splits bot and user grants: Dapier asks for a user
+        # token only, so the requested scopes ride ``user_scope``
+        # (comma-separated, per Slack's docs). No bot ``scope`` is sent and
+        # Slack's code exchange takes no PKCE verifier, so none is sent.
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "state": state,
+        }
+        if scopes:
+            params["user_scope"] = ",".join(scopes)
+        return f"{spec['authorization_url']}?{urllib.parse.urlencode(params)}"
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
@@ -268,9 +309,65 @@ def _token_request(spec, fields, *, client_id, client_secret, transport,
     return _form_post(spec["token_url"], fields, transport=transport, headers=headers)
 
 
+def _slack_exchange_code(*, code, client_id, client_secret, redirect_uri, transport):
+    """Exchange a Slack authorization code for the authed user's token.
+
+    ``oauth.v2.access`` answers HTTP 200 even on failure (``{"ok": false,
+    "error": ...}``), so the generic form-post helper cannot parse it — and
+    the token Dapier stores is not the top-level bot token but
+    ``authed_user.access_token`` (the ``xoxp-`` user token the user_scope
+    grant mints). Slack's comma-separated user scope list is normalized to
+    the space-separated shape the callback's missing-scope check reads.
+    """
+    body = urllib.parse.urlencode({
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "redirect_uri": redirect_uri,
+    }).encode()
+    transport = transport or _default_transport
+    try:
+        status, raw = transport(
+            "POST", SLACK_TOKEN_URL,
+            headers={"content-type": "application/x-www-form-urlencoded"},
+            body=body, timeout=15,
+        )
+    except Exception as exc:
+        raise ProviderError(f"token endpoint unreachable: {type(exc).__name__}")
+    try:
+        data = json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise ProviderError(f"token endpoint returned HTTP {status} with an unreadable body")
+    if status >= 300 or not isinstance(data, dict) or not data.get("ok"):
+        error = data.get("error") if isinstance(data, dict) else None
+        code_name = str(error).split(":", 1)[0].strip() if isinstance(error, str) else ""
+        safe_error = code_name if code_name and len(code_name) <= 64 else ""
+        suffix = f" ({safe_error})" if safe_error else ""
+        raise ProviderError(f"slack token exchange failed{suffix}")
+    authed = data.get("authed_user") or {}
+    user_token = authed.get("access_token") if isinstance(authed, dict) else None
+    if not user_token:
+        raise ProviderError(
+            "slack exchange returned no user token; approve the user scopes "
+            "and reinstall the app on the workspace"
+        )
+    scope = authed.get("scope", "") if isinstance(authed, dict) else ""
+    return {
+        "access_token": user_token,
+        "token_type": "user",
+        "scope": str(scope).replace(",", " "),
+    }
+
+
 def exchange_code(provider_name, *, code, client_id, client_secret, redirect_uri,
                   code_verifier=None, transport=None):
     """Exchange an authorization code for tokens (PKCE when ``code_verifier``)."""
+    if provider_name == "slack":
+        get(provider_name)
+        return _slack_exchange_code(
+            code=code, client_id=client_id, client_secret=client_secret,
+            redirect_uri=redirect_uri, transport=transport,
+        )
     spec = get(provider_name)
     fields = {
         "code": code,
@@ -288,6 +385,10 @@ def exchange_code(provider_name, *, code, client_id, client_secret, redirect_uri
 
 def refresh_access_token(provider_name, *, refresh_token, client_id, client_secret, transport=None):
     """Refresh an access token. May omit ``refresh_token`` on rotation."""
+    if provider_name == "slack":
+        # Slack user tokens are long-lived and carry no refresh token;
+        # renewal is a fresh consent, not a refresh grant.
+        raise ProviderError("slack tokens do not refresh; reconnect the connection")
     spec = get(provider_name)
     fields = {
         "grant_type": "refresh_token",
@@ -364,6 +465,15 @@ def verify_account(provider_name, access_token, *, transport=None):
     raises ProviderError instead of returning an unverified identity.
     """
     get(provider_name)
+    if provider_name == "slack":
+        # The stored token is a workspace token (bot or user); the binding
+        # is the workspace it was verified in, via Slack's auth.test.
+        from . import slack_tokens
+
+        try:
+            return slack_tokens.verify_account(access_token, transport=transport)
+        except slack_tokens.SlackTokenError as exc:
+            raise ProviderError(str(exc))
     if provider_name == "google":
         data = _get_json(GOOGLE_USERINFO_URL, access_token, transport=transport)
         email = data.get("email")
@@ -421,6 +531,16 @@ def revoke_token(provider_name, token, *, transport=None,
     get(provider_name)
     transport = transport or _default_transport
     try:
+        if provider_name == "slack":
+            # auth.revoke takes the token in the Authorization header; an
+            # OAuth user token and a pasted workspace token revoke alike.
+            status, _ = transport(
+                "POST", SLACK_REVOKE_URL,
+                headers={"authorization": f"Bearer {token}",
+                         "content-type": "application/x-www-form-urlencoded"},
+                body=b"", timeout=15,
+            )
+            return status < 300
         if provider_name == "zoom":
             # Zoom's revoke endpoint wants the client credentials; absent
             # ones degrade to an unauthenticated attempt that fails benignly.

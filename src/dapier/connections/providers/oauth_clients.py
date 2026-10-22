@@ -16,7 +16,7 @@ import time
 from . import oauth_providers
 
 # Canonical configuration providers: youtube shares the Google client.
-CANONICAL_PROVIDERS = ("dropbox", "google", "zoom")
+CANONICAL_PROVIDERS = ("dropbox", "google", "zoom", "slack")
 
 _RECORD_PREFIX = "oauth-client#"
 _CACHE_TTL_SECONDS = 60

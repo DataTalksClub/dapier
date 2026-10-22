@@ -95,6 +95,24 @@ def save_token_connection(body, *, operator_subject, connections_table, audit_ev
         return 400, {"error": str(exc)}
     if fields["provider"] in TOKEN_PROVIDER_SCOPES:
         fields["scopes"] = list(TOKEN_PROVIDER_SCOPES[fields["provider"]])
+    if fields["provider"] == "slack":
+        # A pasted workspace token carries its own scopes: the OAuth consent
+        # defaults must not leak into a token save (a bot token holds no
+        # user scopes). Explicit scopes ride through; an omitted list keeps
+        # the connection's previous scopes, else stays empty.
+        raw = body.get("scopes")
+        if raw is None:
+            try:
+                stored_previous = connections.get_connection(
+                    connections_table, fields["connection_id"])
+            except Exception:  # noqa: BLE001 — an unscannable table only loses the fallback
+                stored_previous = None
+            fields["scopes"] = list((stored_previous or {}).get("scopes") or [])
+        else:
+            if isinstance(raw, str):
+                raw = raw.split()
+            fields["scopes"] = sorted(
+                {scope for scope in raw if isinstance(scope, str) and scope.strip()})
     token = str(body.get("token") or "").strip()
     if not token and reuse_stored_token:
         # An edit without a re-pasted token re-verifies the stored one.
@@ -167,9 +185,20 @@ def import_core(body, *, operator_subject, connections_table):
         audit.emit(str(body.get("connection_id", "zoom")), audit.IMPORT, operator_subject,
                    outcome="ok" if status == 200 else "error")
         return status, payload
-    if str(body.get("provider", "")).strip().lower() in connections.TOKEN_PROVIDERS:
+    provider = str(body.get("provider", "")).strip().lower()
+    if provider in connections.TOKEN_PROVIDERS or (
+            provider == "slack" and isinstance(body.get("token"), str)
+            and body["token"].strip()):
+        # Slack is an OAuth provider now, but a pasted workspace token still
+        # imports through the legacy token path (bot connections, operator
+        # paste). OAuth Slack connections never import: they are created and
+        # consented, not transferred.
         return _import_token_connection(
             body, operator_subject=operator_subject, connections_table=connections_table)
+    if provider == "slack":
+        return 400, {"error": "Slack imports with a token (--token-file); "
+                              "new Slack connections use OAuth consent "
+                              "(connections create + connect)"}
     if not isinstance(body.get("authorized_user"), dict):
         return 400, {"error": "An authorized-user credential object is required"}
     try:
