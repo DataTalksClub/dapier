@@ -121,3 +121,13 @@ dapier runs list --workflow dev-mailbox
 ```
 
 Tokens: `dapier webhooks show`; never put them in git or shared reports.
+
+Run history masks storage values whose key contains `token`, `secret`,
+`password`, `authorization`, or `api_key` (case-insensitive). For other
+`storage_get` keys, set `secret: true` on the step to hide its recorded value.
+Later steps still receive the real value through `{steps.<id>.output.value}`.
+Recorded HTTP credentials (including `auth_token` and authorization headers)
+are masked before storage and truncation. Console, CLI, export, and content
+search share the same redaction; older matching records are also masked on
+read, without rewriting or deleting historical data. A retry or replay that
+reuses a masked storage read fetches its current value from workflow storage.

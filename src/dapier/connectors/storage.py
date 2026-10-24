@@ -24,12 +24,15 @@ register(Action(
                 "scoped to this workflow and survive runs.",
     run=lambda action, event, workflow_id, steps=None: run_storage_get(action, event, workflow_id, steps=steps),
     required=frozenset({"key"}),
-    optional=frozenset(),
+    optional=frozenset({"secret"}),
     fields=(
         {"key": "key", "label": "Key", "type": "text", "required": True,
          "placeholder": "last-seen-id",
          "help": "Reads this workflow's own key-value store — other workflows "
                  "cannot see its values"},
+        {"key": "secret", "label": "Secret value", "type": "boolean",
+         "help": "Redact the value in run history. Keys containing token, secret, "
+                 "password, authorization or api_key are redacted automatically."},
     ),
 ))
 

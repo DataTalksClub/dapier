@@ -3,6 +3,7 @@ autoretry planning and backoff, and the dispatch into the
 action runner."""
 import random
 import time
+from ..history import is_redacted, step_output
 from .controls import (_predicate_scope, _run_condition, _run_decision,
                        _run_delay, _run_filter, _run_paths, _run_union)
 from .core import (AUTORETRY_DEFAULTS, CompletedStep, ERROR_MODES, ON_FAIL_MODES,
@@ -31,7 +32,14 @@ def _run_step(workflow_id, step, index, event, run_action, *,
         else:
             if not gate:
                 if isinstance(gate, CompletedStep):
+                    # Telemetry is deliberately lossy. A deduped read may
+                    # fetch its value again; never feed a mask to templates.
+                    if (step.get("type") == "storage_get" and isinstance(gate.output, dict)
+                            and is_redacted(gate.output.get("value"))):
+                        gate.output = run_action(step, event, workflow_id, steps=step_outputs)
                     step_outputs[action_id] = {"status": gate.status, "output": gate.output}
+                    if step.get("type") == "storage_get" and step.get("secret") is True:
+                        step_outputs[action_id]["secret"] = True
                     if gate.status == "filtered":
                         return "filtered"
                 else:
@@ -116,8 +124,11 @@ def _run_step(workflow_id, step, index, event, run_action, *,
             step_outputs=step_outputs, duration_ms=_elapsed(started),
         )
     step_outputs[action_id] = {"status": status, "output": output or {}}
+    if step.get("type") == "storage_get" and step.get("secret") is True:
+        step_outputs[action_id]["secret"] = True
     if after_action:
-        after_action(workflow_id, action_id, event, output=output or {},
+        after_action(workflow_id, action_id, event,
+                     output=step_output(step, output or {}, step_outputs),
                      duration_ms=_elapsed(started), status=status)
     return stop
 

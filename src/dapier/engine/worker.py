@@ -11,6 +11,7 @@ from ..connectors.ingress import normalize_event, processing_id
 from ..triggers import failure_counts, inbox
 from . import _run_connector, usage
 from .logic import CompletedStep, RunSuspended, resume_chain, run_chain
+from .history import is_redacted, redact
 from .matching import all_workflows, matches
 from .notify import notify_auto_pause, notify_failure
 
@@ -187,7 +188,7 @@ def _stored(value, limit=6000):
     """Trim a step value for an execution item and make it DynamoDB-safe:
     the resource API rejects Python floats (a decision step's confidence
     and probabilities), so they are written as Decimals."""
-    text = json.dumps(_trim(value, limit),
+    text = json.dumps(_trim(redact(value), limit),
                       default=lambda v: _loaded(v) if isinstance(v, Decimal) else str(v))
     return json.loads(text, parse_float=Decimal)
 
@@ -654,6 +655,13 @@ def _resume_run(resume, *, queue=None):
     for reused in resume.get("reused_steps") or []:
         if not isinstance(reused, dict):
             continue
+        output = reused.get("output")
+        if (reused.get("action_type") == "storage_get" and isinstance(output, dict)
+                and is_redacted(output.get("value"))):
+            output = _run_connector({"type": "storage_get", "key": output["key"]},
+                                    event, workflow_id)
+            resume.setdefault("step_outputs", {})[reused["action_id"]] = {
+                "status": "completed", "output": output, "secret": True}
         _mark_reused(workflow_id, event, action_id=reused.get("action_id"),
                      action_type=reused.get("action_type"),
                      output=reused.get("output"))

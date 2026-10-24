@@ -38,6 +38,7 @@ import boto3
 from boto3.dynamodb.conditions import Attr, Key
 
 from ..auth import visibility
+from ..engine.history import redact
 from botocore.exceptions import ClientError
 
 GSI_NAME = "runs-by-run-id"
@@ -205,6 +206,7 @@ def run_summary(run_id, items):
     ``stalled`` (additive, no new run status) with the step and the moment
     work last advanced.
     """
+    items = [redact(item) for item in items]
     statuses = [item.get("status", "") for item in items]
     if any(status == "failed" for status in statuses):
         status = "failed"
@@ -333,7 +335,7 @@ def _step_view(item):
     view["duration_ms"] = _int(item.get("duration_ms"))
     view["expires_at"] = _int(item.get("expires_at"))
     view["retry_attempt"] = _int(item.get("retry_attempt"))
-    return view
+    return redact(view)
 
 
 def _parse_ts(value):
@@ -536,9 +538,9 @@ def _search_blob(run_id, items):
     parts = [str(run_id)]
     for item in items:
         parts.append(json.dumps(
-            {field: item.get(field) for field in
+            redact({field: item.get(field) for field in
              ("workflow_id", "action_id", "connector", "event_type",
-              "error", "input", "output")},
+              "error", "input", "output")}),
             default=str,
         )[:SEARCH_BLOB_CAP])
     return json.dumps(parts, default=str).lower()
