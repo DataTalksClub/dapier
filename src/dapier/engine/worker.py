@@ -987,7 +987,10 @@ def handler(event, _context):
             from ..triggers.email_from import rejected as _sender_rejected
 
             if _sender_rejected(payload):
-                inbox.ignore(inbox_id)
+                from ..triggers import email_refusals
+
+                inbox.ignore(inbox_id, error="sender not allowed")
+                email_refusals.signal(payload)
                 continue
             matched = execute(
                 payload,

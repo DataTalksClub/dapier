@@ -18,6 +18,40 @@ trigger:
 claims `<local-part>@dtcdev.click` in the Emails inventory
 (`dapier emails list|show`). There is no separate mailbox store.
 
+### Per-address sender policy is required for bot alerts
+
+Claiming a mailbox does not authorize its alert senders. An address without
+its own sender-policy row inherits the default allowlist (Alexey's two
+addresses). Set an explicit **allowlist** for each assistant mailbox and add
+its expected alert senders; do not switch bot mailboxes to `anyone`:
+
+```bash
+dapier emails from allowlist dev
+dapier emails from add noreply@datatalks.club --route dev
+dapier emails from add no-reply@dtcdev.click --route dev
+dapier emails from list --route dev
+```
+
+A new allowlist copies the default senders. The dev policy above was already
+applied on production on 2026-10-24; these commands document setup, not a
+request to reapply it.
+
+Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
+the address, sender, and owning workflows, and emit `EmailSenderPolicyRefused`
+in `Dapier/Triggers`. Atomic claims in the cursors table dedupe each
+address/sender pair for 24 hours, including concurrent workers and queue
+redeliveries. `EmailSenderPolicyRefusalAlarm` uses the existing operator alarm
+topic and stays active while any hour in the last day has a refusal. The
+inbox still shows `refused: sender not allowed`; no workflow action runs.
+Disabled, auto-paused, and unclaimed addresses do not emit the signal.
+
+The refusal handler sends no email or forwards mail. Refused Dapier operator
+notices (alarm, failure, auto-pause, and error-digest subjects from Dapier's
+configured sender) log the ERROR but emit no metric, so a refusal notice
+cannot recursively trigger another notice. Ordinary alerts from that same
+sender still signal. Webhook POST errors remain failed runs, and missing
+webhook storage keys still fail fast. Alarm recipients are unchanged.
+
 ## Built-in connect webhook
 
 ```bash
@@ -48,6 +82,13 @@ trigger:
 Notify path: workflow `agent` step on the Hetzner dapier worker runs
 `hub intake create` for tofu@ and orin@. For dev@, `dev-mailbox` forwards
 directly to the Developer bot webhook via HTTP POST without running an agent.
+
+For a matching per-assistant bot setup, keep each assistant's own mailbox
+and allowlist, and provision its own destination webhook URL and token in
+that mailbox workflow's storage (`webhook_url` / `webhook_token`). The
+`/hooks/webhook/tofu` trigger is an inbound Dapier hook; it does not itself
+connect to a Tofu Grok Bot. Tofu currently uses the agent-to-Hub intake path.
+Do not replace that path until Tofu's destination webhook values are supplied.
 
 ## Operator steps (repeatable)
 
