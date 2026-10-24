@@ -38,17 +38,23 @@ SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
      object metadata) and posts the envelope to the DataOps connection's
      origin (`/api/v1/intake/email-documents`) with x-dataops-intake-secret.
      DataOps goes first so its invoice preview — `invoices[0]` with
-     counterparty/transactionDate/invoiceNumber — can name the file. A 409
-     completes as already_exists (idempotent replay), like Dropbox
-     skip_existing.
+     counterparty/transactionDate/invoiceNumber — can name the file. An exact duplicate
+     returns its existing preview (idempotent replay). A 409 means the
+     immutable source changed and remains an error.
   6. build-filename — a Python code step reads prior step outputs via
      `steps` and builds the Dropbox name: the preview's transaction date,
-     counterparty and invoice number when present, else the email date and
-     clean subject; the checksum document key always rides along so names
+     counterparty and invoice number when present, else the email date;
+     a missing company produces an explicit held_for_review result, never
+     a subject-based filename. The checksum document key rides along so names
      stay unique. Body-only mail renders to PDF first (the else branch,
      completed by invoice-body-completion, which runs the same
      intake → build-filename → archive order).
-  7. archive-document — dropbox_upload (source: step) archives that one
+  7. archive-if-company — archives only when build-filename produced a
+     filename. Otherwise manual-review records the missing_company reason
+     and DataOps intake/invoice references in the run history (Console and
+     `dapier runs show`). The document stays in DataOps Finance review; no
+     Dropbox upload occurs and this metadata gap does not retry into SQS.
+     archive-document — dropbox_upload (source: step) archives that one
      document under the built filename with skip_existing, so replays of
      an already-archived path complete instead of failing.
 ```
@@ -69,9 +75,9 @@ Nothing in Dapier keeps invoice state.
 Filename preview contract (DataOps intake response): when the intake
 returns `invoices: [{invoiceId, counterparty, transactionDate (YYYY-MM-DD),
 invoiceNumber}]` alongside `status/intakeItemId/artifacts`, build-filename
-uses the first entry; without it the email date + clean subject + checksum
-form applies. Until the intake returns the preview, every file lands with
-the fallback name — the reorder is safe either way.
+uses the first entry. Without its company, archival is held for review in
+DataOps Finance. The email subject is never used as a company name.
+Review state belongs to DataOps; Dapier records only the handoff outcome.
 
 ## Live setup (one-time)
 

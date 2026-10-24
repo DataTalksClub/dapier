@@ -2,7 +2,7 @@
 # job.completed with the source event's route, so a rendered invoice body
 # completes through this flow. DataOps goes first; its invoice preview
 # names the Dropbox file via build-filename. Missing company metadata
-# stops the run rather than archiving under the email subject.
+# holds archival for DataOps Finance review; never use the email subject.
 id: invoice-body-completion
 enabled: true
 trigger:
@@ -80,7 +80,6 @@ actions:
         text = text.replace("/", "_").replace("\\", "_")
         return text[:limit].strip() or None
     date = _out("email-date", "output", "formatted")
-    subject = _out("clean-subject", "output", "result", "subject")
     doc_key = _out("clean-subject", "output", "result", "document_key")
     intake = _out("intake-rendered", "output") or {}
     invoices = intake.get("invoices") if isinstance(intake, dict) else None
@@ -91,17 +90,23 @@ actions:
         else (str(date or "").strip() or "undated")
     vendor = _slug(preview.get("counterparty"))
     if not vendor:
-        raise ValueError("DataOps has no extracted company; refusing an email-subject archive name")
-    inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
-    key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
-    parts = [use_date, vendor]
-    if inv_no:
-        parts.append(inv_no)
-    if key:
-        parts.append(key)
-    output = {"filename": "-".join(parts) + ".pdf"}
+        # DataOps already owns the document and its Finance review draft.
+        # Never substitute the email subject for an extracted company.
+        output = {"status": "held_for_review", "reason": "missing_company",
+                  "review_system": "DataOps Finance",
+                  "intakeItemId": intake.get("intakeItemId"),
+                  "invoiceId": preview.get("invoiceId")}
+    else:
+        inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
+        key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
+        parts = [use_date, vendor]
+        if inv_no:
+            parts.append(inv_no)
+        if key:
+            parts.append(key)
+        output = {"filename": "-".join(parts) + ".pdf"}
   tests:
-  - name: a missing company stops archival
+  - name: missing company is held for DataOps review
     steps:
       email-date:
         output:
@@ -114,7 +119,12 @@ actions:
       intake-rendered:
         output:
           status: accepted
-    expected_error: no extracted company
+    expected:
+      status: held_for_review
+      reason: missing_company
+      review_system: DataOps Finance
+      intakeItemId: null
+      invoiceId: null
   - name: a DataOps preview names vendor, invoice date and number
     steps:
       email-date:
@@ -134,13 +144,24 @@ actions:
             invoiceNumber: GPA-123
     expected:
       filename: 2026-10-02-Google Play-GPA-123-839f39e8a3ba.pdf
-- id: archive-rendered
-  type: dropbox_upload
-  connection_id: dropbox
-  source: output
-  folder: /_dtc_paperwork/invoices
-  filename: '{steps.build-filename.output.result.filename}'
-  overwrite: false
-  autorename: false
-  strict_conflict: true
-  skip_existing: true
+- id: archive-if-company
+  type: condition
+  when:
+    steps.build-filename.output.result.filename:
+      exists: true
+  then:
+  - id: archive-rendered
+    type: dropbox_upload
+    connection_id: dropbox
+    source: output
+    folder: /_dtc_paperwork/invoices
+    filename: '{steps.build-filename.output.result.filename}'
+    overwrite: false
+    autorename: false
+    strict_conflict: true
+    skip_existing: true
+  else:
+  - id: manual-review
+    type: code
+    code: |
+      output = steps["build-filename"]["output"]["result"]

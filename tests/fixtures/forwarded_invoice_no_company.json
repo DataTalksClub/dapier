@@ -1,0 +1,20 @@
+{
+  "id": "synthetic-forwarded-invoice",
+  "connector": "email",
+  "event": "message.received",
+  "occurred_at": "2026-10-24T00:00:00Z",
+  "data": {
+    "route": "invoice",
+    "message_id": "synthetic-message@example.test",
+    "date": "2026-10-24T00:00:00Z",
+    "subject": "Fwd: Invoice SYNTHETIC-42",
+    "sender": {"addresses": ["forwarder@example.test"]},
+    "body": {"text": {"value": "Forwarded invoice attached."}},
+    "attachments": [{
+      "filename": "synthetic-invoice.pdf",
+      "content_type": "application/pdf",
+      "checksum": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "s3": {"bucket": "synthetic-inbound", "key": "synthetic-invoice.pdf"}
+    }]
+  }
+}

@@ -95,14 +95,13 @@ def test_attachment_branch_builds_and_archives_one_document():
                   if action.get("id") == "route")["then"]
     assert [action["id"] for action in branch] == [
         "email-date", "clean-subject", "make-document", "file-to-dataops",
-        "build-filename", "archive-document",
+        "build-filename", "archive-if-company",
     ]
-    make_document, intake, build_filename, archive = branch[2], branch[3], branch[4], branch[5]
+    make_document, intake, build_filename, archive = branch[2], branch[3], branch[4], branch[5]["then"][0]
     assert make_document["type"] == "merge_pdfs"
     assert make_document["plan_step"] == "triage"
     # DataOps runs before the archive so its invoice preview can name the
-    # file; the archive takes the builder's filename, falling back to the
-    # subject/checksum form when the intake returns no preview.
+    # file; missing company metadata holds archival for DataOps review.
     assert intake["document_step"] == "route.then.make-document"
     assert intake["connection_id"] == "dataops"
     assert "steps.route.then.build-filename" in archive["filename"]
@@ -165,7 +164,7 @@ def test_missing_body_never_turns_into_a_blank_pdf():
             run_code(strip_forwarded, {"data": {"body": body}})
 
 
-def test_missing_company_falls_back_to_subject_without_crashing():
+def test_missing_company_holds_for_review_without_crashing():
     from src.dapier.engine.actions.code import run_code
 
     build_filename = find_action(shipped_workflow(), "build-filename")
@@ -182,5 +181,6 @@ def test_missing_company_falls_back_to_subject_without_crashing():
         },
     }
     result = run_code(build_filename, event, steps=steps)
-    assert result["result"]["filename"] == "2026-10-19-Invoice F-0007-2026-F-0007-2026-f763650d2764.pdf"
+    assert result["result"]["status"] == "held_for_review"
+    assert "filename" not in result["result"]
 
