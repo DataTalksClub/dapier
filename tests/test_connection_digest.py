@@ -190,6 +190,23 @@ def test_handler_emails_the_expiring_connections(monkeypatch, ses):
     assert "google-sheets" in kwargs["Message"]["Body"]["Text"]["Data"]
 
 
+def test_handler_sends_from_alert_sender_when_configured(monkeypatch, ses):
+    rows = _expiring_rows()
+    monkeypatch.setattr(connection_digest, "expiring", lambda *a, **k: rows)
+    monkeypatch.delenv("DAPIER_CONNECTION_DIGEST_HOURS", raising=False)
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_ALERT_SENDER", "DTC Alerts <alerts@dtcdev.click>")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+
+    result = connection_digest.handler({})
+
+    assert result["sent"] is True
+    assert result["to"] == "ops@example.test"
+    kwargs = ses.return_value.send_email.call_args.kwargs
+    assert kwargs["Source"] == "DTC Alerts <alerts@dtcdev.click>"
+    assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]
+
+
 def test_send_with_nothing_expiring_skips(monkeypatch, ses):
     monkeypatch.setattr(connection_digest, "expiring", lambda *a, **k: [])
     monkeypatch.delenv("DAPIER_CONNECTION_DIGEST_HOURS", raising=False)

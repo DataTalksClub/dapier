@@ -229,6 +229,10 @@ def test_backup_email_uses_iam_ses_without_a_mailer_key(monkeypatch):
     assert calls[0]["Destination"] == {"ToAddresses": ["ops@example.com"]}
     assert calls[0]["Message"]["Body"]["Text"]["Data"] == "details"
 
+    monkeypatch.setenv("DAPIER_ALERT_SENDER", "DTC Alerts <alerts@dtcdev.click>")
+    backup._send_email({"email": "ops@example.com", "context": {"subject": "failure", "body": "details"}})
+    assert calls[1]["Source"] == "DTC Alerts <alerts@dtcdev.click>"
+
 
 def test_daily_claim_is_atomic_and_duplicate_is_skipped(monkeypatch):
     from botocore.exceptions import ClientError

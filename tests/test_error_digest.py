@@ -181,6 +181,20 @@ def test_handler_sends_to_the_notify_inbox_from_the_sender(monkeypatch, ses):
     assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]
 
 
+def test_handler_sends_from_alert_sender_when_configured(monkeypatch, ses):
+    _stub_summary(monkeypatch, _failed_runs())
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_ALERT_SENDER", "DTC Alerts <alerts@dtcdev.click>")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+
+    result = error_digest.handler({})
+
+    assert result["to"] == "ops@example.test"
+    kwargs = ses.return_value.send_email.call_args.kwargs
+    assert kwargs["Source"] == "DTC Alerts <alerts@dtcdev.click>"
+    assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]
+
+
 def test_handler_with_zero_failures_skips_the_send(monkeypatch, ses):
     _stub_summary(monkeypatch, [])
     with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "ops@dtcdev.click"}):
@@ -363,6 +377,7 @@ def test_template_schedules_the_digest_daily():
     assert "ErrorDigestFunction:" in text
     assert "src.dapier.error_digest.handler" in text
     assert "DAPIER_EMAIL_SENDER: !Ref EmailSender" in text
+    assert "DAPIER_ALERT_SENDER: !Ref AlertEmailSender" in text
     assert "DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail" in text
     assert "ses:SendEmail" in text
     assert "Schedule: cron(0 7 * * ? *)" in text

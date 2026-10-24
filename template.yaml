@@ -95,6 +95,12 @@ Parameters:
     Type: String
     Default: no-reply@dtcdev.click
     Description: From address for email_send workflow actions (must be SES-verified)
+  AlertEmailSender:
+    Type: String
+    Default: 'DTC Alerts <alerts@dtcdev.click>'
+    Description: >
+      From address for operator alert emails (alarm notify, failure
+      notices, error/connection digests, backup notices, agent host jobs).
   NotifyEmail:
     Type: String
     Default: dev@dtcdev.click
@@ -180,6 +186,7 @@ Globals:
         HOST_TASKS_TABLE: !Ref HostTasksTable
         HOST_QUEUE_URL: !Ref HostQueue
         DAPIER_EMAIL_REGION: !Ref EmailSendRegion
+        DAPIER_ALERT_SENDER: !Ref AlertEmailSender
         DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         TRIGGER_INBOX_TABLE: !Ref TriggerInboxTable
@@ -473,6 +480,7 @@ Resources:
           HUB_INTAKE_TOKEN_SECRET_ID: !Ref HubIntakeTokenSecret
           HUB_INTAKE_URL: !Ref HubIntakeUrl
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_ALERT_SENDER: !Ref AlertEmailSender
           GITHUB_WORKFLOWS_TOKEN_SECRET: !Ref GithubWorkflowsTokenSecret
           WORKER_FUNCTION_ARN: !GetAtt WorkerFunction.Arn
           DROPBOX_QUEUE_URL: !Ref DropboxQueue
@@ -758,6 +766,7 @@ Resources:
           HUB_INTAKE_URL: !Ref HubIntakeUrl
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_ALERT_SENDER: !Ref AlertEmailSender
           # Configuration set attached to every workflow send
           # (engine.actions.email) so SES reports bounce/complaint feedback
           # into the ses-notifications hook; empty sends untagged.
@@ -1030,6 +1039,7 @@ Resources:
       Environment:
         Variables:
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_ALERT_SENDER: !Ref AlertEmailSender
       Policies:
         - Statement:
             Effect: Allow
@@ -1539,6 +1549,7 @@ Resources:
         Variables:
           BACKUP_BUCKET: !Ref BackupBucket
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_ALERT_SENDER: !Ref AlertEmailSender
           DAPIER_EMAIL_REGION: !Ref EmailSendRegion
           BACKUP_ALERT_EMAIL: !Ref BackupAlertEmail
       Policies:
@@ -1595,6 +1606,7 @@ Resources:
       Environment:
         Variables:
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_ALERT_SENDER: !Ref AlertEmailSender
           EXECUTIONS_TABLE: !Ref ExecutionsTable
           DAPIER_ERROR_DIGEST_DAYS: '1'
       Policies:
@@ -1643,6 +1655,7 @@ Resources:
       Environment:
         Variables:
           DAPIER_EMAIL_SENDER: !Ref EmailSender
+          DAPIER_ALERT_SENDER: !Ref AlertEmailSender
           DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           CREDENTIALS_TABLE: !Ref CredentialsTable

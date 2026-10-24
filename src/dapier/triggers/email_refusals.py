@@ -19,11 +19,26 @@ WINDOW_SECONDS = 86400
 METRIC = "EmailSenderPolicyRefused"
 
 
-def _operator_notice(event, senders):
+def _operator_senders():
     from ..engine.notify import operator_sender
+    from .email_triggers import trigger_domain
 
+    domain = (trigger_domain() or "dtcdev.click").lower()
+    candidates = {
+        operator_sender(),
+        os.environ.get("DAPIER_ALERT_SENDER"),
+        os.environ.get("DAPIER_EMAIL_SENDER"),
+        f"alerts@{domain}",
+        f"no-reply@{domain}",
+        "alerts@dtcdev.click",
+        "no-reply@dtcdev.click",
+    }
+    return {email_from.bare_address(s) for s in candidates if s}
+
+
+def _operator_notice(event, senders):
     subject = str((event.get("data") or {}).get("subject") or "").strip()
-    return email_from.bare_address(operator_sender()) in senders and subject.startswith((
+    return bool(_operator_senders().intersection(senders)) and subject.startswith((
         "[dapier]", "dapier error digest:",
     ))
 

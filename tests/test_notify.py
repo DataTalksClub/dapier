@@ -78,10 +78,30 @@ def test_operator_recipient_falls_back_to_the_configured_sender(monkeypatch):
 def test_operator_recipient_falls_back_to_the_trigger_domain(monkeypatch):
     monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
     monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
+    monkeypatch.delenv("DAPIER_ALERT_SENDER", raising=False)
     monkeypatch.delenv("DAPIER_EMAIL_SENDER", raising=False)
     monkeypatch.setenv("TRIGGER_EMAIL_DOMAIN", "ops.example.test")
 
     assert notify.operator_recipient() == "no-reply@ops.example.test"
+
+
+def test_operator_sender_prefers_alert_sender(monkeypatch):
+    monkeypatch.setenv("DAPIER_ALERT_SENDER", "DTC Alerts <alerts@dtcdev.click>")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+    assert notify.operator_sender() == "DTC Alerts <alerts@dtcdev.click>"
+
+
+def test_operator_sender_falls_back_to_email_sender(monkeypatch):
+    monkeypatch.delenv("DAPIER_ALERT_SENDER", raising=False)
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+    assert notify.operator_sender() == "no-reply@dtcdev.click"
+
+
+def test_operator_recipient_extracts_bare_address_from_display_name_when_falling_back(monkeypatch):
+    monkeypatch.delenv("DAPIER_NOTIFY_EMAIL", raising=False)
+    monkeypatch.delenv("BACKUP_ALERT_EMAIL", raising=False)
+    monkeypatch.setenv("DAPIER_ALERT_SENDER", "DTC Alerts <alerts@dtcdev.click>")
+    assert notify.operator_recipient() == "alerts@dtcdev.click"
 
 
 def test_ses_client_uses_the_email_send_region(monkeypatch):
@@ -269,11 +289,13 @@ def test_worker_function_can_send_failure_mail():
     globals_env = text.split("Globals:")[1].split("Resources:")[0]
     assert "DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail" in globals_env
     assert "DAPIER_EMAIL_REGION: !Ref EmailSendRegion" in globals_env
+    assert "DAPIER_ALERT_SENDER: !Ref AlertEmailSender" in globals_env
     start = text.index("\n  WorkerFunction:\n")
     rest = text[start + 1:]
     nxt = re.search(r"\n  [A-Z]\w+:\n", rest)
     block = rest[:nxt.start()] if nxt else rest
     assert "DAPIER_EMAIL_SENDER: !Ref EmailSender" in block
+    assert "DAPIER_ALERT_SENDER: !Ref AlertEmailSender" in block
     assert "ses:SendEmail" in block
 
 

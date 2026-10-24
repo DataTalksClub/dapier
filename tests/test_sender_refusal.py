@@ -116,16 +116,21 @@ def test_distinct_mailboxes_have_distinct_claims(monkeypatch, signal_store):
     assert table.scan()["Count"] == 2
 
 
+@pytest.mark.parametrize("sender", [
+    "no-reply@dtcdev.click",
+    "alerts@dtcdev.click",
+    "DTC Alerts <alerts@dtcdev.click>",
+])
 @pytest.mark.parametrize("subject", [
     "[dapier] alarm: refusal-alarm", "dapier error digest: 1 failed run (last 24h)",
     "[dapier] Run failed: dev-mailbox", "[dapier] Workflow auto-paused: dev-mailbox",
     "[dapier] 2 alarms fired",
 ])
-def test_refused_operator_notices_cannot_retrigger_alarm(signal_store, caplog, subject):
+def test_refused_operator_notices_cannot_retrigger_alarm(signal_store, caplog, sender, subject):
     table, cloudwatch = signal_store
     with caplog.at_level(logging.ERROR):
         for now in (100, 86500, 172900):
-            assert email_refusals.signal(mail("no-reply@dtcdev.click", subject=subject),
+            assert email_refusals.signal(mail(sender, subject=subject),
                                          table_ref=table, cloudwatch=cloudwatch, now=now) == 0
     assert len(caplog.records) == 3  # Still visible in logs.
     cloudwatch.put_metric_data.assert_not_called()

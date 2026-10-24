@@ -66,6 +66,7 @@ OperatorEmails: "$OPERATOR_EMAILS"
 # parameter omitted here, so the template default alone would not reroute
 # the live stack — this override is what performs the reroute.
 NotifyEmail: "${NOTIFY_EMAIL:-dev@dtcdev.click}"
+AlertEmailSender: "${ALERT_EMAIL_SENDER:-DTC Alerts <alerts@dtcdev.click>}"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
 ${github_token_lines}
 EOF

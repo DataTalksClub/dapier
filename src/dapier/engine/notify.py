@@ -40,11 +40,12 @@ def ses_client():
 def operator_sender():
     """The SES-verified From address for operator mail.
 
-    DAPIER_EMAIL_SENDER is the verified identity (template.yaml
-    ``EmailSender``); with it unset, the trigger domain's no-reply plays
-    the role. This is the From header, not the inbox that reads failures.
+    Prefers ``DAPIER_ALERT_SENDER`` (template.yaml ``AlertEmailSender``),
+    falling back to ``DAPIER_EMAIL_SENDER`` (template.yaml ``EmailSender``),
+    then the trigger domain's no-reply identity. This is the From header,
+    not the inbox that reads failures.
     """
-    sender = str(os.environ.get("DAPIER_EMAIL_SENDER") or "").strip()
+    sender = str(os.environ.get("DAPIER_ALERT_SENDER") or os.environ.get("DAPIER_EMAIL_SENDER") or "").strip()
     if sender:
         return sender
     from ..triggers.email_triggers import trigger_domain
@@ -64,7 +65,10 @@ def operator_recipient():
         address = str(os.environ.get(name) or "").strip()
         if address:
             return address
-    return operator_sender()
+    from email.utils import parseaddr
+
+    sender = operator_sender()
+    return parseaddr(sender)[1] or sender
 
 
 def _console_runs_url():

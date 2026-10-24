@@ -576,6 +576,11 @@ class EmailSendTests(unittest.TestCase):
             run_email_send({"type": "email_send", "to": "a@x", "text": "t"},
                            {"data": {}}, ses=self.ses)
         self.assertEqual(self.ses.sent[1]["Source"], "env@x")
+        # email_send is for user workflows, not alerts; it ignores DAPIER_ALERT_SENDER
+        with patch.dict(os.environ, {"DAPIER_EMAIL_SENDER": "env@x", "DAPIER_ALERT_SENDER": "alerts@x"}):
+            run_email_send({"type": "email_send", "to": "a@x", "text": "t"},
+                           {"data": {}}, ses=self.ses)
+        self.assertEqual(self.ses.sent[2]["Source"], "env@x")
 
     def test_subject_defaults_when_omitted(self):
         call = self.run_action({"type": "email_send", "to": "a@example.com", "text": "hi"}, {})

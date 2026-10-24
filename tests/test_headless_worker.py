@@ -115,6 +115,22 @@ def test_completion_email_uses_configured_ses_region(monkeypatch):
     assert calls[0]["Destination"]["ToAddresses"] == ["writer@example.com"]
     assert calls[0]["Source"] == "no-reply@dtcdev.click"
 
+    # Default prefers DAPIER_ALERT_SENDER when set
+    monkeypatch.setenv("DAPIER_ALERT_SENDER", "DTC Alerts <alerts@dtcdev.click>")
+    host_jobs._notify(Table(), "task-2", {
+        "status": "failed", "notify_to": "writer@example.com",
+        "error": "Failed", "email_subject": "A task",
+    })
+    assert calls[1]["Source"] == "DTC Alerts <alerts@dtcdev.click>"
+
+    # Row-level notify_from overrides the default alert sender
+    host_jobs._notify(Table(), "task-3", {
+        "status": "succeeded", "notify_to": "writer@example.com",
+        "notify_from": "custom@example.com",
+        "summary": "Done", "email_subject": "A task",
+    })
+    assert calls[2]["Source"] == "custom@example.com"
+
 
 def test_worker_runs_foreground_harness_and_reports_result(tmp_path):
     calls = []

@@ -381,10 +381,13 @@ def _notify(table, task_id, row, ses_ref=None):
 
         ses_ref = boto3.client(
             "ses", region_name=os.environ.get("DAPIER_EMAIL_REGION") or None)
+    from .engine.notify import operator_sender
+
     summary = str(row.get("summary") or row.get("error") or "")[:1500]
     title = str(row.get("email_subject") or "Agent task")[:150]
+    sender = str(row.get("notify_from") or operator_sender())
     ses_ref.send_email(
-        Source=str(row.get("notify_from") or os.environ["DAPIER_EMAIL_SENDER"]),
+        Source=sender,
         Destination={"ToAddresses": [address]},
         Message={"Subject": {"Data": f"Agent {row['status']}: {title}"[:250], "Charset": "utf-8"},
                  "Body": {"Text": {"Data": f"Task: {task_id}\nStatus: {row['status']}\n\n{summary}",
