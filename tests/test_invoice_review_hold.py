@@ -14,6 +14,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("workflow_id", ["invoice-intake", "invoice-body-completion"])
+def test_embedded_code_tests_survive_workflow_publication(workflow_id):
+    from src.dapier.engine.code_tests import run_code_tests
+    from src.dapier.triggers.published_workflows import _scrub
+
+    workflow = yaml.safe_load((ROOT / f"workflows/{workflow_id}.yaml").read_text())
+
+    def check(actions):
+        for action in actions:
+            if action.get("tests"):
+                report = run_code_tests(action)
+                assert report["failed"] == 0, report
+            for branch in ("then", "else"):
+                check(action.get(branch) or [])
+
+    # The published store removes null-valued fields, including fixtures.
+    check(_scrub(workflow)["actions"])
+
+
+@pytest.mark.parametrize("workflow_id", ["invoice-intake", "invoice-body-completion"])
 @pytest.mark.parametrize("status", ["accepted", "duplicate"])
 @pytest.mark.parametrize("company", [None, "", "   ", "Example Vendor Ltd"])
 def test_company_controls_archive_or_visible_review_hold(workflow_id, status, company):

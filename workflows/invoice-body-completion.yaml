@@ -94,8 +94,8 @@ actions:
         # Never substitute the email subject for an extracted company.
         output = {"status": "held_for_review", "reason": "missing_company",
                   "review_system": "DataOps Finance",
-                  "intakeItemId": intake.get("intakeItemId"),
-                  "invoiceId": preview.get("invoiceId")}
+                  "intakeItemId": intake.get("intakeItemId") or "",
+                  "invoiceId": preview.get("invoiceId") or ""}
     else:
         inv_no = _slug(preview.get("invoiceNumber") or preview.get("invoice_number"), 40)
         key = re.sub(r"[^a-f0-9]", "", str(doc_key or "").lower())[:12]
@@ -123,8 +123,8 @@ actions:
       status: held_for_review
       reason: missing_company
       review_system: DataOps Finance
-      intakeItemId: null
-      invoiceId: null
+      intakeItemId: ''
+      invoiceId: ''
   - name: a DataOps preview names vendor, invoice date and number
     steps:
       email-date:
