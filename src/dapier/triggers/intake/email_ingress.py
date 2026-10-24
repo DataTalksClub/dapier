@@ -64,6 +64,12 @@ def data_from_message(message, pointer, limit=BODY_LIMIT):
         "text": _body(message, "plain", limit=limit),
         "html": _body(message, "html", limit=limit),
         "s3": pointer,
+        **({"authentication_results": [str(value)[:8192] for value in message.get_all("Authentication-Results", [])[:10]]}
+           if message.get_all("Authentication-Results") else {}),
+        **({"dkim_signatures": [str(value)[:8192] for value in message.get_all("DKIM-Signature", [])[:10]]}
+           if message.get_all("DKIM-Signature") else {}),
+        **({"received_spf": [str(value)[:8192] for value in message.get_all("Received-SPF", [])[:10]]}
+           if message.get_all("Received-SPF") else {}),
     }
 
 

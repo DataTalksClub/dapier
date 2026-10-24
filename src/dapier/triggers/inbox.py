@@ -278,6 +278,12 @@ def email_body(data):
         content["html"] = html
     if truncated:
         content["truncated"] = True
+    # Expose only these bounded diagnostic headers, never arbitrary headers
+    # (which may contain credentials). These are observed values, not a trust decision.
+    for field in ("authentication_results", "received_spf", "dkim_signatures"):
+        values = source.get(field)
+        if isinstance(values, list):
+            content[field] = [str(value)[:8192] for value in values[:10]]
     return content or None
 
 

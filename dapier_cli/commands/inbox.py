@@ -92,7 +92,7 @@ def inbox_show(api_url, inbox_id, debug=False):
         print(f"  run: {run.get('run_id')} ({run.get('status') or 'status unknown'})")
     email = event.get("email") or {}
     for key in ("from", "to", "cc", "subject", "date", "message_id", "route",
-                "feedback", "bounce_type", "recipients"):
+                "feedback", "bounce_type", "recipients", "authentication_results", "received_spf", "dkim_signatures"):
         value = email.get(key)
         if value not in (None, "", []):
             print(f"  email.{key}: {', '.join(value) if isinstance(value, list) else value}")

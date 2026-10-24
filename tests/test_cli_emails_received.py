@@ -101,3 +101,14 @@ def test_outcome_text_refused_rows_surface_the_reason():
                          "error": "invalid signature"}) == "refused: invalid signature"
     assert outcome_text({"outcome": "refused", "error": "Zoom webhook is "
                         "not configured"}) == "refused: Zoom webhook is not configured"
+
+
+def test_inbox_show_prints_received_authentication_headers(monkeypatch, capsys):
+    from dapier_cli.commands import inbox
+    monkeypatch.setattr(inbox.api, 'call', lambda *args, **kwargs: {'event': {
+        'inbox_id': 'proof', 'email': {'authentication_results': ['receiver; dkim=pass; spf=pass; dmarc=pass'],
+                                     'received_spf': ['pass']}}})
+    inbox.inbox_show('https://example.invalid', 'proof')
+    output = capsys.readouterr().out
+    assert 'email.authentication_results: receiver; dkim=pass; spf=pass; dmarc=pass' in output
+    assert 'email.received_spf: pass' in output

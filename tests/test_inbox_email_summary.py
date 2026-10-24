@@ -233,3 +233,16 @@ def test_api_get_reports_each_matched_run_status(table):  # noqa: F811
 
     _, payload = inbox.api_get("mail-1", table_ref=table, run_status=broken)
     assert payload["event"]["runs"][0]["status"] is None
+
+
+def test_raw_detail_exposes_only_authentication_diagnostics(table, monkeypatch):
+    raw = _raw_message().replace(b"Subject:", b"Authentication-Results: inbound.example; dkim=pass; spf=pass; dmarc=pass\nReceived-SPF: pass\nDKIM-Signature: v=1; d=dtcdev.click; s=test; b=public-signature\nX-Private-Key: do-not-expose\nSubject:")
+    inbox.record({**EMAIL, "id": "auth-proof", "data": {
+        "raw_mime": {"bucket": "b", "key": "k"}, "subject": "proof"}}, table_ref=table)
+    monkeypatch.setattr(email_ingress, "s3", _s3_mock(raw))
+    _, payload = inbox.api_get("auth-proof", table_ref=table)
+    email = payload["event"]["email"]
+    assert email["authentication_results"] == ["inbound.example; dkim=pass; spf=pass; dmarc=pass"]
+    assert email["received_spf"] == ["pass"]
+    assert "d=dtcdev.click" in email["dkim_signatures"][0]
+    assert "do-not-expose" not in str(payload)
