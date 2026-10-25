@@ -1,4 +1,10 @@
-"""Operator agent orin@datatalks.club, and the read-only owner filter."""
+"""Orin holds the operator role, and the owner filter for everyone else.
+
+``orin@datatalks.club`` resolves through the operator allowlist exactly
+like Alexey's account (the directory row keeps the ``orin`` alias for
+``--owner orin`` and the console "View as" control). The ``agent`` band
+(``AGENT_ACTIONS`` + ``console_allowed`` + owner-scoped visibility) stays
+in place for future least-privilege rows."""
 
 import argparse
 import json
@@ -20,10 +26,10 @@ def _token(monkeypatch, sub, subject):
     return session._sign({"sub": sub, "subject": subject, "exp": int(time.time()) + 3600})
 
 
-def test_orin_is_an_agent_and_not_a_full_operator():
+def test_orin_is_a_full_operator_like_alexey():
     payload = {"sub": "orin@datatalks.club", "subject": "sub-orin"}
-    assert actors.is_agent(payload)
-    assert actors.gate(payload) == "agent"
+    assert not actors.is_agent(payload)
+    assert actors.gate(payload) == "operator"
     assert actors.stable_subject(payload) == "sub-orin"
     assert actors.action_allowed(payload, "runs")
     assert actors.action_allowed(payload, "agent-tasks")
@@ -33,16 +39,32 @@ def test_orin_is_an_agent_and_not_a_full_operator():
     assert actors.action_allowed(payload, "typefully.media_status")
     assert actors.action_allowed(payload, "typefully.patch_draft")
     assert actors.action_allowed(payload, "typefully.schedule_draft")
-    assert not actors.action_allowed(payload, "credential")
-    assert not actors.action_allowed(payload, "quota.set")
+    # Operator-only actions pass for Orin exactly as for Alexey.
+    assert actors.action_allowed(payload, "triggers.inbox")
+    assert actors.action_allowed(payload, "schedule-trigger")
+    assert actors.action_allowed(payload, "poll-trigger")
+    assert actors.action_allowed(payload, "errors")
+    assert actors.action_allowed(payload, "credential")
+    assert actors.action_allowed(payload, "quota.set")
     assert actors.console_allowed("GET", "/api/admin/runs")
     assert actors.console_allowed("GET", "/api/admin/agent-tasks")
     assert actors.console_allowed("PUT", "/api/admin/designer/workflows")
+    assert actors.console_allowed("GET", "/api/admin/triggers/inbox")
+    # The agent band stays closed on these paths for agent rows; Orin no
+    # longer goes through it — dispatch only consults console_allowed for
+    # agent payloads (is_agent is False for Orin now), so the full console
+    # routes (schedules, polls, errors, credentials, tokens) reach her.
+    assert not actors.console_allowed("GET", "/api/admin/schedule-triggers")
+    assert not actors.console_allowed("GET", "/api/admin/poll-triggers")
+    assert not actors.console_allowed("GET", "/api/admin/errors/summary")
     assert not actors.console_allowed("PUT", "/api/admin/credentials/slack")
     assert not actors.console_allowed("DELETE", "/api/admin/tokens")
     scope = visibility.for_session(payload)
-    assert scope.is_operator is False
+    assert scope.is_operator is True
     assert scope.subject == "sub-orin"
+    alexey = {"sub": "alexey@datatalks.club", "subject": "sub-alex"}
+    assert visibility.for_session(alexey).is_operator is True
+    assert actors.gate(alexey) == "operator"
 
 
 def test_a_full_operator_is_not_narrowed_by_the_directory():
@@ -127,18 +149,21 @@ def test_me_offers_view_as_to_operators_and_narrows_orin(monkeypatch):
     agent = _token(monkeypatch, "orin@datatalks.club", "sub-orin")
     event["cookies"] = [f"dapier_session={agent}"]
     body = json.loads(dispatch._pre_routes(event, "GET", "/api/admin/me")["body"])
-    assert body["role"] == "agent"
+    assert body["role"] == "operator"
     assert body["operator"] is True
-    assert body["view_as"] == []
+    assert [person["alias"] for person in body["view_as"]] == ["orin"]
 
 
-def test_orin_is_refused_on_an_operator_only_console_route(monkeypatch):
+def test_orin_reaches_operator_only_console_routes(monkeypatch):
+    from src.dapier.api.admin import routes
+
     token = _token(monkeypatch, "orin@datatalks.club", "sub-orin")
     event = {"headers": {"host": "dapier.example.test"},
              "cookies": [f"dapier_session={token}"]}
+    monkeypatch.setattr(routes, "list_api_tokens",
+                        lambda event: {"statusCode": 200, "body": "{}"})
     response = dispatch.route(event, "GET", "/api/admin/tokens")
-    assert response["statusCode"] == 403
-    assert "role" in json.loads(response["body"])["error"]
+    assert response["statusCode"] == 200
 
 
 def test_cli_accepts_owner_as_and_assignee():
@@ -179,7 +204,7 @@ def test_view_as_filters_runs_and_blocks_writes(monkeypatch):
                     "alias": "orin",
                     "email": "orin@datatalks.club",
                     "label": "Orin",
-                    "role": "agent",
+                    "role": "operator",
                     "identities": ["orin", "orin@datatalks.club"],
                 }],
             }

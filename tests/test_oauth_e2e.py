@@ -246,7 +246,7 @@ def test_me_names_the_signed_in_person_from_the_id_token(monkeypatch):
     assert body["name"] == "Alexey Grigorev"
     assert body["operator"] is True
     assert body["role"] == "operator"
-    assert any(person["alias"] == "orin" and person["role"] == "agent"
+    assert any(person["alias"] == "orin" and person["role"] == "operator"
                for person in body["view_as"])
 
 

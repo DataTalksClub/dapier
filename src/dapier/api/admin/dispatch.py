@@ -56,7 +56,9 @@ def _pre_routes(event, method, path):
         # token's name claim when the identity provider sent one.
         email = username if isinstance(username, str) and "@" in username else ""
         actor = actors.match_session(payload)
-        full_operator = authz.is_operator(payload) and actor is None
+        full_operator = authz.is_operator(payload) and (
+            actor is None or actor["role"] == actors.ROLE_OPERATOR
+        )
         return http._json_response(200, {
             "username": username,
             "email": email,

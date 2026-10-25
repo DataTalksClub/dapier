@@ -1,8 +1,15 @@
-# Operator agents
+# Operator directory
 
-An operator agent is a datatalks.club account that can run its own
-workflows and read the runs and agent tasks that belong to them. It is
-not a full operator.
+A directory row in `src/dapier/auth/actors.py` names a datatalks.club
+account (email plus alias). A row with the `operator` role holds the same
+rights as the operator allowlist: the full console and the full agent API.
+A row with the `agent` role is least privilege — it passes only
+`AGENT_ACTIONS` (or `workflow.*`) on the CLI bearer gate, stays
+owner-scoped by the G17 write gate, and is refused on console routes
+outside `console_allowed`. The first successful sign-in stores the DTC
+subject beside the email in the device-sessions table
+(`actor#<email>`, no expiry). Until that subject exists, `--owner <alias>`
+matches the alias and the email only.
 
 ## Orin
 
@@ -10,17 +17,14 @@ not a full operator.
 | --- | --- |
 | Email | `orin@datatalks.club` |
 | Alias | `orin` |
-| Role | `agent` |
-| API token | none. Sign in with the console or `dapier auth login` when the account is ready. |
+| Role | `operator` |
+| API token | none. Sign in with the console or `dapier auth login`. |
 
-The role allows:
-
-- workflows the account owns (list, save, publish, test, toggle, and the other workflow actions)
-- runs of those workflows (list, show, export, replay, cancel, resolve)
-- agent tasks of those workflows (list and show)
-- a read of connections, workers, and the trigger sample, so a workflow can be built and a queued task can be seen
-
-It does not allow credentials, grants, API tokens, OAuth clients, quota, audit, sender-policy changes, or storage. The directory entry lives in `src/dapier/auth/actors.py`. The first successful sign-in stores the DTC subject beside the email in the device-sessions table (`actor#orin@datatalks.club`, no expiry). Until that subject exists, `--owner orin` matches the alias and the email only.
+Orin holds the same role and rights as Alexey's dapier account:
+workflows, runs, inbox, polls, schedules, errors, credential view, and
+everything else the operator allowlist gates — reads and writes. The
+directory row keeps the stable alias so `--owner orin` and the console
+"View as" control keep working.
 
 ## Seeing another person's work
 

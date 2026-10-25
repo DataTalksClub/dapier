@@ -1,17 +1,18 @@
-"""Operator agents: a least-privilege account, and the read-only owner filter.
+"""Operator directory: named accounts and the read-only owner filter.
 
-``orin@datatalks.club`` is the operator agent. The role can work with
-workflows, runs, and agent tasks, and only with workflows it owns. It
-cannot administer credentials, grants, tokens, OAuth clients, or other
-accounts. No API token is issued for it. Orin signs in later through the
-normal console or device-login flow; the first sign-in records the DTC
-subject next to the email so ``--owner orin`` matches work stamped with
-that subject.
+``orin@datatalks.club`` (Orin) holds the ``operator`` role: the same rights
+as every allowlisted operator — workflows, runs, inbox, polls, schedules,
+errors, credentials, grants, tokens, and everything else the console and
+the agent API gate on the operator allowlist. The directory row keeps the
+stable alias (``--owner orin`` and the console "View as" control) and the
+first sign-in records the DTC subject next to the email so work stamped
+with that subject resolves to the alias.
 
-A full operator (the allowlist, or any other DTC account while the
-allowlist is empty) is unchanged and can narrow a list to one agent's
-work. That narrowing is a read filter. It does not change who a write
-runs as.
+The ``agent`` band stays available for future least-privilege rows: an
+agent passes only ``AGENT_ACTIONS`` (or ``workflow.*``) on the CLI bearer
+gate, is owner-scoped by the G17 write gate, and is refused on console
+routes outside ``console_allowed``. With no agent rows every directory entry
+is a full operator and the operator allowlist decides exactly as before.
 """
 
 import os
@@ -42,12 +43,13 @@ AGENT_ACTIONS = frozenset({
 
 # The directory is the user record. Email is the stable key until the
 # DTC subject is known; alias is what `--owner orin` and the console
-# "View as" control use.
+# "View as" control use. Orin holds the operator role: the same rights as
+# the operator allowlist grants Alexey's account.
 DIRECTORY = (
     {
         "alias": "orin",
         "email": "orin@datatalks.club",
-        "role": ROLE_AGENT,
+        "role": ROLE_OPERATOR,
         "display_name": "Orin",
     },
 )
@@ -99,8 +101,9 @@ def stable_subject(payload):
 
 
 def gate(payload):
-    """``agent``, ``operator``, or None. A directory row narrows an
-    allowlisted operator; with no row the allowlist decides as before."""
+    """``agent``, ``operator``, or None. A directory row with the agent
+    role narrows an allowlisted operator to least privilege; a row with
+    the operator role (or no row) leaves the allowlist to decide."""
     if is_agent(payload):
         return ROLE_AGENT
     if authz.is_operator(payload):
