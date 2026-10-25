@@ -280,6 +280,11 @@ Resources:
                 Resource:
                   - !GetAtt EventQueue.Arn
                   - !GetAtt DropboxQueue.Arn
+              # Inline designer/CLI tests execute render_html_to_pdf in the
+              # API process. Its queue URL is supplied by the stack.
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt RenderQueue.Arn
         - PolicyName: dapier-api-provider-secrets
           PolicyDocument:
             Version: '2012-10-17'

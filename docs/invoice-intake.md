@@ -72,6 +72,15 @@ DataOps or parse invoice contents. DataOps handles extraction, verification and
 spreadsheet publication, and uses its own stable document ID for archive names.
 Nothing in Dapier keeps invoice state.
 
+The body render action also runs inside `IngressFunction` when invoked by
+the Console designer or `dapier workflows test --execute` / `test-step
+--execute`. Its `ApiExecutionRole` therefore needs `sqs:SendMessage` on
+the stack's `RenderQueue`, as well as the existing render-artifact S3
+access. The stack supplies `RENDER_QUEUE_URL` directly; this path needs no
+queue lookup, attribute, receive, or delete permissions. Verify queue
+submission with an unsaved TEST workflow and a distinct test route so its
+renderer completion cannot match the invoice completion workflow.
+
 Filename preview contract (DataOps intake response): when the intake
 returns `invoices: [{invoiceId, counterparty, transactionDate (YYYY-MM-DD),
 invoiceNumber}]` alongside `status/intakeItemId/artifacts`, build-filename

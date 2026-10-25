@@ -64,6 +64,23 @@ def test_api_can_enqueue_agent_host_tasks():
     assert "sqs:SendMessage" in actions
 
 
+def test_api_can_enqueue_render_jobs_with_send_only_permission():
+    resources = _resources()
+    # Inline designer/CLI execution runs the real renderer in IngressFunction.
+    assert resources["IngressFunction"]["Properties"]["Role"] == "ApiExecutionRole.Arn"
+    grants = []
+    for statement in _api_role_statements(resources):
+        targets = statement.get("Resource")
+        targets = [targets] if isinstance(targets, str) else (targets or [])
+        if "RenderQueue.Arn" in targets:
+            grants.append(statement)
+    assert grants == [{
+        "Effect": "Allow",
+        "Action": "sqs:SendMessage",
+        "Resource": "RenderQueue.Arn",
+    }]
+
+
 def test_hook_claims_and_poll_cleanup_have_scoped_cursor_write_permissions():
     grants = [s for s in _api_role_statements(_resources())
               if s.get("Resource") == "CursorsTable.Arn"
