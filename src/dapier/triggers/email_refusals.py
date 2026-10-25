@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 
 from . import email_from, email_triggers
 
@@ -61,8 +62,10 @@ def signal(event, *, table_ref=None, cloudwatch=None, now=None):
         return 0
     address = email_triggers.address_for(route)
     senders = email_from.sender_addresses(event)
-    logger.error("inbound email refused: sender not allowed; address=%s sender=%s workflows=%s",
-                 address, ",".join(senders) or "unknown", ",".join(owners))
+    logger.error("inbound email refused: sender not allowed; address=%s sender=%s "
+                 "workflows=%s rule=%s event_id=%s run_id=not-started",
+                 address, ",".join(senders) or "unknown", ",".join(owners),
+                 "sender_not_in_allowlist" if senders else "missing_sender", event.get("id"))
     if _operator_notice(event, senders):
         return 0
 
@@ -97,3 +100,66 @@ def signal(event, *, table_ref=None, cloudwatch=None, now=None):
             raise
         emitted += 1
     return emitted
+
+
+def alarm_details(changed_at=None, *, table_ref=None):
+    """Envelope-only context for refusals in the alarm's 24-hour window.
+
+    Refusals happen before a run exists. The inbox id is the stable delivery
+    reference; never fabricate a run or include subjects, bodies, attachments,
+    or arbitrary event data in the alert. Read the existing inbox so alerts
+    also explain refusals recorded before this notifier was deployed.
+    """
+    import boto3
+    from . import inbox
+
+    until = (datetime.fromisoformat(changed_at.replace("Z", "+00:00"))
+             if changed_at else datetime.now(timezone.utc)).astimezone(timezone.utc)
+    since = until - timedelta(seconds=WINDOW_SECONDS)
+    table = table_ref if table_ref is not None else boto3.resource("dynamodb").Table(
+        os.environ[inbox.TABLE_ENV])
+    owners = {}
+    for row in email_triggers.managed_routes():
+        if row["status"] == "enabled":
+            owners.setdefault(row["name"], set()).add(row["workflow"])
+    # A projection prevents loading email bodies or other event payloads.
+    kwargs = {
+        "FilterExpression": "#status = :ignored AND connector = :email "
+                            "AND #error = :reason AND processed_at >= :since",
+        "ExpressionAttributeNames": {"#status": "status", "#error": "error", "#from": "from"},
+        "ExpressionAttributeValues": {":ignored": inbox.IGNORED, ":email": "email",
+                                      ":reason": "sender not allowed", ":since": since.isoformat()},
+        "ProjectionExpression": "inbox_id, processed_at, email.#from, email.from_address, "
+                                "email.route, email.subject",
+    }
+    details = []
+    while True:
+        page = table.scan(**kwargs)
+        for item in page.get("Items") or []:
+            processed = datetime.fromisoformat(item["processed_at"].replace("Z", "+00:00"))
+            if not since <= processed <= until:
+                continue
+            envelope = item.get("email") or {}
+            route = envelope.get("route") or ""
+            workflows = sorted(owners.get(route) or [])
+            event = {"data": {"from": envelope.get("from_address") or envelope.get("from"),
+                              "subject": envelope.get("subject")}}
+            senders = email_from.sender_addresses(event)
+            if not workflows or _operator_notice(event, senders):
+                continue
+            details.append((processed, (
+                f"recipient: {email_triggers.address_for(route)}\n"
+                f"sender: {', '.join(senders) or 'unknown'}\n"
+                f"rule: {'sender_not_in_allowlist' if senders else 'missing_sender'}\n"
+                f"workflow: {', '.join(workflows)}\n"
+                f"inbox/event id: {item['inbox_id']}\n"
+                "run id: not started (refused before workflow execution)"
+            )))
+        if not page.get("LastEvaluatedKey"):
+            break
+        kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+    details.sort(key=lambda row: row[0], reverse=True)
+    shown = [row[1] for row in details[:20]]
+    if len(details) > 20:
+        shown.append(f"{len(details) - 20} additional refusals; inspect dapier inbox list --outcome refused.")
+    return "\n\n".join(shown) or "No retained refusal context; inspect worker ERROR logs and dapier inbox list --outcome refused."

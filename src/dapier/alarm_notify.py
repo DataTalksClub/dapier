@@ -42,12 +42,24 @@ def _summarize(event, sender):
             message = json.loads(raw)
             alarm = message.get("AlarmName", "unknown-alarm")
             reason = message.get("NewStateReason", raw)
+            trigger = message.get("Trigger") or {}
+            if (trigger.get("Namespace") == "Dapier/Triggers"
+                    and trigger.get("MetricName") == "EmailSenderPolicyRefused"
+                    and message.get("NewStateValue") == "ALARM"):
+                from .triggers.email_refusals import alarm_details
+
+                # Keep the bounded CloudWatch reason separate from the details:
+                # its 2000-char cap must not truncate the actionable context.
+                details = alarm_details(message.get("StateChangeTime"))
+            else:
+                details = ""
         except (ValueError, AttributeError):
-            alarm, reason = "unknown-alarm", raw
+            alarm, reason, details = "unknown-alarm", raw, ""
         subjects.append(f"[dapier] alarm: {alarm}")
         bodies.append(
             "A dapier CloudWatch alarm changed state.\n"
             f"\nalarm: {alarm}\n\n{str(reason)[:2000]}\n"
+            + (f"\nSender-policy refusals (last 24 hours):\n\n{details}\n" if details else "")
         )
     subject = subjects[0] if len(subjects) == 1 else f"[dapier] {len(subjects)} alarms fired"
     return "\n".join(bodies), subject

@@ -89,3 +89,47 @@ class HandlerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_sender_refusal_alarm_includes_context_beyond_reason_cap():
+    import json
+    from src.dapier.triggers import email_refusals
+
+    details = ("recipient: invoice@example.test\nsender: test@example.test\n"
+               "rule: sender_not_in_allowlist\nworkflow: invoice-intake\n"
+               "inbox/event id: event-1\nrun id: not started")
+    message = {"AlarmName": "sender-refusal", "NewStateValue": "ALARM",
+               "NewStateReason": "x" * 2500, "StateChangeTime": "2026-10-25T12:15:00Z",
+               "Trigger": {"Namespace": "Dapier/Triggers", "MetricName": email_refusals.METRIC}}
+    with patch.object(email_refusals, "alarm_details", return_value=details) as lookup:
+        body, _ = alarm_notify._summarize(sns_event(json.dumps(message)), "ops@example.test")
+    lookup.assert_called_once_with("2026-10-25T12:15:00Z")
+    assert details in body
+    assert "x" * 2001 not in body
+
+
+def test_other_alarm_and_ok_transition_do_not_read_refusal_inbox():
+    import json
+    from src.dapier.triggers import email_refusals
+
+    with patch.object(email_refusals, "alarm_details") as lookup:
+        for namespace, metric, state in [("Other", email_refusals.METRIC, "ALARM"),
+                                         ("Dapier/Triggers", "Other", "ALARM"),
+                                         ("Dapier/Triggers", email_refusals.METRIC, "OK")]:
+            alarm_notify._summarize(sns_event(json.dumps({
+                "AlarmName": "X", "NewStateValue": state,
+                "Trigger": {"Namespace": namespace, "MetricName": metric},
+            })), "ops@example.test")
+    lookup.assert_not_called()
+
+
+def test_refusal_context_read_failure_retries_notification():
+    import json
+    import pytest
+    from src.dapier.triggers import email_refusals
+
+    message = {"AlarmName": "sender-refusal", "NewStateValue": "ALARM",
+               "Trigger": {"Namespace": "Dapier/Triggers", "MetricName": email_refusals.METRIC}}
+    with patch.object(email_refusals, "alarm_details", side_effect=RuntimeError("read unavailable")):
+        with pytest.raises(RuntimeError, match="read unavailable"):
+            alarm_notify.handler(sns_event(json.dumps(message)))

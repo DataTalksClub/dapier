@@ -37,12 +37,18 @@ applied on production on 2026-10-24; these commands document setup, not a
 request to reapply it.
 
 Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
-the address, sender, and owning workflows, and emit `EmailSenderPolicyRefused`
+the address, sender, owning workflows, policy rule, and event id, and emit `EmailSenderPolicyRefused`
 in `Dapier/Triggers`. Atomic claims in the cursors table dedupe each
 address/sender pair for 24 hours, including concurrent workers and queue
 redeliveries. `EmailSenderPolicyRefusalAlarm` uses the existing operator alarm
 topic and stays active while any hour in the last day has a refusal. The
 inbox still shows `refused: sender not allowed`; no workflow action runs.
+Alarm emails include recipient, sender, rule (`sender_not_in_allowlist` or
+`missing_sender`), owning workflow, and inbox/event id from refusals in the
+24-hour evaluation window. A refused email has no run id because it never
+starts a workflow; the alert states this explicitly. The notifier reads only
+envelope metadata from the existing inbox and lists at most 20 recent
+refusals, without message subjects, bodies, attachments, or arbitrary payloads.
 Disabled, auto-paused, and unclaimed addresses do not emit the signal.
 
 The refusal handler sends no email or forwards mail. Refused Dapier operator

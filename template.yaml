@@ -1014,8 +1014,9 @@ Resources:
     Properties:
       AlarmDescription: >
         Inbound email was refused by sender policy at an enabled workflow
-        mailbox. Check worker ERROR logs for the address and sender, then
-        inspect that address's sender allowlist through dapier emails from.
+        mailbox. The alert lists recipient, sender, rule, workflow, and inbox/event
+        id (no run starts for a refused delivery). Inspect the sender allowlist
+        through dapier emails from.
       Namespace: Dapier/Triggers
       MetricName: EmailSenderPolicyRefused
       Statistic: Sum
@@ -1045,6 +1046,10 @@ Resources:
             Effect: Allow
             Action: [ses:SendEmail]
             Resource: '*'
+        - DynamoDBReadPolicy:
+            TableName: !Ref TriggerInboxTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PublishedWorkflowsTable
       Events:
         Alarm:
           Type: SNS

@@ -68,6 +68,7 @@ def test_worker_refusal_logs_error_and_signals_enabled_mailbox(monkeypatch, sign
     assert "dev@dtcdev.click" in caplog.text
     assert "noreply@datatalks.club" in caplog.text
     assert "sender not allowed" in caplog.text
+    assert "rule=sender_not_in_allowlist event_id=email-1 run_id=not-started" in caplog.text
     cloudwatch.put_metric_data.assert_called_once_with(
         Namespace="Dapier/Triggers", MetricData=[{
             "MetricName": "EmailSenderPolicyRefused", "Value": 1, "Unit": "Count"}])
@@ -167,3 +168,68 @@ def test_refusal_alarm_uses_existing_operator_topic():
     assert alarm["Period"] * alarm["EvaluationPeriods"] == 86400
     assert alarm["DatapointsToAlarm"] == 1
     assert alarm["TreatMissingData"] == "notBreaching"
+    policies = template["Resources"]["AlarmNotifyFunction"]["Properties"]["Policies"]
+    assert {"DynamoDBReadPolicy": {"TableName": "TriggerInboxTable"}} in policies
+    assert {"DynamoDBReadPolicy": {"TableName": "PublishedWorkflowsTable"}} in policies
+
+
+def test_alarm_context_reads_paginated_envelopes_and_excludes_content(monkeypatch, signal_store):
+    from src.dapier.triggers import inbox
+
+    with mock_aws():
+        table = boto3.resource("dynamodb", region_name="eu-west-1").create_table(
+            TableName="inbox", BillingMode="PAY_PER_REQUEST",
+            KeySchema=[{"AttributeName": "inbox_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "inbox_id", "AttributeType": "S"}],
+        )
+        for event_id, route, sender, at, subject in [
+            ("refused-1", "dev", "outsider@example.test", "2026-10-25T12:14:47+00:00", "private subject"),
+            ("missing-sender", "dev", "", "2026-10-25T12:13:00+00:00", "private subject"),
+            ("old", "dev", "outsider@example.test", "2026-10-24T12:14:47+00:00", "private subject"),
+            ("later", "dev", "outsider@example.test", "2026-10-25T12:16:00+00:00", "private subject"),
+            ("unclaimed", "unknown", "outsider@example.test", "2026-10-25T12:14:47+00:00", "private subject"),
+            ("operator-loop", "dev", "alerts@dtcdev.click", "2026-10-25T12:14:47+00:00", "[dapier] alarm: X"),
+        ]:
+            table.put_item(Item={
+                "inbox_id": event_id, "connector": "email", "status": inbox.IGNORED,
+                "error": "sender not allowed", "processed_at": at,
+                "email": {"route": route, "from_address": sender, "subject": subject,
+                          "text": "private body", "html": "private html", "attachments": ["private file"]},
+                "data": {"secret": "must not be loaded"},
+            })
+        requests = []
+        class Paginated:
+            def scan(self, **kwargs):
+                requests.append(kwargs)
+                return table.scan(**kwargs, Limit=1)
+        details = email_refusals.alarm_details("2026-10-25T14:15:00+02:00", table_ref=Paginated())
+    assert len(requests) > 1
+    assert "ExclusiveStartKey" in requests[1]
+    assert "recipient: dev@dtcdev.click" in details
+    assert "sender: outsider@example.test" in details
+    assert "workflow: dev-mailbox" in details
+    assert "rule: sender_not_in_allowlist" in details
+    assert "rule: missing_sender" in details
+    assert "inbox/event id: refused-1" in details
+    assert "run id: not started" in details
+    for private in ("private subject", "private body", "private html", "private file", "must not be loaded",
+                    "inbox/event id: old", "inbox/event id: later", "unclaimed", "operator-loop"):
+        assert private not in details
+    for request in requests:
+        assert "data" not in request["ProjectionExpression"]
+        assert "text" not in request["ProjectionExpression"]
+        assert "html" not in request["ProjectionExpression"]
+        assert "attachments" not in request["ProjectionExpression"]
+
+
+def test_alarm_context_is_bounded_and_explains_missing_context(signal_store):
+    table = Mock()
+    table.scan.return_value = {"Items": []}
+    assert "No retained refusal context" in email_refusals.alarm_details(table_ref=table)
+    table.scan.return_value = {"Items": [{
+        "inbox_id": f"event-{i}", "processed_at": "2026-10-25T12:14:47+00:00",
+        "email": {"route": "dev", "from": "outsider@example.test"},
+    } for i in range(21)]}
+    details = email_refusals.alarm_details("2026-10-25T12:15:00Z", table_ref=table)
+    assert details.count("recipient:") == 20
+    assert "1 additional refusals" in details
