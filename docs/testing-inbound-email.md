@@ -23,6 +23,12 @@ The worker now checks inbound-email provenance before normalization, raw MIME
 reads, attachment staging, sender policy, or matching. Direct queue messages
 require an AWS SQS SenderId for the intake, API replay, or worker retry role.
 SNS notifications require a valid AWS signature and a configured inbound topic.
+Raw SNS contracts use the protected queue's AWS event-source metadata. Its
+resource policy explicitly denies SendMessage from all principals except
+Dapier producer roles and AWS services; the SNS allow statement permits only
+the configured inbound topics. Thus operator/agent IAM grants cannot inject
+hand-built receipts into the live queue. Raw delivery subscriptions remain
+unchanged.
 Event IDs, S3 pointers, and message attributes cannot establish provenance.
 Untrusted inbound events are recorded as ignored with an invalid-provenance
 error and a WARNING log; no workflow runs and no refusal metric is emitted.

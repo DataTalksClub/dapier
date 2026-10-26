@@ -3,7 +3,10 @@
 SQS supplies SenderId as a system attribute (never a message attribute).
 Direct messages must come from Dapier's intake, API replay or worker retry
 roles. SNS messages must carry a valid AWS signature from a configured
-inbound topic. Payload fields, TEST IDs and S3 pointers confer no trust.
+inbound topic. Raw SNS contracts instead use the protected EventQueue's
+AWS-generated eventSourceARN: its resource policy denies direct publishing
+except Dapier producer roles and grants SNS only the configured source topics.
+Payload fields, TEST IDs and S3 pointers confer no trust.
 """
 import base64
 import os
@@ -81,4 +84,11 @@ def has_valid_provenance(payload, record):
     sender = str((record.get("attributes") or {}).get("SenderId", ""))
     role_id, separator, session = sender.partition(":")
     trusted = set(filter(None, os.environ.get("EMAIL_PUBLISHER_ROLE_IDS", "").split(",")))
-    return bool(separator and session and role_id in trusted)
+    if separator and session and role_id in trusted:
+        return True
+    # RawMessageDelivery omits SNS signatures. Only inbound contracts arriving
+    # through the queue protected by DenyUntrustedPublishers may use this path.
+    # eventSourceARN is Lambda/SQS metadata, not part of SendMessage's body.
+    queue_arn = os.environ.get("INBOUND_EMAIL_QUEUE_ARN")
+    return bool(payload.get("contract") == "inbound-email" and queue_arn and
+                record.get("eventSourceARN") == queue_arn)

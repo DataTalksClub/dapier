@@ -93,9 +93,13 @@ def test_synthetic_event_takes_invalid_provenance_path(mailbox, monkeypatch, cap
     if fake_pointer:
         synthetic["data"]["s3"] = {"bucket": "mail-bucket", "key": "raw/fake"}
     monkeypatch.setattr(worker, "normalize_payload", Mock(side_effect=AssertionError("must not normalize")))
+    queue_arn = "arn:aws:sqs:eu-west-1:817685572750:events"
+    monkeypatch.setenv("INBOUND_EMAIL_QUEUE_ARN", queue_arn)
     with caplog.at_level(logging.WARNING):
         result = worker.handler({"Records": [{"messageId": "sqs-9",
-                                               "body": json.dumps(synthetic)}]}, None)
+            "eventSourceARN": queue_arn,
+            "attributes": {"SenderId": "AROAAGENT:synthetic-test"},
+            "body": json.dumps(synthetic)}]}, None)
     assert result == {"batchItemFailures": []}
     ignore.assert_called_once_with(
         "inbox-9", error=email_provenance.INVALID_PROVENANCE_ERROR)
@@ -136,7 +140,8 @@ def test_genuine_non_allowlisted_sender_still_refused_and_counted(
             "MetricName": "EmailSenderPolicyRefused", "Value": 1, "Unit": "Count"}])
 
 
-def test_genuine_relay_sns_non_allowlisted_sender_still_refused(mailbox, monkeypatch, caplog):
+@pytest.mark.parametrize("raw_delivery", [False, True])
+def test_genuine_relay_sns_non_allowlisted_sender_still_refused(mailbox, monkeypatch, caplog, raw_delivery):
     table, cloudwatch = mailbox
     _sender_gate(monkeypatch)
     monkeypatch.setattr(worker, "_note_email_event", Mock())
@@ -163,8 +168,15 @@ def test_genuine_relay_sns_non_allowlisted_sender_still_refused(mailbox, monkeyp
         "subject": "invoice", "raw_mime": {"bucket": "b", "key": "raw/sns-1"},
     }
     caplog.set_level(logging.ERROR)
-    envelope = signed_notification(relay, monkeypatch)
-    result = worker.handler({"Records": [{"messageId": "m1", "body": json.dumps(envelope)}]}, None)
+    record = {"messageId": "m1"}
+    if raw_delivery:
+        monkeypatch.setenv("INBOUND_EMAIL_QUEUE_ARN", "arn:aws:sqs:eu-west-1:817685572750:events")
+        record["eventSourceARN"] = "arn:aws:sqs:eu-west-1:817685572750:events"
+        envelope = relay
+    else:
+        envelope = signed_notification(relay, monkeypatch)
+    record["body"] = json.dumps(envelope)
+    result = worker.handler({"Records": [record]}, None)
     assert result == {"batchItemFailures": []}
     ignore.assert_called_once_with("inbox-sns", error="sender not allowed")
     execute.assert_not_called()
@@ -217,3 +229,38 @@ def test_template_wires_trusted_publishers_and_zero_schedule():
         {"Fn::GetAtt": ["WorkerFunctionRole", "RoleId"]}]]}
     assert variables["INBOUND_EMAIL_TOPICS"] == {"Join": [",", [
         {"Ref": "InboundEmailTopicArn"}, {"Ref": "LegacyInboundEmailTopicArn"}]]}
+
+
+def test_raw_sns_contract_requires_protected_queue_metadata(monkeypatch):
+    queue = "arn:aws:sqs:eu-west-1:817685572750:dapier-events"
+    monkeypatch.setenv("INBOUND_EMAIL_QUEUE_ARN", queue)
+    raw = {"contract": "inbound-email", "version": 1, "event_id": "mail-1"}
+    assert not email_provenance.has_valid_provenance(raw, {})
+    assert not email_provenance.has_valid_provenance(dict(raw, eventSourceARN=queue), {})
+    assert not email_provenance.has_valid_provenance(raw, {"eventSourceARN": queue + "-other"})
+    assert email_provenance.has_valid_provenance(raw, {"eventSourceARN": queue})
+
+
+def test_queue_policy_denies_arbitrary_direct_publishers():
+    import yaml
+    from test_template_alarms import load_alarms
+    with open("template.yaml") as stream:
+        resources = yaml.load(stream, Loader=yaml.SafeLoader)["Resources"]
+    statements = resources["EventQueuePolicy"]["Properties"]["PolicyDocument"]["Statement"]
+    deny = next(s for s in statements if s["Sid"] == "DenyUntrustedPublishers")
+    assert deny["Effect"] == "Deny"
+    assert deny["Principal"] == "*"
+    assert deny["Action"] == "sqs:SendMessage"
+    assert deny["Resource"] == {"Fn::GetAtt": ["EventQueue", "Arn"]}
+    assert deny["Condition"] == {
+        "BoolIfExists": {"aws:PrincipalIsAWSService": "false"},
+        "ArnNotEquals": {"aws:PrincipalArn": [
+            {"Fn::GetAtt": [role, "Arn"]} for role in ["ApiExecutionRole", "EmailIngressFunctionRole",
+            "WorkerFunctionRole", "DropboxResolverFunctionRole", "HtmlRendererFunctionRole"]]}}
+    sns = next(s for s in statements if s["Sid"] == "AllowInboundEmailEvents")
+    assert sns["Principal"] == {"Service": "sns.amazonaws.com"}
+    assert sns["Condition"]["ArnEquals"]["aws:SourceArn"] == [
+        {"Ref": "InboundEmailTopicArn"}, {"Ref": "LegacyInboundEmailTopicArn"}]
+    variables = resources["WorkerFunction"]["Properties"]["Environment"]["Variables"]
+    assert variables["INBOUND_EMAIL_QUEUE_ARN"] == {"Fn::GetAtt": ["EventQueue", "Arn"]}
+    assert resources["WorkerFunction"]["DependsOn"] == "EventQueuePolicy"

@@ -760,6 +760,7 @@ Resources:
 
   WorkerFunction:
     Type: AWS::Serverless::Function
+    DependsOn: EventQueuePolicy
     Properties:
       CodeUri: .
       Handler: src.dapier.engine.worker.handler
@@ -771,6 +772,7 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
+          INBOUND_EMAIL_QUEUE_ARN: !GetAtt EventQueue.Arn
           EMAIL_PUBLISHER_ROLE_IDS: !Join
             - ','
             - - !GetAtt EmailIngressFunctionRole.RoleId
@@ -984,6 +986,23 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
+          # Explicit deny overrides operator/agent identity-policy SendMessage
+          # grants. Raw SNS deliveries are authenticated by this queue boundary.
+          - Sid: DenyUntrustedPublishers
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:SendMessage
+            Resource: !GetAtt EventQueue.Arn
+            Condition:
+              BoolIfExists:
+                aws:PrincipalIsAWSService: 'false'
+              ArnNotEquals:
+                aws:PrincipalArn:
+                  - !GetAtt ApiExecutionRole.Arn
+                  - !GetAtt EmailIngressFunctionRole.Arn
+                  - !GetAtt WorkerFunctionRole.Arn
+                  - !GetAtt DropboxResolverFunctionRole.Arn
+                  - !GetAtt HtmlRendererFunctionRole.Arn
           - Sid: AllowInboundEmailEvents
             Effect: Allow
             Principal: {Service: sns.amazonaws.com}
