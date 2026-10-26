@@ -28,4 +28,9 @@ Untrusted inbound events are recorded as ignored with an invalid-provenance
 error and a WARNING log; no workflow runs and no refusal metric is emitted.
 
 Genuine non-allowlisted mail still logs ERROR and emits the existing deduplicated
-EmailSenderPolicyRefused metric.
+EmailSenderPolicyRefused metric. A minute schedule adds zero values to this
+metric: hourly Sum preserves every refusal, while regular data prevents
+CloudWatch's sparse-metric evaluation lookback from retaining an expired
+refusal. Threshold, period, evaluation count, missing-data policy, and alarm
+actions are unchanged. See AWS's
+[missing-data evaluation documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/alarms-and-missing-data.html).

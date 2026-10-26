@@ -1045,6 +1045,32 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions: [!Ref AlarmTopic]
 
+  # Explicit zeros prevent sparse-metric lookback retaining an old refusal.
+  # Sum still includes every real refusal; no alarm setting changes.
+  EmailRefusalHeartbeatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dapier.triggers.email_refusals.heartbeat
+      Runtime: python3.12
+      Architectures: [arm64]
+      Timeout: 15
+      MemorySize: 128
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action: cloudwatch:PutMetricData
+            Resource: '*'
+            Condition:
+              StringEquals:
+                cloudwatch:namespace: Dapier/Triggers
+      Events:
+        Heartbeat:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+            Enabled: true
+
   AlarmNotifyFunction:
     Type: AWS::Serverless::Function
     Properties:

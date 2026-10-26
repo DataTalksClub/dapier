@@ -163,3 +163,11 @@ def alarm_details(changed_at=None, *, table_ref=None):
     if len(details) > 20:
         shown.append(f"{len(details) - 20} additional refusals; inspect dapier inbox list --outcome refused.")
     return "\n\n".join(shown) or "No retained refusal context; inspect worker ERROR logs and dapier inbox list --outcome refused."
+
+
+def heartbeat(event, context):
+    """Keep the refusal metric dense without changing its hourly Sum."""
+    import boto3
+    boto3.client("cloudwatch").put_metric_data(
+        Namespace="Dapier/Triggers", MetricData=[{
+            "MetricName": METRIC, "Value": 0, "Unit": "Count"}])
