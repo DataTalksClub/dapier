@@ -49,6 +49,7 @@ def test_worker_refusal_logs_error_and_signals_enabled_mailbox(monkeypatch, sign
     sender_table.get_item.return_value = {"Item": {"mode": "allowlist",
                                                   "addresses": list(email_from.SEED)}}
     monkeypatch.setattr(email_from, "_table", lambda _: sender_table)
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")
     monkeypatch.setattr(worker, "_note_email_event", Mock())
     monkeypatch.setattr(worker.inbox, "record", lambda _: "inbox-1")
     ignore = Mock()
@@ -61,7 +62,7 @@ def test_worker_refusal_logs_error_and_signals_enabled_mailbox(monkeypatch, sign
     event = mail(subject="other subject")
     with caplog.at_level(logging.ERROR):
         result = worker.handler({"Records": [{"messageId": "sqs-1",
-                                              "body": json.dumps(event)}]}, None)
+                                              "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(event)}]}, None)
     assert result == {"batchItemFailures": []}
     ignore.assert_called_once_with("inbox-1", error="sender not allowed")
     execute.assert_not_called()
@@ -233,3 +234,8 @@ def test_alarm_context_is_bounded_and_explains_missing_context(signal_store):
     details = email_refusals.alarm_details("2026-10-25T12:15:00Z", table_ref=table)
     assert details.count("recipient:") == 20
     assert "1 additional refusals" in details
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")

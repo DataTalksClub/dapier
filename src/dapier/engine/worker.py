@@ -988,6 +988,23 @@ def handler(event, _context):
                 # record, no matching — the captured remainder replays as-is.
                 _resume_run(payload[RESUME_KEY])
                 continue
+            from ..triggers import email_provenance
+
+            if not email_provenance.has_valid_provenance(payload, record):
+                # Do not normalize: that can fetch raw MIME and stage files.
+                # Retain only the envelope for operator inspection.
+                untrusted = payload
+                if payload.get("Type") == "Notification":
+                    untrusted = json.loads(payload["Message"])
+                if untrusted.get("contract") == "inbound-email":
+                    untrusted = {"id": untrusted.get("event_id"), "connector": "email",
+                                 "event": "message.received", "data": untrusted}
+                inbox_id = inbox.record(untrusted)
+                inbox.ignore(inbox_id, error=email_provenance.INVALID_PROVENANCE_ERROR)
+                logger.warning("inbound email ignored: invalid provenance; event_id=%s; "
+                               "no workflow ran; use dapier workflows test for synthetic events",
+                               untrusted.get("id"))
+                continue
             payload = normalize_payload(payload)
             if payload.get("connector") == "email":
                 _note_email_event()

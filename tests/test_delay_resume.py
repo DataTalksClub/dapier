@@ -618,7 +618,7 @@ class TestHandlerPark:
         monkeypatch.setattr(worker, "execute",
                             lambda payload, **hooks: (_ for _ in ()).throw(a_suspension()))
         monkeypatch.setattr(worker, "_sqs", lambda: sqs)
-        event = {"Records": [{"messageId": "m1",
+        event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1",
                               "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
 
         result = worker.handler(event, None)
@@ -655,7 +655,7 @@ class TestHandlerPark:
         monkeypatch.setattr(worker, "execute",
                             lambda payload, **hooks: (_ for _ in ()).throw(a_suspension()))
         monkeypatch.setattr(worker, "_park_suspension", broken_park)
-        event = {"Records": [{"messageId": "m1",
+        event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1",
                               "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
 
         result = worker.handler(event, None)
@@ -677,7 +677,7 @@ class TestHandlerPark:
         envelope = {"workflow_id": "wf-1", "event": dict(EVENT),
                     "resume_at": time.time() - 1,
                     "segments": [{"steps": [POST], "prefix": "", "scope": None}]}
-        event = {"Records": [{"messageId": "m1",
+        event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1",
                               "body": json.dumps({"dapier_resume": envelope})}]}
 
         result = worker.handler(event, None)
@@ -689,3 +689,9 @@ class TestHandlerPark:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    """Queue fixtures represent the authenticated intake role."""
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")

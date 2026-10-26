@@ -444,13 +444,6 @@ Resources:
                   - !Sub arn:aws:s3:::${MailBucket}/*
         # Designer/CLI execution tests run file-read steps in the API process.
         # Stage and read their bytes just as the worker does.
-        - PolicyName: dapier-api-test-worker-connections
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: [lambda:InvokeFunction]
-                Resource: !GetAtt WorkerFunction.Arn
         - PolicyName: dapier-api-render-artifacts
           PolicyDocument:
             Version: '2012-10-17'
@@ -458,6 +451,19 @@ Resources:
               - Effect: Allow
                 Action: [s3:GetObject, s3:PutObject]
                 Resource: !Sub '${RenderArtifactsBucket.Arn}/*'
+
+  # Separate attachment avoids a role -> worker -> publisher role cycle.
+  ApiWorkerInvokePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: dapier-api-test-worker-connections
+      Roles: [!Ref ApiExecutionRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: !GetAtt WorkerFunction.Arn
 
   IngressFunction:
     Type: AWS::Serverless::Function
@@ -765,6 +771,12 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
+          EMAIL_PUBLISHER_ROLE_IDS: !Join
+            - ','
+            - - !GetAtt EmailIngressFunctionRole.RoleId
+              - !GetAtt ApiExecutionRole.RoleId
+              - !GetAtt WorkerFunctionRole.RoleId
+          INBOUND_EMAIL_TOPICS: !Join [',', [!Ref InboundEmailTopicArn, !Ref LegacyInboundEmailTopicArn]]
           YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
           DEVELOPER_WEBHOOK_SECRET_ID: !Ref DeveloperWebhookSecret
           HUB_INTAKE_TOKEN_SECRET_ID: !Ref HubIntakeTokenSecret

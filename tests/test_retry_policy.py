@@ -189,7 +189,7 @@ def test_handler_retries_a_failed_action_without_batch_failure(monkeypatch):
                return_value=[{"id": "wf-1", "retry": {"attempts": 3, "backoff_seconds": 30}}]):
         queue = FakeQueue()
         monkeypatch.setattr(worker, "_sqs", lambda: queue)
-        event = {"Records": [{"messageId": "m1", "body": json.dumps(EVENT)}]}
+        event = {"Records": [{"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(EVENT)}]}
 
         result = worker.handler(event, None)
 
@@ -210,7 +210,7 @@ def test_handler_notes_the_pending_retry_on_the_inbox_row(monkeypatch):
                return_value=[{"id": "wf-1", "retry": {"attempts": 3}}]):
         queue = FakeQueue()
         monkeypatch.setattr(worker, "_sqs", lambda: queue)
-        worker.handler({"Records": [{"messageId": "m1", "body": json.dumps(EVENT)}]}, None)
+        worker.handler({"Records": [{"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(EVENT)}]}, None)
 
     assert box.recorded == [EVENT]
     assert box.completed == [("evt-1", None, "retry scheduled: a later "
@@ -227,7 +227,7 @@ def test_handler_notifies_once_the_attempts_are_exhausted(monkeypatch):
                return_value=[{"id": "wf-1", "retry": {"attempts": 3}}]):
         queue = FakeQueue()
         monkeypatch.setattr(worker, "_sqs", lambda: queue)
-        record = {"messageId": "m1", "body": json.dumps(EVENT),
+        record = {"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(EVENT),
                   "messageAttributes": {"retry_attempt": {"stringValue": "2"}}}
 
         result = worker.handler({"Records": [record]}, None)
@@ -252,7 +252,7 @@ def test_handler_mid_retry_success_records_the_attempt_and_stays_quiet(monkeypat
     monkeypatch.setattr(worker, "notify_failure", lambda exc, event: notified.append(event))
     queue = FakeQueue()
     monkeypatch.setattr(worker, "_sqs", lambda: queue)
-    record = {"messageId": "m1", "body": json.dumps(EVENT),
+    record = {"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(EVENT),
               "messageAttributes": {"retry_attempt": {"stringValue": "2"}}}
 
     assert worker.handler({"Records": [record]}, None) == {"batchItemFailures": []}
@@ -273,7 +273,7 @@ def test_handler_without_a_retry_key_keeps_todays_behavior(monkeypatch):
         queue = FakeQueue()
         monkeypatch.setattr(worker, "_sqs", lambda: queue)
         result = worker.handler(
-            {"Records": [{"messageId": "m1", "body": json.dumps(EVENT)}]}, None)
+            {"Records": [{"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(EVENT)}]}, None)
 
     assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
     assert notified == []
@@ -400,3 +400,8 @@ class RunHistoryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")

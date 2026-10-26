@@ -85,7 +85,7 @@ def test_worker_ignores_a_stranger_and_runs_an_allowed_sender(monkeypatch):
         ran.clear()
         return worker.handler({"Records": [{
             "messageId": "m",
-            "body": json.dumps(body),
+            "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(body),
         }]}, None)
 
     stranger = {
@@ -109,6 +109,7 @@ def test_worker_ignores_a_stranger_and_runs_an_allowed_sender(monkeypatch):
 
 
 def test_datamailer_sns_uses_the_same_sender_list(monkeypatch):
+    from test_email_provenance import signed_notification
     """Replay the inbound-email v1 shape: sender is {addresses, header}, not a string."""
     from src.dapier.triggers import inbox
 
@@ -139,7 +140,7 @@ def test_datamailer_sns_uses_the_same_sender_list(monkeypatch):
     }
     worker.handler({"Records": [{
         "messageId": "m",
-        "body": json.dumps({"Type": "Notification", "Message": json.dumps(message)}),
+        "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(signed_notification(message, monkeypatch)),
     }]}, None)
     assert ran and ran[0]["connector"] == "email"
     assert ran[0]["data"]["sender"]["addresses"] == ["alexey@datatalks.club"]
@@ -150,7 +151,7 @@ def test_datamailer_sns_uses_the_same_sender_list(monkeypatch):
     message["event_id"] = "sns-2"
     worker.handler({"Records": [{
         "messageId": "m2",
-        "body": json.dumps({"Type": "Notification", "Message": json.dumps(message)}),
+        "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(signed_notification(message, monkeypatch)),
     }]}, None)
     assert ran == []
     assert inbox_table.items["sns-2"]["status"] == "ignored"
@@ -233,6 +234,7 @@ def test_ses_like_event_resolves_route_from_source_or_to(monkeypatch):
 
 
 def test_datamailer_anyone_lets_a_stranger_through(monkeypatch):
+    from test_email_provenance import signed_notification
     from src.dapier.triggers import inbox
 
     _bind(monkeypatch)
@@ -260,7 +262,7 @@ def test_datamailer_anyone_lets_a_stranger_through(monkeypatch):
     }
     worker.handler({"Records": [{
         "messageId": "m",
-        "body": json.dumps({"Type": "Notification", "Message": json.dumps(message)}),
+        "attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps(signed_notification(message, monkeypatch)),
     }]}, None)
     assert ran and ran[0]["data"]["route"] == "newsletter"
     assert inbox_table.items["sns-news"]["status"] != "ignored"
@@ -292,7 +294,7 @@ def test_post_mode_add_and_delete_with_route(monkeypatch):
     with pytest.raises(email_from.FromError, match="unknown route"):
         email_from.api_remove("ada@example.com", route="consulting")
     resp = routes.email_from_add(
-        {"body": json.dumps({"route": "consulting", "mode": "anyone"})}, "op")
+        {"attributes": {"SenderId": "AROAINTAKE:test"}, "body": json.dumps({"route": "consulting", "mode": "anyone"})}, "op")
     assert resp["statusCode"] == 200
     assert json.loads(resp["body"])["routes"]["consulting"]["mode"] == "anyone"
     dropped = routes.email_from_remove(
@@ -395,3 +397,8 @@ def test_cli_emails_from_list_add_remove_and_mode(monkeypatch, capsys):
     assert main.main(["emails", "from", "allowlist", "invoice@dtcdev.click"]) == 0
     assert calls[-1][2] == {"route": "invoice", "mode": "allowlist"}
     assert "invoice now uses an allow-list." in capsys.readouterr().out
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")

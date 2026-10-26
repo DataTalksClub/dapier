@@ -19,7 +19,7 @@ def test_notification_counts_scheduled_and_queue_attempts(monkeypatch, scheduled
     notice = Mock()
     monkeypatch.setattr(worker, '_emit_failure_notice', notice)
     record = {'messageId': 'record', 'body': json.dumps({'id': 'event', 'connector': 'email', 'data': {}}),
-        'attributes': {'ApproximateReceiveCount': str(received)},
+        'attributes': {"SenderId": "AROAINTAKE:test", 'ApproximateReceiveCount': str(received)},
         'messageAttributes': {'retry_attempt': {'stringValue': str(scheduled)}}}
     assert worker.handler({'Records': [record]}, None) == {'batchItemFailures': [{'itemIdentifier': 'record'}]}
     assert notice.called is notify
@@ -31,7 +31,7 @@ def test_success_on_third_delivery_sends_no_failure_email(monkeypatch):
     notice = Mock()
     monkeypatch.setattr(worker, '_emit_failure_notice', notice)
     record = {'messageId': 'record', 'body': json.dumps({'id': 'event', 'connector': 'email'}),
-              'attributes': {'ApproximateReceiveCount': '3'}}
+              'attributes': {"SenderId": "AROAINTAKE:test", 'ApproximateReceiveCount': '3'}}
     assert worker.handler({'Records': [record]}, None) == {'batchItemFailures': []}
     notice.assert_not_called()
 
@@ -39,3 +39,9 @@ def test_success_on_third_delivery_sends_no_failure_email(monkeypatch):
 def test_missing_or_malformed_delivery_counter_is_first_attempt():
     assert worker._notification_attempt({}) == 1
     assert worker._notification_attempt({'attributes': {'ApproximateReceiveCount': 'invalid'}}) == 1
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    """Queue fixtures represent the authenticated intake role."""
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")

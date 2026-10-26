@@ -123,3 +123,14 @@ verify the affected behavior through the Dapier API or CLI. Live email routes,
 sender lists, and other operator configuration are changed through the Console
 or `dapier` CLI after the code deploys. Routine Dapier work does not require
 local AWS credentials or an AWS Gate; use the API and CI/CD path first.
+
+## Testing inbound email (required)
+
+Never inject synthetic inbound email into the live EventQueue, invoke the live
+worker with a fabricated receipt, or publish test receipts to inbound SNS topics.
+Use the Console designer Test action, `dapier workflows test workflow.yaml
+--event @sample.json` (dry-run by default), or the shared HTTP workflow-test API.
+Use `--execute` only when the intended action side effects are authorized.
+See `docs/testing-inbound-email.md`. Inbox/run replay is for an existing delivery;
+it runs live workflows and is not the synthetic test path. Do not change sender
+allowlists to admit test identities.

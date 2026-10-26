@@ -369,7 +369,7 @@ def test_handler_notifies_on_failed_queue_records(monkeypatch):
         raise exc
 
     monkeypatch.setattr(worker, "execute", boom)
-    event = {"Records": [{"messageId": "m1", "attributes": {"ApproximateReceiveCount": "3"},
+    event = {"Records": [{"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test", "ApproximateReceiveCount": "3"},
                           "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
 
     result = worker.handler(event, None)
@@ -386,7 +386,7 @@ def test_handler_records_inbox_outcome(monkeypatch):
                         lambda inbox_id, matched, error=None: completed.append((inbox_id, matched, error)))
     monkeypatch.setattr(worker, "execute", lambda payload, **hooks: ["wf-1"])
 
-    event = {"Records": [{"messageId": "m1",
+    event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1",
                           "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
     result = worker.handler(event, None)
 
@@ -406,7 +406,7 @@ def test_handler_requeues_and_stays_quiet_on_lease_busy(monkeypatch):
         raise worker.LeaseBusy("still processing")
 
     monkeypatch.setattr(worker, "execute", busy)
-    event = {"Records": [{"messageId": "m1",
+    event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1",
                           "body": json.dumps({"id": "evt-1", "connector": "email"})}]}
 
     result = worker.handler(event, None)
@@ -420,7 +420,7 @@ def test_handler_skips_notifications_when_the_payload_never_parses(monkeypatch):
     notified = []
     monkeypatch.setattr(worker, "notify_failure", lambda exc, event: notified.append(event))
     monkeypatch.setattr(worker, "execute", lambda payload, **hooks: None)
-    event = {"Records": [{"messageId": "m1", "body": "not json"}]}
+    event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1", "body": "not json"}]}
 
     result = worker.handler(event, None)
 
@@ -732,7 +732,7 @@ def test_handler_resumes_a_parked_run_before_the_trigger_path(monkeypatch):
                 "segments": [], "step_outputs": {}, "run_id": "wf-1:evt-1"}
     body = json.dumps({"dapier_resume": envelope})
 
-    result = worker.handler({"Records": [{"messageId": "m1", "body": body}]}, None)
+    result = worker.handler({"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1", "body": body}]}, None)
 
     assert result == {"batchItemFailures": []}
     assert resumed == [envelope]  # the captured remainder replays as-is
@@ -760,7 +760,7 @@ def test_handler_parks_a_long_delay_and_the_resume_completes_the_run(monkeypatch
 
     # First delivery: the run parks at the delay step.
     result = worker.handler(
-        {"Records": [{"messageId": "m1", "body": json.dumps(EVENT)}]}, None)
+        {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1", "body": json.dumps(EVENT)}]}, None)
 
     assert result == {"batchItemFailures": []}
     assert ran == ["post"]  # the chain stopped at the pause
@@ -782,7 +782,7 @@ def test_handler_parks_a_long_delay_and_the_resume_completes_the_run(monkeypatch
     completed.clear()
 
     result = worker.handler(
-        {"Records": [{"messageId": "m2",
+        {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m2",
                       "body": json.dumps({"dapier_resume": parked})}]}, None)
 
     assert result == {"batchItemFailures": []}
@@ -809,7 +809,7 @@ def test_handler_fails_the_record_when_parking_cannot_enqueue(monkeypatch):
     monkeypatch.setattr(worker, "_sqs", broken_sqs)
 
     result = worker.handler(
-        {"Records": [{"messageId": "m1", "body": json.dumps(EVENT)}]}, None)
+        {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1", "body": json.dumps(EVENT)}]}, None)
 
     # The park is load-bearing: without it the record fails so the event
     # re-runs (leases dedupe the steps that already ran, the delay suspends
@@ -899,3 +899,9 @@ def test_a_metric_failure_never_raises(monkeypatch):
 
     monkeypatch.setattr(boto3, "client", _boom)
     worker._note_email_event()
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    """Queue fixtures represent the authenticated intake role."""
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")

@@ -455,7 +455,7 @@ def test_handler_sends_the_pause_notice_when_the_streak_trips(counter, live, mon
     _handler_env(counter, live, monkeypatch, notified)
 
     result = worker.handler(
-        {"Records": [{"messageId": "m1", "attributes": {"ApproximateReceiveCount": "3"}, "body": json.dumps(EVENT)}]}, None)
+        {"Records": [{"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test", "ApproximateReceiveCount": "3"}, "body": json.dumps(EVENT)}]}, None)
 
     assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
     assert notified == [("failure", EVENT), ("auto-pause", EVENT)]
@@ -467,7 +467,7 @@ def test_handler_stays_quiet_about_the_pause_below_the_threshold(counter, live,
     _handler_env(counter, live, monkeypatch, notified, streak=1)
 
     result = worker.handler(
-        {"Records": [{"messageId": "m1", "attributes": {"ApproximateReceiveCount": "3"}, "body": json.dumps(EVENT)}]}, None)
+        {"Records": [{"messageId": "m1", "attributes": {"SenderId": "AROAINTAKE:test", "ApproximateReceiveCount": "3"}, "body": json.dumps(EVENT)}]}, None)
 
     assert result == {"batchItemFailures": [{"itemIdentifier": "m1"}]}
     assert notified == [("failure", EVENT)]
@@ -646,3 +646,9 @@ def test_overview_view_defaults_for_an_unpaused_workflow(live):
     assert view["auto_paused_at"] == ""
     assert view["auto_paused_reason"] == ""
     assert view["failures"] == 0
+
+
+@pytest.fixture(autouse=True)
+def trusted_queue_publisher(monkeypatch):
+    """Queue fixtures represent the authenticated intake role."""
+    monkeypatch.setenv("EMAIL_PUBLISHER_ROLE_IDS", "AROAINTAKE")
