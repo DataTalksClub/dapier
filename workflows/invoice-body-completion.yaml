@@ -63,7 +63,7 @@ actions:
 - id: intake-rendered
   type: dataops
   connection_id: dataops
-  auth_secret_id: dapier/dataops
+  auth_secret_id: dapier.dataops
 - id: build-filename
   type: code
   code: |

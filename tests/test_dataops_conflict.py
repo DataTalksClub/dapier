@@ -15,7 +15,7 @@ def _http_error(code, reason="Conflict"):
 
 
 def _run(outcome):
-    action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
+    action = {"type": "dataops", "auth_secret_id": "dapier.dataops",
               "connection_id": "dataops"}
     with patch("src.dapier.engine.actions.base.secrets_value",
                return_value='{"token": "tok"}'), \

@@ -84,10 +84,8 @@ class HubRecorder:
 def hub(monkeypatch):
     """A configured push path: env, fake secretsmanager, recording hub."""
     recorder = HubRecorder()
-    monkeypatch.setattr(youtube_subscriptions, "boto3",
-                        type("B", (), {"client": staticmethod(
-                            lambda name: FakeSecretsClient())}))
-    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_ID", "secret-id")
+    monkeypatch.setattr(youtube_subscriptions, "secret_value", lambda name: "hub-secret")
+    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_NAME", "secret-id")
     monkeypatch.setenv("YOUTUBE_CALLBACK_URL", "https://dapier.example.test/hooks/youtube")
     monkeypatch.setattr(urllib.request, "urlopen", recorder)
     return recorder
@@ -202,7 +200,7 @@ def test_unconfigured_push_path_is_a_silent_no_op(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen",
                         refuse("no hub call without the push config"))
     monkeypatch.delenv("YOUTUBE_CALLBACK_URL", raising=False)
-    monkeypatch.delenv("YOUTUBE_WEBHOOK_SECRET_ID", raising=False)
+    monkeypatch.delenv("YOUTUBE_WEBHOOK_SECRET_NAME", raising=False)
 
     warnings = youtube_subscriptions.reconcile(None, workflow({"equals": "UCa"}))
 
@@ -214,8 +212,7 @@ def test_secret_store_failure_becomes_a_warning(hub, monkeypatch):
         raise ValueError("secrets down")
 
     live_workflows(monkeypatch, [])
-    monkeypatch.setattr(youtube_subscriptions, "boto3",
-                        type("B", (), {"client": staticmethod(broken_secrets)}))
+    monkeypatch.setattr(youtube_subscriptions, "secret_value", broken_secrets)
 
     warnings = youtube_subscriptions.reconcile(None, workflow({"equals": "UCa"}))
 

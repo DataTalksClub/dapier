@@ -14,7 +14,7 @@ register(Action(
         {"key": "connection_id", "label": "DataOps connection", "placeholder": "dataops",
          "required": True, "provider": "dataops",
          "help": "The DataOps connection holds the API origin; this step appends /api/v1/intake/leads or /email-documents."},
-        {"key": "auth_secret_id", "label": "Auth secret ID", "placeholder": "dapier/dataops", "required": True},
+        {"key": "auth_secret_id", "label": "Auth secret ID", "placeholder": "dapier.dataops", "required": True},
         {"key": "extraction_step", "label": "Extraction step", "placeholder": "extract-sponsors",
          "help": "Step id whose output.data carries {newsletter, sponsors[]}. Set this for the sponsors-leads intake; omit for documents."},
         {"key": "document_step", "label": "Document step", "placeholder": "route.then.make-document",

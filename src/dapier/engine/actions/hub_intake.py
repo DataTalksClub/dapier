@@ -2,7 +2,7 @@
 
 Workflows that handle per-bot mailboxes (``dev@``, ``tofu@``) or other dapier
 events use this instead of inventing a second notification path. Token and
-URL come from env / Secrets Manager — never from the workflow YAML.
+URL come from env / the DataOps team secrets store — never from the workflow YAML.
 """
 
 from __future__ import annotations

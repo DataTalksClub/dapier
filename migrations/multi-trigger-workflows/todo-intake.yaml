@@ -51,7 +51,7 @@ actions:
 - id: create-intake
   type: dataops
   connection_id: dataops
-  auth_secret_id: dapier/dataops
+  auth_secret_id: dapier.dataops
 - id: confirm-telegram
   type: condition
   when:

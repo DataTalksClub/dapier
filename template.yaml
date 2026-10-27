@@ -3,6 +3,18 @@ Transform: AWS::Serverless-2016-10-31
 Description: Code-configured serverless automation runner
 
 Parameters:
+  TeamSecretsTable:
+    Type: String
+    Default: dataops-v1-secrets
+  TeamSecretsKeyId:
+    Type: String
+    Default: 420b802e-1d2c-4a51-95e7-f798381303bb
+  YouTubeWebhookSecretName:
+    Type: String
+    Default: youtubewebhooksecret-ehtsdest4scz
+  AdminSecretName:
+    Type: String
+    Default: dapier.admin
   AwsAssumableRoleArns:
     Type: CommaDelimitedList
     Default: arn:aws:iam::387546586013:role/dapier-mailchimp-backup
@@ -15,11 +27,11 @@ Parameters:
   DeveloperWebhookSecret:
     Type: String
     Default: ""
-    Description: Optional Secrets Manager name/ARN for /hooks/developer shared secret (empty disables)
+    Description: Optional DataOps team store name for /hooks/developer shared secret (empty disables)
   HubIntakeTokenSecret:
     Type: String
     Default: ""
-    Description: Optional Secrets Manager name/ARN for Hub intake Bearer token (empty disables Hub notify)
+    Description: Optional DataOps team store name for Hub intake Bearer token (empty disables Hub notify)
   HubIntakeUrl:
     Type: String
     Default: https://hub.dtcdev.click/api/intake/tasks
@@ -118,7 +130,7 @@ Parameters:
     Type: String
     Default: ''
     Description: >
-      Secrets Manager secret name holding a GitHub token (Contents: read/write
+      DataOps team store entry name holding a GitHub token (Contents: read/write
       on the workflows repo). Set to let the console designer commit
       workflows/*.yaml straight to the repo; empty disables designer saves.
   SesNotificationTopics:
@@ -152,6 +164,9 @@ Globals:
     Tracing: Active
     Environment:
       Variables:
+        TEAM_SECRETS_TABLE: !Ref TeamSecretsTable
+        TEAM_SECRETS_KEY_ID: !Ref TeamSecretsKeyId
+        TEAM_SECRETS_REGION: eu-west-1
         AWS_ASSUMABLE_ROLE_ARNS: !Join [",", !Ref AwsAssumableRoleArns]
         S3_RUNTIME_UPLOAD_BUCKETS: !Ref ZoomTranscriptsBucket
         EVENT_QUEUE_URL: !Ref EventQueue
@@ -306,23 +321,20 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource:
-                  - !Ref YouTubeWebhookSecret
-                  - !Ref DapierAdminSecret
-                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*'
-                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/hub-intake-*'
-                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/developer-webhook-*'
-        - !If
-          - HasGithubWorkflowsToken
-          - PolicyName: dapier-api-github-token-read
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action: secretsmanager:GetSecretValue
-                  Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
-          - !Ref AWS::NoValue
+                Action: dynamodb:GetItem
+                Resource: !Sub arn:aws:dynamodb:eu-west-1:${AWS::AccountId}:table/${TeamSecretsTable}
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Sub arn:aws:kms:eu-west-1:${AWS::AccountId}:key/${TeamSecretsKeyId}
+                Condition:
+                  StringEquals:
+                    kms:EncryptionContext:secret:
+                      - !Ref AdminSecretName
+                      - dapier.dataops
+                      - !Ref YouTubeWebhookSecretName
+                      - !Ref DeveloperWebhookSecret
+                      - !Ref HubIntakeTokenSecret
+                      - !Ref GithubWorkflowsTokenSecret
         - PolicyName: dapier-api-dataops-intake-stage
           PolicyDocument:
             Version: '2012-10-17'
@@ -494,18 +506,18 @@ Resources:
       Role: !GetAtt ApiExecutionRole.Arn
       Environment:
         Variables:
-          YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
+          YOUTUBE_WEBHOOK_SECRET_NAME: !Ref YouTubeWebhookSecretName
           # The save path subscribes/unsubscribes WebSub topics on designer
           # saves, toggles, and deletes (designer_store._sync_youtube).
           YOUTUBE_CALLBACK_URL: !Sub https://${DomainName}/hooks/youtube
           # TopicArn allowlist for the SES feedback hook
           # (triggers.intake.ses_notifications); empty accepts any topic.
           SES_NOTIFICATION_TOPICS: !Ref SesNotificationTopics
-          ADMIN_SECRET_ID: !Ref DapierAdminSecret
+          ADMIN_SECRET_NAME: !Ref AdminSecretName
           # Optional Developer notify hook (/hooks/developer) + Hub intake.
           # Secrets created out-of-band; empty IDs leave the hook 503.
-          DEVELOPER_WEBHOOK_SECRET_ID: !Ref DeveloperWebhookSecret
-          HUB_INTAKE_TOKEN_SECRET_ID: !Ref HubIntakeTokenSecret
+          DEVELOPER_WEBHOOK_SECRET_NAME: !Ref DeveloperWebhookSecret
+          HUB_INTAKE_TOKEN_SECRET_NAME: !Ref HubIntakeTokenSecret
           HUB_INTAKE_URL: !Ref HubIntakeUrl
           DAPIER_EMAIL_SENDER: !Ref EmailSender
           DAPIER_ALERT_SENDER: !Ref AlertEmailSender
@@ -681,22 +693,6 @@ Resources:
             Path: /hooks/developer
             Method: POST
 
-  # Standalone (not inline) because the grant exists only when the token
-  # secret is configured; AWS::NoValue inside the function's Policies list
-  # does not survive SAM's template transform.
-  DesignerGithubTokenPolicy:
-    Type: AWS::IAM::Policy
-    Condition: HasGithubWorkflowsToken
-    Properties:
-      PolicyName: dapier-designer-github-token-read
-      Roles: [!Ref ApiExecutionRole]
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action: secretsmanager:GetSecretValue
-            Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GithubWorkflowsTokenSecret}*
-
   EmailIngressFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -735,10 +731,20 @@ Resources:
       Environment:
         Variables:
           YOUTUBE_CALLBACK_URL: !Sub https://${DomainName}/hooks/youtube
-          YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
+          YOUTUBE_WEBHOOK_SECRET_NAME: !Ref YouTubeWebhookSecretName
       Policies:
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref YouTubeWebhookSecret
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !Sub arn:aws:dynamodb:eu-west-1:${AWS::AccountId}:table/${TeamSecretsTable}
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: !Sub arn:aws:kms:eu-west-1:${AWS::AccountId}:key/${TeamSecretsKeyId}
+              Condition:
+                StringEquals:
+                  kms:EncryptionContext:secret:
+                    - !Ref YouTubeWebhookSecretName
+
         # all_workflows reads the managed definitions plus operator triggers.
         - DynamoDBReadPolicy:
             TableName: !Ref PublishedWorkflowsTable
@@ -798,9 +804,9 @@ Resources:
               - !GetAtt ApiExecutionRole.RoleId
               - !GetAtt WorkerFunctionRole.RoleId
           INBOUND_EMAIL_TOPICS: !Join [',', [!Ref InboundEmailTopicArn, !Ref LegacyInboundEmailTopicArn]]
-          YOUTUBE_WEBHOOK_SECRET_ID: !Ref YouTubeWebhookSecret
-          DEVELOPER_WEBHOOK_SECRET_ID: !Ref DeveloperWebhookSecret
-          HUB_INTAKE_TOKEN_SECRET_ID: !Ref HubIntakeTokenSecret
+          YOUTUBE_WEBHOOK_SECRET_NAME: !Ref YouTubeWebhookSecretName
+          DEVELOPER_WEBHOOK_SECRET_NAME: !Ref DeveloperWebhookSecret
+          HUB_INTAKE_TOKEN_SECRET_NAME: !Ref HubIntakeTokenSecret
           HUB_INTAKE_URL: !Ref HubIntakeUrl
           CONNECTIONS_TABLE: !Ref ConnectionsTable
           DAPIER_EMAIL_SENDER: !Ref EmailSender
@@ -827,7 +833,21 @@ Resources:
             Effect: Allow
             Action: [cloudwatch:PutMetricData]
             Resource: '*'
-        - AWSSecretsManagerGetSecretValuePolicy: {SecretArn: '*'}
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !Sub arn:aws:dynamodb:eu-west-1:${AWS::AccountId}:table/${TeamSecretsTable}
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: !Sub arn:aws:kms:eu-west-1:${AWS::AccountId}:key/${TeamSecretsKeyId}
+              Condition:
+                StringEquals:
+                  kms:EncryptionContext:secret:
+                    - dapier.dataops
+                    - !Ref YouTubeWebhookSecretName
+                    - !Ref DeveloperWebhookSecret
+                    - !Ref HubIntakeTokenSecret
+
         # Outbound identity for verified Anthropic LLM connections. Only the worker
         # may mint these tokens; the Anthropic rule pins this role's exact ARN.
         - Statement:
@@ -1843,7 +1863,7 @@ Outputs:
   YouTubeSubscriptionFunctionName:
     Value: !Ref YouTubeSubscriptionFunction
   AdminSecretName:
-    Value: !Ref DapierAdminSecret
+    Value: !Ref AdminSecretName
   CredentialsTableName:
     Value: !Ref CredentialsTable
   CredentialsTableArn:

@@ -21,7 +21,7 @@ actions:
 - id: intake-invoice
   type: dataops
   connection_id: dataops
-  auth_secret_id: dapier/dataops
+  auth_secret_id: dapier.dataops
   dropbox_connection_id: dropbox
   path: '{steps.move-file.output.item.path}'
 trigger:

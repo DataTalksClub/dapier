@@ -7,7 +7,7 @@ import os
 import time
 import urllib.parse
 
-import boto3
+from ..secrets import value as secret_value
 
 from .. import audit as audit_log
 from .. import http
@@ -25,9 +25,7 @@ def _credentials():
     # The generated "password" is the HMAC key for signed session cookies.
     global _admin_secret
     if _admin_secret is None:
-        value = boto3.client("secretsmanager").get_secret_value(
-            SecretId=os.environ["ADMIN_SECRET_ID"]
-        )["SecretString"]
+        value = secret_value(os.environ["ADMIN_SECRET_NAME"])
         _admin_secret = json.loads(value)
     return _admin_secret
 

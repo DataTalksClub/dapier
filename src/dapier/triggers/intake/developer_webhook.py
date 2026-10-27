@@ -4,11 +4,11 @@ POST ``/hooks/developer`` (Zoom-style shared-secret auth). Prefer Hub intake
 create so Developer sees the event; optional best-effort assign wakes a
 session when Hub accepts it.
 
-Secrets stay in env / Secrets Manager — never in git:
+Secrets stay in env / the DataOps team secrets store — never in git:
 
-- ``DEVELOPER_WEBHOOK_SECRET`` or ``DEVELOPER_WEBHOOK_SECRET_ID``
+- ``DEVELOPER_WEBHOOK_SECRET`` or ``DEVELOPER_WEBHOOK_SECRET_NAME``
 - ``HUB_INTAKE_URL`` (default ``https://hub.dtcdev.click/api/intake/tasks``)
-- ``HUB_INTAKE_TOKEN_SECRET_ID`` (Secrets Manager; bearer token string or
+- ``HUB_INTAKE_TOKEN_SECRET_NAME`` (the DataOps team secrets store; bearer token string or
   JSON ``{"token": "..."}``)
 """
 
@@ -40,7 +40,7 @@ def webhook_secret():
     raw = (os.environ.get("DEVELOPER_WEBHOOK_SECRET") or "").strip()
     if raw:
         return raw
-    secret_id = (os.environ.get("DEVELOPER_WEBHOOK_SECRET_ID") or "").strip()
+    secret_id = (os.environ.get("DEVELOPER_WEBHOOK_SECRET_NAME") or "").strip()
     if not secret_id:
         return ""
     value = base.secrets_value(secret_id)
@@ -63,7 +63,7 @@ def hub_intake_url():
 
 
 def hub_bearer_token():
-    secret_id = (os.environ.get("HUB_INTAKE_TOKEN_SECRET_ID") or "").strip()
+    secret_id = (os.environ.get("HUB_INTAKE_TOKEN_SECRET_NAME") or "").strip()
     if not secret_id:
         return ""
     value = base.secrets_value(secret_id)
@@ -146,7 +146,7 @@ def create_hub_intake(payload, *, transport=None, token=None, url=None):
     """POST Hub intake create; return ``(status, body_dict_or_text)``."""
     token = token if token is not None else hub_bearer_token()
     if not token:
-        raise RuntimeError("HUB_INTAKE_TOKEN_SECRET_ID is not configured")
+        raise RuntimeError("HUB_INTAKE_TOKEN_SECRET_NAME is not configured")
     endpoint = url or hub_intake_url()
     body = json.dumps(payload, separators=(",", ":")).encode()
     headers = {

@@ -61,9 +61,8 @@ class FakeResponse:
 def test_handler_subscribes_each_configured_channel(monkeypatch):
     monkeypatch.setattr(youtube_subscriptions.engine, "all_workflows",
                         lambda: [workflow({"in": ["UCa", "UCb"]})])
-    monkeypatch.setattr(youtube_subscriptions, "boto3",
-                        type("B", (), {"client": staticmethod(lambda name: FakeSecretsClient())}))
-    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_ID", "secret-id")
+    monkeypatch.setattr(youtube_subscriptions, "secret_value", lambda name: "hub-secret")
+    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_NAME", "secret-id")
     monkeypatch.setenv("YOUTUBE_CALLBACK_URL", "https://dapier.example.test/hooks/youtube")
     bodies = []
 
@@ -105,14 +104,11 @@ def test_handler_reads_secret_id_from_environment(monkeypatch):
                         lambda: [workflow({"equals": "UCa"})])
     seen = {}
 
-    class RecordingSecrets:
-        def get_secret_value(self, SecretId):
-            seen["secret_id"] = SecretId
-            return {"SecretString": "s"}
-
-    monkeypatch.setattr(youtube_subscriptions, "boto3",
-                        type("B", (), {"client": staticmethod(lambda name: RecordingSecrets())}))
-    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_ID", "the-secret-id")
+    def read_secret(name):
+        seen["secret_id"] = name
+        return "s"
+    monkeypatch.setattr(youtube_subscriptions, "secret_value", read_secret)
+    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_NAME", "the-secret-id")
     monkeypatch.setenv("YOUTUBE_CALLBACK_URL", "https://dapier.example.test/hooks/youtube")
     monkeypatch.setattr(urllib.request, "urlopen", lambda request, timeout=15: FakeResponse())
 

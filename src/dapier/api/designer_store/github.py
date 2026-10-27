@@ -57,11 +57,11 @@ def get_token():
     if not secret_id:
         raise SyncConfigError(
             "git sync is not configured: store a GitHub token (Contents: read/write) "
-            "in Secrets Manager and set GithubWorkflowsTokenSecret at deploy time"
+            "in the DataOps team secrets store and set GithubWorkflowsTokenSecret at deploy time"
         )
-    import boto3
+    from ...secrets import value as secret_value
 
-    value = boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"]
+    value = secret_value(secret_id)
     token = str(value).strip()
     if not token:
         raise SyncConfigError(f"the secret {secret_id} is empty")

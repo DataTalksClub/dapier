@@ -26,7 +26,7 @@ if [ "$AUTH_CLI_CLIENT_ID" = "None" ]; then AUTH_CLI_CLIENT_ID=""; fi
 # OPERATOR_EMAILS="a@datatalks.club,b@datatalks.club" to restrict it.
 OPERATOR_EMAILS="${OPERATOR_EMAILS:-}"
 
-# Optional: Secrets Manager secret name holding the GitHub token the console
+# Optional: DataOps team store entry name holding the GitHub token the console
 # designer uses to commit workflows/*.yaml (Contents: read/write on this
 # repo). Omitted when unset so CloudFormation keeps
 # the previously deployed value.

@@ -636,7 +636,7 @@ export const actionCatalog: ActionEntry[] = [
     description: "Push the event into a DataOps intake. The DataOps connection holds the API origin; this step appends /api/v1/intake/leads (when extraction_step is set) or /api/v1/intake/email-documents. Attachments and rendered PDFs — or a Dropbox file event's bytes — are staged with sha256 checksums and referenced by s3:// URI.",
     fields: [
       { key: "connection_id", label: "DataOps connection", placeholder: "dataops", required: true, provider: "dataops", help: "The connection's url is the API origin." },
-      { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier/dataops", required: true },
+      { key: "auth_secret_id", label: "Auth secret ID", placeholder: "dapier.dataops", required: true },
       { key: "extraction_step", label: "Extraction step", placeholder: "extract-sponsors", help: "Step id whose output.data carries {newsletter, sponsors[]}. Set this for the sponsors-leads intake; omit for documents." },
       { key: "dropbox_connection_id", label: "Dropbox connection", placeholder: "dropbox — for file-event intakes", provider: "dropbox" },
       { key: "path", label: "Dropbox file path", placeholder: "{steps.move.output.item.path}" },

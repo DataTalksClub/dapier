@@ -42,7 +42,7 @@ def test_the_shipped_newsletter_sponsors_workflow_validates():
     assert forward["connection_id"] == "dataops"
     assert "url" not in forward
     assert "url_env" not in forward
-    assert forward["auth_secret_id"] == "dapier/dataops"
+    assert forward["auth_secret_id"] == "dapier.dataops"
     assert forward["extraction_step"] == "extract-sponsors"
     # Zero-sponsor issues post sponsors: [], so nothing is absorbed.
     assert "on_fail" not in forward

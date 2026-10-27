@@ -31,7 +31,7 @@ STEPS = {"route.then.make-document": {
     "output": {"merged": True, "parts": 2, "filename": "merged.pdf",
                "output": {"bucket": "artifacts", "key": "invoice-document/ev.pdf"}}}}
 ACTION = {"type": "dataops", "connection_id": "dataops",
-          "auth_secret_id": "dapier/dataops",
+          "auth_secret_id": "dapier.dataops",
           "document_step": "route.then.make-document"}
 
 

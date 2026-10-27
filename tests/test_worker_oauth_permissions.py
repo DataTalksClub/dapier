@@ -20,7 +20,10 @@ CfnLoader.add_multi_constructor("!", intrinsic)
 def test_worker_can_persist_only_oauth_refresh_records():
     template = yaml.load(Path("template.yaml").read_text(), Loader=CfnLoader)
     policies = template["Resources"]["WorkerFunction"]["Properties"]["Policies"]
-    statements = [policy["Statement"] for policy in policies if "Statement" in policy]
+    statements = []
+    for policy in policies:
+        statement = policy.get("Statement", [])
+        statements.extend(statement if isinstance(statement, list) else [statement])
     credential_statements = [statement for statement in statements
                              if statement.get("Resource") == {"GetAtt": "CredentialsTable.Arn"}]
     assert len(credential_statements) == 2

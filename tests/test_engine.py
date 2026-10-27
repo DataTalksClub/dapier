@@ -353,7 +353,7 @@ class DropboxIntakeTests(unittest.TestCase):
 
     def run_dataops_action(self, event=None):
         action = {"type": "dataops", "connection_id": "dataops",
-                  "dropbox_connection_id": "dropbox", "auth_secret_id": "dapier/dataops"}
+                  "dropbox_connection_id": "dropbox", "auth_secret_id": "dapier.dataops"}
         s3 = MagicMock()
         with patch("src.dapier.engine.actions.base.secrets_value", return_value='{"token": "tok"}'), \
              patch("src.dapier.engine.actions.base._json_request") as json_request, \

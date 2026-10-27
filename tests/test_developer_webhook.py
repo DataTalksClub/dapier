@@ -35,7 +35,7 @@ def test_build_intake_payload_defaults(monkeypatch):
 def test_handle_creates_intake_and_optional_assign(monkeypatch):
     secret = "hook-secret"
     monkeypatch.setenv("DEVELOPER_WEBHOOK_SECRET", secret)
-    monkeypatch.setenv("HUB_INTAKE_TOKEN_SECRET_ID", "dapier/hub-intake")
+    monkeypatch.setenv("HUB_INTAKE_TOKEN_SECRET_NAME", "dapier/hub-intake")
     monkeypatch.setattr(dw.base, "secrets_value", lambda _sid: "hub-token")
     calls = []
 
@@ -64,6 +64,6 @@ def test_handle_rejects_bad_signature(monkeypatch):
 
 def test_handle_unconfigured(monkeypatch):
     monkeypatch.delenv("DEVELOPER_WEBHOOK_SECRET", raising=False)
-    monkeypatch.delenv("DEVELOPER_WEBHOOK_SECRET_ID", raising=False)
+    monkeypatch.delenv("DEVELOPER_WEBHOOK_SECRET_NAME", raising=False)
     status, answer = dw.handle({}, b"{}")
     assert status == 503

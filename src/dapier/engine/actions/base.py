@@ -11,10 +11,7 @@ from ...connections import records as connections
 
 @lru_cache
 def _signing_secret(secret_id):
-    import boto3
-
-    secrets = boto3.client("secretsmanager")
-    value = secrets.get_secret_value(SecretId=secret_id)["SecretString"]
+    value = secrets_value(secret_id)
     try:
         return json.loads(value).get("signing_secret", value)
     except json.JSONDecodeError:
@@ -53,9 +50,8 @@ def _connected_connection(connection_id):
 
 @lru_cache
 def secrets_value(secret_id):
-    import boto3
-
-    return boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"]
+    from ...secrets import value
+    return value(secret_id)
 
 def _s3_body(ref):
     import boto3

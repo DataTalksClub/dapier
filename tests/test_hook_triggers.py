@@ -408,7 +408,7 @@ class YouTubeSaveTests(unittest.TestCase):
             "HOOK_TRIGGERS_TABLE": "hooks",
             "HOOKS_BASE_URL": "https://dapier.example.test",
             "YOUTUBE_CALLBACK_URL": "https://dapier.example.test/hooks/youtube",
-            "YOUTUBE_WEBHOOK_SECRET_ID": "secret-id",
+            "YOUTUBE_WEBHOOK_SECRET_NAME": "secret-id",
         })
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -418,7 +418,7 @@ class YouTubeSaveTests(unittest.TestCase):
             lambda name: type("S", (), {
                 "get_secret_value": staticmethod(
                     lambda SecretId: {"SecretString": "hub-secret"})})())})
-        secrets_patch = patch.object(youtube_subscriptions, "boto3", fake_secrets)
+        secrets_patch = patch.object(youtube_subscriptions, "secret_value", lambda name: "hub-secret")
         secrets_patch.start()
         self.addCleanup(secrets_patch.stop)
         self.transport = HubTransport()

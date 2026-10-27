@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from ..secrets import value as secret_value
 import boto3
 
 from . import admin
@@ -254,11 +255,11 @@ def _youtube(body):
 
 def _verify_youtube(event, body):
     global _youtube_secret
-    secret_id = os.environ.get("YOUTUBE_WEBHOOK_SECRET_ID")
+    secret_id = os.environ.get("YOUTUBE_WEBHOOK_SECRET_NAME")
     if not secret_id:
         return True
     if _youtube_secret is None:
-        _youtube_secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"]
+        _youtube_secret = secret_value(secret_id)
     signature = _header(event, "x-hub-signature")
     if not signature.startswith("sha1="):
         return False

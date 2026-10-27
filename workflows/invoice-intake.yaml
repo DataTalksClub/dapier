@@ -264,7 +264,7 @@ actions:
   - id: file-to-dataops
     type: dataops
     connection_id: dataops
-    auth_secret_id: dapier/dataops
+    auth_secret_id: dapier.dataops
     document_step: route.then.make-document
   - id: build-filename
     type: code

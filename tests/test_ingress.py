@@ -12,7 +12,7 @@ def test_youtube_signature_header_is_case_insensitive(monkeypatch):
     body = b"<feed />"
     signature = hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()
 
-    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_ID", "dapier/youtube-websub")
+    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_NAME", "dapier/youtube-websub")
     monkeypatch.setattr(ingress, "_youtube_secret", secret)
 
     assert ingress._verify_youtube(
@@ -21,7 +21,7 @@ def test_youtube_signature_header_is_case_insensitive(monkeypatch):
 
 
 def test_youtube_signature_rejects_missing_or_invalid_value(monkeypatch):
-    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_ID", "dapier/youtube-websub")
+    monkeypatch.setenv("YOUTUBE_WEBHOOK_SECRET_NAME", "dapier/youtube-websub")
     monkeypatch.setattr(ingress, "_youtube_secret", "websub-secret")
 
     assert not ingress._verify_youtube({"headers": {}}, b"<feed />")

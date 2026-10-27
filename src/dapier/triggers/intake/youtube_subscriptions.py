@@ -20,6 +20,7 @@ import urllib.parse
 import urllib.error
 import urllib.request
 
+from ...secrets import value as secret_value
 import boto3
 
 from ... import engine
@@ -102,10 +103,10 @@ def _settings():
     """(callback_url, hub secret); RuntimeError when the deployment runs
     without the push path (the schedule no-ops for the same reason)."""
     callback_url = os.environ.get("YOUTUBE_CALLBACK_URL", "").strip()
-    secret_id = os.environ.get("YOUTUBE_WEBHOOK_SECRET_ID", "").strip()
+    secret_id = os.environ.get("YOUTUBE_WEBHOOK_SECRET_NAME", "").strip()
     if not callback_url or not secret_id:
         raise RuntimeError("YouTube webhook push is not configured")
-    secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_id)["SecretString"]
+    secret = secret_value(secret_id)
     return callback_url, secret
 
 

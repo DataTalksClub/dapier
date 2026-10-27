@@ -19,7 +19,7 @@ flows:
       - id: create-intake
         type: dataops
         connection_id: dataops
-        auth_secret_id: dapier/dataops
+        auth_secret_id: dapier.dataops
 
   todo-sheet:
     description: TODO list sheet row, then the DataOps intake
@@ -33,7 +33,7 @@ flows:
       - id: create-intake
         type: dataops
         connection_id: dataops
-        auth_secret_id: dapier/dataops
+        auth_secret_id: dapier.dataops
       - id: confirm
         type: telegram_send
         connection_id: telegram-bot
@@ -51,7 +51,7 @@ flows:
       - id: create-intake
         type: dataops
         connection_id: dataops
-        auth_secret_id: dapier/dataops
+        auth_secret_id: dapier.dataops
 
 id: todo-intake
 enabled: true

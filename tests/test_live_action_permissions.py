@@ -52,8 +52,8 @@ def test_api_and_worker_can_send_attachment_email_and_api_can_stage_intake():
     assert any(s.get("Action") == "s3:PutObject" and
                names_resource(s, "arn:aws:s3:::${DataOpsEmailDocumentsBucket}/transfer/*")
                for s in api_statements)
-    assert any(s.get("Action") == "secretsmanager:GetSecretValue" and
-               names_resource(s, "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:dapier/dataops-*")
+    assert any(s.get("Action") == "kms:Decrypt" and
+               "dapier.dataops" in s["Condition"]["StringEquals"]["kms:EncryptionContext:secret"]
                for s in api_statements)
 
 

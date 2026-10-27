@@ -38,7 +38,7 @@ def extraction_steps(newsletter="Data Bites Weekly", sponsors=(), step="extract-
 
 
 def leads_action(**overrides):
-    action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
+    action = {"type": "dataops", "auth_secret_id": "dapier.dataops",
               "connection_id": "dataops", "extraction_step": "extract-sponsors"}
     action.update(overrides)
     return action
@@ -69,7 +69,7 @@ class RoutingTests(unittest.TestCase):
         assert dataops_action._is_leads_action(leads_action()) is True
 
     def test_omitting_extraction_step_routes_to_documents(self):
-        action = {"type": "dataops", "auth_secret_id": "dapier/dataops",
+        action = {"type": "dataops", "auth_secret_id": "dapier.dataops",
                   "connection_id": "dataops"}
         assert dataops_action._is_leads_action(action) is False
 
@@ -89,7 +89,7 @@ class TargetUrlTests(unittest.TestCase):
 
     def test_documents_appends_the_documents_path(self):
         action = {"type": "dataops", "connection_id": "dataops",
-                  "auth_secret_id": "dapier/dataops"}
+                  "auth_secret_id": "dapier.dataops"}
         with patch_connection("https://intake.test"):
             assert dataops_action._target_url(action) == (
                 "https://intake.test/api/v1/intake/email-documents")

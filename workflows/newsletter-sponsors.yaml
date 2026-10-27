@@ -8,7 +8,7 @@
 # Dapier: no sponsor store, no ledger, no review queue.
 #
 # Live state: enabled. The DataOps connection carries the API origin and the
-# intake secret lives at dapier/dataops; the LLM runs on the `llm`
+# intake secret lives at dapier.dataops; the LLM runs on the `llm`
 # connection (model claude-sonnet-5-5). This file mirrors the live
 # definition — change it through save/publish, then sync here.
 id: newsletter-sponsors
@@ -104,9 +104,9 @@ actions:
   # newsletter name and sponsors from steps.extract-sponsors.output.data.
   # Normalization (trim, https-only URLs, within-email dedup, 20-cap) lives
   # in that builder — no code step needed (code steps see event data only).
-  # Same auth as the invoice intake: the dapier/dataops secret lands in
+  # Same auth as the invoice intake: the dapier.dataops secret lands in
   # x-dataops-intake-secret. An issue with no forwardable sponsors posts
   # sponsors: [] so DataOps records it as checked; a real failure fails the run.
   connection_id: dataops
-  auth_secret_id: dapier/dataops
+  auth_secret_id: dapier.dataops
   extraction_step: extract-sponsors

@@ -22,7 +22,7 @@ Connections, app credentials, OAuth tokens, cursors, and idempotency records are
 stored in DynamoDB. DynamoDB's default AWS-owned encryption protects records at
 rest, while narrowly scoped IAM policies control application access. Generated
 infrastructure secrets such as session signing and webhook verification values
-remain in Secrets Manager. SQS provides retries and dead-letter queues; CloudWatch
+remain in the DataOps team secrets store. SQS provides retries and dead-letter queues; CloudWatch
 alarms track worker failures and visible DLQ messages, and a queue-age alarm pages
 when the event queue's oldest message is at least 900 seconds old (a full redrive
 cycle of 5 receives at 180s visibility) while a depth alarm pages when its visible
@@ -67,7 +67,7 @@ taken). CLI commands that take a workflow accept the file, the id, or the
 exact name (case-insensitive; an ambiguous name is refused).
 
 The webhook receives the normalized event as JSON. When `secret_id` is present,
-the worker reads a Secrets Manager secret containing either a plain signing secret
+the worker reads a DataOps team store entry containing either a plain signing secret
 or `{ "signing_secret": "..." }`, and adds `X-Dapier-Signature`, an HMAC-SHA256
 signature of the request body.
 
@@ -233,16 +233,12 @@ page link redirects to Workflows. The CLI reaches the same actions with
 `dapier workflows`, `dapier runs`, `dapier connections`, `dapier storage`,
 `dapier quota`, `dapier errors send-digest`, and `dapier audit`.
 
-Open `https://dapier.dtcdev.click` and sign in as `admin`. Retrieve the generated
-password from Secrets Manager without putting it in source control:
-
-```bash
-aws secretsmanager get-secret-value \
-  --secret-id dapier/admin \
-  --region eu-west-1 \
-  --query SecretString \
-  --output text | jq -r .password
-```
+Open `https://dapier.dtcdev.click` and sign in through shared authentication.
+Session signing material comes from the DataOps team secrets store entry
+`dapier.admin`; provider secrets are read using DynamoDB GetItem and KMS
+Decrypt with the exact store name as encryption context. Each entry keeps the
+original plain string or JSON in its `value` field. Workflow `auth_secret_id`
+references use store names, for example `dapier.dataops`.
 
 The **Credentials** view accepts the Slack bot token used by Dapier and the
 Mailchimp API key used by DataOps. The values are write-only: the browser sends
@@ -290,7 +286,7 @@ access without sharing Dapier's administration permissions.
 The full design lives in
 [docs/oauth-token-factory-spec.md](docs/oauth-token-factory-spec.md). One
 deliberate deviation: OAuth tokens stay in the DynamoDB credentials table
-(with optimistic versioning) instead of Secrets Manager, so all application
+(with optimistic versioning) instead of the team secrets store; these OAuth records retain their own
 secrets share one storage boundary and IAM shape. The OAuth client ID/secret
 pair is shared per provider and comes from deploy-time configuration rather
 than per-connection entry.
@@ -413,7 +409,7 @@ actions:
   - id: forward
     type: dataops
     connection_id: dataops
-    auth_secret_id: dapier/dataops
+    auth_secret_id: dapier.dataops
 trigger:
   connector: email
   event: message.received
