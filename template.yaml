@@ -759,28 +759,6 @@ Resources:
             Schedule: rate(4 days)
             Enabled: true
 
-  YouTubeWebhookSecret:
-    Type: AWS::SecretsManager::Secret
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Description: WebSub callback signing secret for Dapier YouTube notifications
-      GenerateSecretString:
-        PasswordLength: 48
-        ExcludePunctuation: true
-  DapierAdminSecret:
-    Type: AWS::SecretsManager::Secret
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Name: !Sub ${AWS::StackName}/admin
-      Description: Signing key for Dapier console session cookies
-      GenerateSecretString:
-        SecretStringTemplate: '{"username":"admin"}'
-        GenerateStringKey: password
-        PasswordLength: 24
-        ExcludePunctuation: true
-
   WorkerFunction:
     Type: AWS::Serverless::Function
     DependsOn: EventQueuePolicy

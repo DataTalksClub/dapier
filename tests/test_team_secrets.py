@@ -20,13 +20,10 @@ def test_reader_binds_context_and_preserves_provider_json():
     assert calls['ddb']['Key']['SK']['S'] == 'SECRET#dapier.admin'
 
 
-def test_template_has_no_sm_read_permissions_and_retains_originals():
+def test_template_has_no_sm_read_permissions_or_resources():
     from pathlib import Path
     text = Path('template.yaml').read_text()
     assert 'secretsmanager:GetSecretValue' not in text
     assert 'AWSSecretsManagerGetSecretValuePolicy' not in text
-    assert text.count('AWS::SecretsManager::Secret') == 2
-    for name in ['YouTubeWebhookSecret', 'DapierAdminSecret']:
-        block = text.split('  '+name+':', 1)[1].split('  WorkerFunction:', 1)[0]
-        assert 'DeletionPolicy: Retain' in block
+    assert 'AWS::SecretsManager::Secret' not in text
     assert 'kms:EncryptionContext:secret' in text
