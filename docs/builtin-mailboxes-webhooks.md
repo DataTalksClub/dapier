@@ -21,20 +21,32 @@ claims `<local-part>@dtcdev.click` in the Emails inventory
 ### Per-address sender policy is required for bot alerts
 
 Claiming a mailbox does not authorize its alert senders. An address without
-its own sender-policy row inherits the default allowlist (Alexey's two
-addresses). Set an explicit **allowlist** for each assistant mailbox and add
-its expected alert senders; do not switch bot mailboxes to `anyone`:
+its own sender-policy row inherits the default allowlist. Set an explicit
+**allowlist** for each bot mailbox and keep the five alert senders on each
+route; do not switch bot mailboxes to `anyone`, and do not remove old
+senders without Alexey's explicit OK:
 
 ```bash
 dapier emails from allowlist dev
+dapier emails from add alerts@dtcdev.click --route dev
 dapier emails from add noreply@datatalks.club --route dev
 dapier emails from add no-reply@dtcdev.click --route dev
 dapier emails from list --route dev
+# repeat for --route tofu and --route orin
 ```
 
-A new allowlist copies the default senders. The dev policy above was already
-applied on production on 2026-10-24; these commands document setup, not a
-request to reapply it.
+Expected per-route allowlist (each of dev / tofu / orin):
+
+- alexey.s.grigoriev@gmail.com
+- alexey@datatalks.club
+- alerts@dtcdev.click
+- noreply@datatalks.club
+- no-reply@dtcdev.click
+
+A new allowlist copies the default senders. Add all five required addresses
+explicitly when provisioning each bot mailbox. The bot's own outgoing/notification senders are never added to
+these allowlists, and the mailbox workflows send no email, so a bot reply
+cannot re-trigger its own mailbox.
 
 Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
 the address, sender, owning workflows, policy rule, and event id, and emit `EmailSenderPolicyRefused`
@@ -77,24 +89,27 @@ trigger:
     hook: { equals: <name> }
 ```
 
-## Live examples (2026-10-19)
+## Live examples
 
-| Address | Webhook | Workflow | Hub project |
+| Address | Webhook | Workflow | Destination |
 | --- | --- | --- | --- |
 | `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Developer bot webhook |
-| `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | `tofu` |
-| `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | `orin` |
+| `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | Tofu Grok bot webhook |
+| `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | Orin Grok bot webhook |
 
-Notify path: workflow `agent` step on the Hetzner dapier worker runs
-`hub intake create` for tofu@ and orin@. For dev@, `dev-mailbox` forwards
-directly to the Developer bot webhook via HTTP POST without running an agent.
+Notify path: each mailbox workflow (`dev-mailbox`, `tofu-mailbox`,
+`orin-mailbox`) forwards directly to its own Grok bot webhook via HTTP POST
+without running an agent and without sending any email. Each workflow reads
+its own storage keys `webhook_url` / `webhook_token` (per-workflow storage,
+same shape for all three), fails fast with a clear error naming the missing
+keys when either is unset (no POST to an empty URL), and POSTs JSON with
+`from`, `to`, `subject`, `snippet` (first 200 chars of the plain-text body),
+`text` (full body), `date`, `message_id` (dedupe), and attachments metadata
+(filename, content_type, size, plus checksum/content_id when present).
 
-For a matching per-assistant bot setup, keep each assistant's own mailbox
-and allowlist, and provision its own destination webhook URL and token in
-that mailbox workflow's storage (`webhook_url` / `webhook_token`). The
-`/hooks/webhook/tofu` trigger is an inbound Dapier hook; it does not itself
-connect to a Tofu Grok Bot. Tofu currently uses the agent-to-Hub intake path.
-Do not replace that path until Tofu's destination webhook values are supplied.
+Loop safety: the mailbox workflows contain no email-send step, and the bot's
+own outgoing/notification senders stay off the sender allowlists, so a bot
+reply cannot re-trigger its own mailbox.
 
 ## Operator steps (repeatable)
 
@@ -103,27 +118,34 @@ Do not replace that path until Tofu's destination webhook values are supplied.
 dapier webhooks save webhook.json
 dapier webhooks show dev    # copy URL + bearer; do not commit tokens
 
-# 2) Save + publish mailbox workflow (email + webhook triggers)
+# 2) Save + publish mailbox workflows (email + webhook triggers)
 dapier workflows save workflows/dev-mailbox.yaml
 dapier workflows publish dev-mailbox.yaml
-dapier emails list          # expect dev@ and tofu@
+dapier workflows save workflows/tofu-mailbox.yaml
+dapier workflows publish tofu-mailbox.yaml
+dapier workflows save workflows/orin-mailbox.yaml
+dapier workflows publish orin-mailbox.yaml
+dapier emails list          # expect dev@, tofu@, orin@
 
-# 2b) Provision the Developer bot webhook config dev-mailbox reads.
-# The workflow's storage_get steps return "" for keys that were never set,
-# and an empty webhook URL fails every dev@ email through five queue
-# redeliveries into the dead-letter queue (EventDeadLetterAlarm). Set once,
-# re-set after a storage TTL expiry or when rotating the token:
-dapier storage set --workflow dev-mailbox --key webhook_url --value "https://api2.cursor.sh/automations/webhook/<target-id>"
-dapier storage set --workflow dev-mailbox --key webhook_token --value "<developer-bot-bearer-token>"
-dapier storage get --workflow dev-mailbox --key webhook_url   # expect found
+# 2b) Provision each bot's webhook config in its own mailbox workflow storage.
+# The console designer "Stored data" panel edits the same per-workflow keys
+# without SSH (open the workflow, Stored data, set webhook_url / webhook_token),
+# and `dapier storage` below reaches the same API. The workflow's storage_get
+# steps return "" for keys that were never set, and an empty webhook URL would
+# fail every mail through five queue redeliveries into the dead-letter queue
+# (EventDeadLetterAlarm). Set once per mailbox, re-set after a storage TTL
+# expiry or when rotating the token. The token is accepted with or without a
+# leading "Bearer " prefix; values are never printed in logs or reports.
+dapier storage set dev-mailbox webhook_url "https://api2.cursor.sh/automations/webhook/<target-id>"
+dapier storage set dev-mailbox webhook_token "<developer-bot-bearer-token>"
+dapier storage set tofu-mailbox webhook_url "<tofu-bot-webhook-url>"
+dapier storage set tofu-mailbox webhook_token "<tofu-bot-bearer-token>"
+dapier storage set orin-mailbox webhook_url "<orin-bot-webhook-url>"
+dapier storage set orin-mailbox webhook_token "<orin-bot-bearer-token>"
 
-# 3) Test webhook
-curl -sS -X POST https://dapier.dtcdev.click/hooks/webhook/dev \
-  -H "authorization: Bearer $(dapier webhooks show dev | awk -FBearer {print })" \
-  -H "content-type: application/json" \
-  -d "{\"subject\":\"ping\",\"from\":\"you@example.com\",\"text\":\"hi\",\"message_id\":\"ping-1\"}"
-dapier webhooks deliveries dev
+# 3) Verify an existing mail delivery through its workflow run.
 dapier runs list --workflow dev-mailbox
+# For synthetic tests use workflows test (dry-run); see docs/testing-inbound-email.md.
 ```
 
 Tokens: `dapier webhooks show`; never put them in git or shared reports.

@@ -69,7 +69,7 @@ def run_http_request(action, event, *, steps=None, transport=None):
     method = str(action.get("method") or "GET").upper()
     if method not in HTTP_METHODS:
         raise ValueError(f"http_request method must be one of: {', '.join(HTTP_METHODS)}")
-    url = render(action["url"], event, steps)
+    url = render(action["url"], event, steps).strip()
     headers = {
         str(name): render(str(value), event, steps)
         for name, value in (action.get("headers") or {}).items()
@@ -147,6 +147,13 @@ def _apply_auth(auth_type, action, url, event, steps, headers):
         token = render(action.get("auth_token") or "", event, steps).strip()
         if not token and action.get("connection_id"):
             token = _connection_token(action["connection_id"])
+        if not token:
+            raise ValueError("http_request bearer auth needs auth_token or connection_id")
+        # Operators paste the Authorization header value ("Bearer <token>")
+        # or the bare token into workflow storage; accept both without
+        # doubling the scheme.
+        if token[:6].lower() == "bearer" and (len(token) == 6 or token[6].isspace()):
+            token = token[6:].strip()
         if not token:
             raise ValueError("http_request bearer auth needs auth_token or connection_id")
         headers["authorization"] = f"Bearer {token}"

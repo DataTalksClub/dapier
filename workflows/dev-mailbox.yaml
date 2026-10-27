@@ -16,6 +16,7 @@ actions:
   - id: get-url
     type: storage_get
     key: webhook_url
+    secret: true
   - id: get-token
     type: storage_get
     key: webhook_token
@@ -40,7 +41,7 @@ actions:
                   "dev-mailbox is not configured: storage key(s) "
                   + ", ".join(_missing_keys)
                   + " are empty. Set them with: dapier storage set"
-                    " --workflow dev-mailbox --key <name> --value <value>"
+                    " dev-mailbox <name> <value>"
               )
 
       sender = input.get("sender") or {}
@@ -78,6 +79,9 @@ actions:
       if not text and hook_body.get("text"):
           text = str(hook_body.get("text"))
 
+      snippet = " ".join(str(text).split())
+      snippet = snippet[:200]
+
       attachments = []
       for att in (input.get("attachments") or hook_body.get("attachments") or []):
           if isinstance(att, dict):
@@ -96,6 +100,7 @@ actions:
           "from": from_addr,
           "to": to_addr,
           "subject": subject,
+          "snippet": snippet,
           "date": date,
           "message_id": message_id,
           "message-id": message_id,
