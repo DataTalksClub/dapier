@@ -1291,6 +1291,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: connection_id, AttributeType: S}
       KeySchema:
@@ -1303,6 +1304,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: month, AttributeType: S}
         - {AttributeName: request_key, AttributeType: S}
@@ -1315,6 +1317,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: month, AttributeType: S}
         - {AttributeName: workflow_id, AttributeType: S}
@@ -1329,6 +1332,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: credential_id, AttributeType: S}
       KeySchema:
@@ -1339,6 +1343,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: cursor_id, AttributeType: S}
       KeySchema:
@@ -1352,6 +1357,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: execution_id, AttributeType: S}
         - {AttributeName: run_id, AttributeType: S}
@@ -1371,6 +1377,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: connection_id, AttributeType: S}
         - {AttributeName: grantee, AttributeType: S}
@@ -1386,6 +1393,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: audit_id, AttributeType: S}
       KeySchema:
@@ -1399,6 +1407,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: id, AttributeType: S}
       KeySchema:
@@ -1409,6 +1418,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: task_id, AttributeType: S}
       KeySchema:
@@ -1422,6 +1432,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: hook_id, AttributeType: S}
       KeySchema:
@@ -1432,6 +1443,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: inbox_id, AttributeType: S}
       KeySchema:
@@ -1445,6 +1457,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: schedule_id, AttributeType: S}
       KeySchema:
@@ -1455,6 +1468,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: poll_id, AttributeType: S}
       KeySchema:
@@ -1465,6 +1479,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: workflow_id, AttributeType: S}
       KeySchema:
@@ -1477,6 +1492,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: token_hash, AttributeType: S}
       KeySchema:
@@ -1490,6 +1506,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: scope, AttributeType: S}
         - {AttributeName: key, AttributeType: S}
@@ -1508,6 +1525,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: scope, AttributeType: S}
         - {AttributeName: key, AttributeType: S}
@@ -1522,6 +1540,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: pk, AttributeType: S}
       KeySchema:
