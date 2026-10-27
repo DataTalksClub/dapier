@@ -36,8 +36,6 @@ def build_request(action, event, workflow_id, steps=None):
     """Render and validate once; reject oversized input rather than truncate."""
     if "engine" in action:
         raise ValueError("hub_session uses workspace and tier; engine is not supported")
-    if action.get("attachments"):
-        raise ValueError("hub_session attachment delivery is not configured yet")
     key = request_key(workflow_id, event.get("id"), action.get("id"))
 
     def field(name, limit, default=None):
@@ -56,6 +54,10 @@ def build_request(action, event, workflow_id, steps=None):
     tier = field("tier", 10, "daily")
     if tier not in {"quick", "daily", "deep"}:
         raise ValueError("hub_session tier must be quick, daily or deep")
+    from .attachments import links, brief_section
+
+    text += brief_section(links(action, event))
+    _required(text, "text with attachments", 8000)
     brief = f"{title}\n\n{text}\n\nAcceptance criteria:\n{criteria}"
     _required(brief, "brief", 8192)
     session = {"workspace": workspace, "tier": tier, "mode": "headless", "brief": brief}

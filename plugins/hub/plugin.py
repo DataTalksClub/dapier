@@ -12,7 +12,10 @@ def validate_session(action):
     for field in ENTRY.required:
         if not isinstance(action.get(field), str) or not action[field].strip():
             raise ValueError(f"hub_session requires non-empty {field}")
-    for field in ENTRY.optional:
+    if "attachments" in action:
+        from .attachments import enabled
+        enabled(action["attachments"])
+    for field in ENTRY.optional - {"attachments"}:
         if field in action and not isinstance(action[field], str):
             raise ValueError(f"hub_session {field} must be a string")
     common = {"type", "id"} | registry.ERROR_STEP_KEYS | registry.ON_FAIL_STEP_KEYS | registry.AUTORETRY_STEP_KEYS
@@ -27,7 +30,7 @@ ENTRY = register(Action(
     run=run_hub_session,
     validate=validate_session,
     required=frozenset({"id", "title", "text", "acceptance_criteria"}),
-    optional=frozenset({"project", "workspace", "cwd", "tier", "notify_to", "notify_from"}),
+    optional=frozenset({"project", "workspace", "cwd", "tier", "notify_to", "notify_from", "attachments"}),
     fields=(
         {"key": "title", "label": "Title", "required": True},
         {"key": "text", "label": "Task instructions", "type": "textarea", "required": True},
@@ -37,6 +40,7 @@ ENTRY = register(Action(
         {"key": "tier", "label": "Tier", "type": "select",
          "options": ["quick", "daily", "deep"], "default": "daily"},
         {"key": "project", "label": "Hub project", "default": "dapier-agents"},
+        {"key": "attachments", "label": "Trigger attachments", "type": "select", "options": ["on", "off"], "default": "on"},
         {"key": "notify_to", "label": "Completion recipient", "type": "email"},
         {"key": "notify_from", "label": "Completion sender", "type": "email", "default": "agents@dtcdev.click"},
     ),

@@ -23,7 +23,7 @@ and HTTP redirects are refused to keep the service bearer at that endpoint.
 Workflow storage (`STORAGE_TABLE`) persists the retry snapshots.
 
 Intake 17ae8720-c809-457a-89f1-8f82bea55af2 still requires service identity
-provisioning, attachment delivery, live completion proof, live migration
+provisioning, live attachment/completion proof, live migration
 and runtime retirement. Existing `hub_intake` behavior remains available.
 No live launch readiness is claimed before credential setup and live proof.
 
@@ -33,8 +33,16 @@ endpoint. The adapter must return `(status, parsed_json)` and propagate network
 timeouts. Do not log request payloads, authorization headers or response bodies.
 Journal rows have no expiry: deleting them can allow duplicate launches. A
 held/unknown response must remain pending and must not be called running or
-successful. Attachment inputs currently fail explicitly until URL delivery is
-implemented; they are never silently discarded.
+successful. Stored trigger attachments are forwarded by default; `attachments:
+"off"` explicitly opts out. This select accepts only `on` and `off`.
+Each file gets an HTTPS, GET-only S3 URL valid for at most one hour (temporary
+credential expiry may shorten this). The private intake text and assigned brief
+carry its sanitized filename and URL. Download promptly; held or delayed sessions
+may outlive a URL and must report the file as unavailable. Immutable snapshots
+reuse the original URLs on retries; they never silently refresh an ambiguous
+create/assign request. At most ten files are accepted. Malformed file pointers
+and requests exceeding Hub's text/brief byte limits fail before Hub creation,
+so attachments are never silently dropped. No new attachment store is added.
 
 Completion delivery uses the existing poll service and workflow storage. Create
 one poll through Console Polls or `dapier polls save` with name

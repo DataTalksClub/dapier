@@ -156,6 +156,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "cwd", label: "Directory within workspace" },
       { key: "tier", label: "Tier", type: "select", options: ["quick", "daily", "deep"], default: "daily" },
       { key: "project", label: "Hub project", default: "dapier-agents" },
+      { key: "attachments", label: "Trigger attachments", type: "select", options: ["on", "off"], default: "on" },
       { key: "notify_to", label: "Completion recipient", placeholder: "Triggering sender" },
       { key: "notify_from", label: "Completion sender", default: "agents@dtcdev.click" }
     ]
