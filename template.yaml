@@ -1261,6 +1261,21 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
+  # Manually created ECR repository backing HtmlRendererFunction's image
+  # (HtmlRendererImageUri parameter). Imported into the stack 2026-10-27
+  # during the sandbox IaC sweep; properties mirror the live repository.
+  HtmlRendererRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: dapier-html-renderer
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+
   HtmlRendererFunction:
     Type: AWS::Serverless::Function
     Properties:
