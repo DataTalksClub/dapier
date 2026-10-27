@@ -154,8 +154,6 @@ Parameters:
     Default: alexey.s.grigoriev@gmail.com
     Description: Recipient of the DynamoDB backup failure email
 
-Conditions:
-  HasGithubWorkflowsToken: !Not [!Equals [!Ref GithubWorkflowsTokenSecret, '']]
 
 Globals:
   Function:

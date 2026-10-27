@@ -17785,7 +17785,7 @@
       type: "hub_intake",
       label: "Hub intake",
       icon: Mail,
-      description: "Create a Hub intake task (and optionally assign/wake Developer). Token and Hub URL come from env / the DataOps team secrets store — never from the workflow YAML.",
+      description: "Create a Hub intake task (and optionally assign/wake Developer). Token and Hub URL come from env / Secrets Manager — never from the workflow YAML.",
       fields: [
         { key: "title", label: "Title", required: true, placeholder: "dapier event" },
         { key: "text", label: "Body (templated)", type: "textarea", placeholder: "Event for Developer" },
