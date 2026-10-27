@@ -37,7 +37,8 @@ class PollSource:
     the provider params ``public_view`` should show beside ``source``.
     """
 
-    def __init__(self, name, connector, event, label, validate, fetch, view=None):
+    def __init__(self, name, connector, event, label, validate, fetch, view=None,
+                 prepare=None, ack=None):
         self.name = name
         self.connector = connector
         self.event = event
@@ -45,6 +46,11 @@ class PollSource:
         self.validate = validate
         self.fetch = fetch
         self.view = view
+        # Execution-only hooks: sampling/reset only call fetch. prepare may
+        # normalize/filter the page in place and return a nonfatal error;
+        # ack runs after successful event processing (or on a seen replay).
+        self.prepare = prepare
+        self.ack = ack
 
 
 def register_source(source):

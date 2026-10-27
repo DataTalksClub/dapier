@@ -870,6 +870,14 @@ Resources:
                      dynamodb:Query]
             Resource: !GetAtt StorageTable.Arn
         - Statement:
+            Sid: HubCompletionNotificationLease
+            Effect: Allow
+            Action: [dynamodb:UpdateItem]
+            Resource: !GetAtt StorageTable.Arn
+            Condition:
+              ForAllValues:StringEquals:
+                dynamodb:LeadingKeys: ["system:hub-sessions"]
+        - Statement:
             Effect: Allow
             Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem,
                      dynamodb:UpdateItem, dynamodb:Query]

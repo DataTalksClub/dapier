@@ -45,6 +45,7 @@ const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-sheets.updates',
 
 /* What a poll watches, in words: the source's kind of thing, then its target. */
 const SOURCE_LABELS = {
+  'hub.sessions': 'Hub sessions',
   http: 'API', rss: 'RSS feed', s3: 'S3 bucket', 's3.updates': 'S3 changes', 's3.deletions': 'S3 deletions',
   'google-sheets.rows': 'Sheet rows', 'google-sheets.updates': 'Sheet row edits',
   'google-drive.files': 'Drive folder', 'google-drive.updates': 'Drive changes',

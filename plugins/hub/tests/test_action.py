@@ -161,7 +161,8 @@ def test_registered_runner_uses_qualified_loop_identity(configured, monkeypatch)
 
     def launch(step, event, workflow_id, **kwargs):
         ids.append(step["id"])
-        return {}
+        return {"hub_task_id": "10000000-0000-4000-8000-000000000001",
+                "hub_session_id": "20000000-0000-4000-8000-000000000002"}
     monkeypatch.setattr(action, "launch", launch)
     logic.run_chain("flow", [{"id": "each", "type": "for_each", "list": "items", "actions": [
         {"id": "delegate", "type": "hub_session", "title": "Title", "text": "Task",

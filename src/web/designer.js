@@ -17793,7 +17793,9 @@
         { key: "workspace", label: "Hub workspace", default: "dapier-agents" },
         { key: "cwd", label: "Directory within workspace" },
         { key: "tier", label: "Tier", type: "select", options: ["quick", "daily", "deep"], default: "daily" },
-        { key: "project", label: "Hub project", default: "dapier-agents" }
+        { key: "project", label: "Hub project", default: "dapier-agents" },
+        { key: "notify_to", label: "Completion recipient", placeholder: "Triggering sender" },
+        { key: "notify_from", label: "Completion sender", default: "agents@dtcdev.click" }
       ]
     },
     {
@@ -20149,6 +20151,7 @@
   const connectorCatalog = [
     { name: "ai", label: "AI", logo: Sparkles, events: [] },
     { name: "email", label: "Email", logo: MailLogo, events: ["message.received", "bounce.received", "complaint.received"] },
+    { name: "hub", label: "Hub", logo: Bot, events: ["session.finished"] },
     { name: "youtube", label: "YouTube", logo: YouTubeLogo, events: ["video.published"] },
     { name: "dropbox", label: "Dropbox", logo: DropboxLogo, events: ["file.created", "file.updated", "file.deleted"] },
     { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended", "meeting.registration_created", "webinar.started", "webinar.ended", "webinar.registration_created"] },
@@ -20167,6 +20170,7 @@
     { name: "custom", label: "Custom", logo: Webhook, events: [] }
   ];
   const connectorEventInfo = {
+    "hub/session.finished": ["Session finished", "A session started by Dapier reaches a terminal state, with its available Hub finish report"],
     "dropbox/file.created": ["File added", "A new file appears in the watched Dropbox folder"],
     "dropbox/file.updated": ["File changed", "A file in the watched Dropbox folder is modified"],
     "dropbox/file.deleted": ["File deleted", "A file is removed from the watched Dropbox folder"],

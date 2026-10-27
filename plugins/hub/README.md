@@ -23,7 +23,7 @@ and HTTP redirects are refused to keep the service bearer at that endpoint.
 Workflow storage (`STORAGE_TABLE`) persists the retry snapshots.
 
 Intake 17ae8720-c809-457a-89f1-8f82bea55af2 still requires service identity
-provisioning, attachment delivery, completion polling/email, live migration
+provisioning, attachment delivery, live completion proof, live migration
 and runtime retirement. Existing `hub_intake` behavior remains available.
 No live launch readiness is claimed before credential setup and live proof.
 
@@ -35,3 +35,25 @@ Journal rows have no expiry: deleting them can allow duplicate launches. A
 held/unknown response must remain pending and must not be called running or
 successful. Attachment inputs currently fail explicitly until URL delivery is
 implemented; they are never silently discarded.
+
+Completion delivery uses the existing poll service and workflow storage. Create
+one poll through Console Polls or `dapier polls save` with name
+`hub-session-completions`, source `hub.sessions`, expression `rate(1 minute)`.
+It emits connector `hub`, event `session.finished`, with task/session/link,
+original workflow/event/step ids, canonical session state, correlated Hub report,
+and optional fleet/worker status. Session termination does not imply success.
+Hub-authored reports must match the assigned fleet launch; user DONE notes are
+never substituted. After a five-minute report race window measured from Hub's
+terminal-state timestamp, a missing report is explicitly `unavailable`, with
+worker outcome unknown. Inaccessible tasks stay pending and log a bounded error
+without blocking other tasks or the round-robin cursor.
+
+`notify_to` defaults to the triggering email sender; an explicit empty value
+suppresses email. Non-email events need an explicit recipient. `notify_from`
+defaults to `agents@dtcdev.click`. Recipients and the first completion snapshot
+are durable before delivery. Follow-up events and SES notifications have separate
+receipts, so either can retry independently. SES is at least once after an
+ambiguous send or receipt-write failure: the two-minute lease limits rapid
+retries but cannot prevent duplicate mail after an accepted send times out.
+Sample pulls and cursor reset are read-only; only actual poll execution delivers
+notifications and acknowledges events. No new queue, daemon or runtime is added.

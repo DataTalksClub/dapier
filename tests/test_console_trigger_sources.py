@@ -19,9 +19,9 @@ WEB = Path(__file__).resolve().parents[1] / "src" / "web"
 # validates against: credential-backed ones (the three s3 sources share the
 # stored aws keys, mailchimp.members the shared mailchimp key or a named
 # credential) and rss, which polls a public feed URL and needs no auth at
-# all.
+# all. Hub uses its scoped service identity rather than an OAuth connection.
 CREDENTIAL_SOURCES = {"s3", "s3.updates", "s3.deletions",
-                      "mailchimp.members", "rss"}
+                      "mailchimp.members", "rss", "hub.sessions"}
 
 
 def _select_sources():

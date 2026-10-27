@@ -517,6 +517,10 @@ def _fire_enabled(item, name, *, cursor_table_ref=None, transport=None):
                           if _sort_key(_raw_id(item, raw)) > _sort_key(cursor)]
         # Oldest first, so the cursor ends at the newest emitted item.
         items = sorted(candidates, key=lambda raw: _sort_key(_raw_id(item, raw)))
+    source = poll_sources.stored_source(item)
+    prepare = getattr(source, "prepare", None)
+    ack = getattr(source, "ack", None)
+    preparation_error = prepare(item, items) if prepare else None
     seen_ids = None
     skipped_seen = 0
     ttl_days = item.get("dedupe_ttl_days") or seen.TTL_DAYS
@@ -524,7 +528,7 @@ def _fire_enabled(item, name, *, cursor_table_ref=None, transport=None):
         seen_ids = seen.load(f"poll#{name}", table_ref=cursor_table_ref)
     fired = 0
     failed = False
-    failure = None
+    failure = preparation_error
     leftover_fresh = False
     for raw in items:
         if seen_ids is not None:
@@ -532,6 +536,8 @@ def _fire_enabled(item, name, *, cursor_table_ref=None, transport=None):
             # id — a recycled page is recognized without building the event.
             raw_id = _raw_id(item, raw)
             if raw_id is not None and _stable_event_id(name, raw_id) in seen_ids:
+                if ack:
+                    ack(item, raw, _stable_event_id(name, raw_id))
                 skipped_seen += 1
                 continue
         if fired >= item.get("max_items", 25):
@@ -556,6 +562,8 @@ def _fire_enabled(item, name, *, cursor_table_ref=None, transport=None):
             failure = f"item {event['data']['item_id']}: {str(exc) or exc.__class__.__name__}"
             break
         inbox.complete(inbox_id, matched)
+        if ack:
+            ack(item, raw, event["id"])
         if watermark:
             put_cursor(name, event["data"]["item_id"], table=cursor_table_ref)
         if seen_ids is not None:

@@ -65,11 +65,14 @@ def build_request(action, event, workflow_id, steps=None):
         if path.is_absolute() or ".." in path.parts or "\\" in cwd or "\x00" in cwd:
             raise ValueError("hub_session cwd must stay within the Hub workspace")
         session["cwd"] = cwd
+    from .notifications import configuration
+
     return {
         "create": {"key": key, "project": project, "title": title, "text": text,
                    "acceptance_criteria": criteria,
                    "source": {"type": "forwarded", "reference": key, "timestamp": None}},
         "session": session,
+        "completion": configuration(action, event, workflow_id, title=title, steps=steps),
     }
 
 
