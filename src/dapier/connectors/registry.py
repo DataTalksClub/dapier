@@ -64,6 +64,7 @@ class Action:
     description: str = ""
     icon: str = "file-text"
     fields: tuple = ()
+    validate: object = None
 
 
 @dataclass(frozen=True)
@@ -431,6 +432,21 @@ def validate_field_types(action, where, error=ActionError):
     return action
 
 
+def validate_action_config(action, where, error=ActionError):
+    """Run a provider's save-time validator on every workflow surface.
+
+    Most existing actions retain permissive designer drafts. Providers that
+    require stronger authoring guarantees supply this hook in their plugin.
+    """
+    entry = ACTIONS.get((action or {}).get("type"))
+    if entry is not None and entry.validate is not None:
+        try:
+            entry.validate(action)
+        except ValueError as exc:
+            raise error(f"{where}: {exc}") from None
+    return action
+
+
 def validate_error_keys(step, where, error=ActionError):
     """Validate one step's generic ``on_error``/``error_actions`` keys.
 
@@ -500,6 +516,7 @@ def validate_action_chain(actions):
         if action.get("error_actions"):
             validate_action_chain(action["error_actions"])
         _validate_field_types(action, entry)
+        validate_action_config(action, str(action_type))
         try:
             templating.validate_action(action)
         except templating.TemplateError as exc:

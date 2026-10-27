@@ -1,6 +1,6 @@
 """Hub intake connector: file a Hub task and optionally wake Developer."""
-from ..engine.actions.hub_intake import run_hub_intake
-from .registry import Action, register
+from .intake_action import run_hub_intake
+from src.dapier.connectors.registry import Action, register
 
 register(Action(
     type="hub_intake",

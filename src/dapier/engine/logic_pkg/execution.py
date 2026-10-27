@@ -3,12 +3,25 @@ autoretry planning and backoff, and the dispatch into the
 action runner."""
 import random
 import time
+from contextvars import ContextVar
 from ..history import is_redacted, step_output
 from .controls import (_predicate_scope, _run_condition, _run_decision,
                        _run_delay, _run_filter, _run_paths, _run_union)
 from .core import (AUTORETRY_DEFAULTS, CompletedStep, ERROR_MODES, ON_FAIL_MODES,
                    QuotaExceeded, RunSuspended, _elapsed, _step_id)
 from .loops import _run_digest, _run_for_each
+
+
+_current_action_id = ContextVar("dapier_current_action_id", default=None)
+
+
+def current_action_id():
+    """Qualified execution identity for runners that coordinate durable work.
+
+    Keep the workflow's local step id intact for existing action runners.
+    The context is restored even when a nested runner raises or retries.
+    """
+    return _current_action_id.get()
 
 
 def _run_step(workflow_id, step, index, event, run_action, *,
@@ -222,8 +235,12 @@ def _execute_step(workflow_id, action_id, step, event, run_action, *,
             on_action_error=on_action_error, scope=scope,
             step_outputs=step_outputs,
         )
-    return None, _dispatch_action(
-        step, event, workflow_id, run_action, step_outputs, autoretry), "completed"
+    token = _current_action_id.set(action_id)
+    try:
+        return None, _dispatch_action(
+            step, event, workflow_id, run_action, step_outputs, autoretry), "completed"
+    finally:
+        _current_action_id.reset(token)
 
 
 def _dispatch_action(step, event, workflow_id, run_action, step_outputs, autoretry):

@@ -358,6 +358,7 @@ def _validate_steps(steps, where="actions"):
         # field type fails the save. Templated values are skipped there; the
         # dry-run re-checks them against a sample event.
         registry.validate_field_types(step, f"step '{label}'", WorkflowError)
+        registry.validate_action_config(step, f"step '{label}'", WorkflowError)
         if step.get("error_actions"):
             _validate_steps(step["error_actions"], where=f"{label}.error")
 

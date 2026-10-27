@@ -28,7 +28,6 @@ from . import (  # noqa: F401  (import = registration)
     storage,
     subworkflow,
     triggers,
-    hub_intake,
     webhook,
 )
 from .ingress import normalize_event  # noqa: F401

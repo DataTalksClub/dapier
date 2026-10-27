@@ -17782,10 +17782,25 @@
       ]
     },
     {
+      type: "hub_session",
+      label: "Hub session",
+      icon: Bot,
+      description: "Create a Hub intake and request a headless session in its workspace.",
+      fields: [
+        { key: "title", label: "Title", required: true },
+        { key: "text", label: "Task instructions", type: "textarea", required: true },
+        { key: "acceptance_criteria", label: "Acceptance criteria", type: "textarea", required: true },
+        { key: "workspace", label: "Hub workspace", default: "dapier-agents" },
+        { key: "cwd", label: "Directory within workspace" },
+        { key: "tier", label: "Tier", type: "select", options: ["quick", "daily", "deep"], default: "daily" },
+        { key: "project", label: "Hub project", default: "dapier-agents" }
+      ]
+    },
+    {
       type: "hub_intake",
       label: "Hub intake",
       icon: Mail,
-      description: "Create a Hub intake task (and optionally assign/wake Developer). Token and Hub URL come from env / Secrets Manager — never from the workflow YAML.",
+      description: "Create a Hub intake task (and optionally assign/wake Developer).",
       fields: [
         { key: "title", label: "Title", required: true, placeholder: "dapier event" },
         { key: "text", label: "Body (templated)", type: "textarea", placeholder: "Event for Developer" },
@@ -20238,6 +20253,7 @@
   const errorHandlingFields = [onErrorField, onFailField, errorActionsField];
   const stepCategories = {
     agent: "ai",
+    hub_session: "ai",
     ai_complete: "ai",
     filter: "flow",
     condition: "flow",

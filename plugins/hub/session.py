@@ -1,8 +1,7 @@
 """Hub session request protocol, independent of credential provisioning.
 
-The caller supplies authenticated HTTP and durable storage. This module does
-not resolve secrets or register a runnable action until the service identity
-and DataOps reader are available. No agent process runs in Dapier.
+The action runner supplies authenticated HTTP and durable storage. This
+module does not resolve secrets. No agent process runs in Dapier.
 """
 import hashlib
 import json
