@@ -198,6 +198,22 @@ Globals:
         HOOKS_BASE_URL: !Sub https://${DomainName}
 
 Resources:
+  # ACM certificate for dapier.dtcdev.click, issued DNS-validated and in use
+  # by the API custom domain (via the DomainCertificateArn parameter below).
+  # Brought under IaC 2026-10-27 during the sandbox IaC sweep by importing
+  # the live issued certificate; properties mirror live config. Retain on
+  # both policies: the cert is shared (also referenced outside this stack)
+  # and must never be deleted or replaced with the stack.
+  DomainCertificate:
+    Type: AWS::CertificateManager::Certificate
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      DomainName: dapier.dtcdev.click
+      ValidationMethod: DNS
+      KeyAlgorithm: RSA_2048
+      CertificateTransparencyLoggingPreference: ENABLED
+
   Api:
     Type: AWS::Serverless::HttpApi
     Properties:
