@@ -361,6 +361,7 @@ Resources:
                   - !GetAtt AuditTable.Arn
                   - !GetAtt EmailFromTable.Arn
                   - !GetAtt HostTasksTable.Arn
+                  - !Sub '${HostTasksTable.Arn}/index/*'
                   - !GetAtt HookTriggersTable.Arn
                   - !GetAtt ApiTokensTable.Arn
                   - !GetAtt DeviceSessionsTable.Arn
@@ -975,7 +976,7 @@ Resources:
             BatchSize: 5
             FunctionResponseTypes: [ReportBatchItemFailures]
 
-  # No Lambda subscribes. dapier worker long-polls this queue.
+  # No Lambda subscribes. The host API short-polls; dapier worker paces idle calls.
   HostQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -1452,8 +1453,16 @@ Resources:
       DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: task_id, AttributeType: S}
+        - {AttributeName: status, AttributeType: S}
       KeySchema:
         - {AttributeName: task_id, KeyType: HASH}
+      GlobalSecondaryIndexes:
+        - IndexName: by-status
+          KeySchema:
+            - {AttributeName: status, KeyType: HASH}
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes: [kind, engine, requires, created_at, lease_until, notify_to, notified_at]
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true

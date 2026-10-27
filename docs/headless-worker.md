@@ -122,11 +122,14 @@ Tasks without `requires` still match only their engine (Claude by default).
 Codex tasks and tasks with requirements are leased directly from the task table
 through the same authenticated host API. They never enter the legacy shared SQS
 queue, so older workers cannot claim them, and waiting for a capable worker
-does not exhaust queue retry limits. Matching uses a paginated scan and
+does not exhaust queue retry limits. Matching uses paginated queries on the compact `by-status` index and
 conditional updates; only one worker can acquire a task. Heartbeats extend the
 table lease, and expired runs become interrupted rather than being rerun.
-Other Claude tasks retain their existing SQS path. A Codex worker polls every
-ten seconds when idle. Windows token files use owner-only ACLs.
+Other Claude tasks retain their existing SQS path. Every worker polls at ten-second intervals when idle; SQS receives use
+`WaitTimeSeconds=0`, so Lambda never bills an idle queue wait. The index
+projects routing metadata rather than prompts, logs or results; candidate
+tasks are read consistently by ID before leasing. Existing tasks are indexed
+automatically when the index is created. Windows token files use owner-only ACLs.
 
 Every `dapier worker` process registers itself under a stable id
 (`hostname-pid-random`), sent with each claim, heartbeat, and finish call.

@@ -14,7 +14,7 @@ from .worker_capabilities import capabilities
 
 from .host_tasks import tasks_table
 
-# Claim long-polls every ~10s and heartbeats every 40s while a task runs,
+# The host polls every ~10s and heartbeats every 40s while a task runs,
 # so a two-minute silence means the process is gone.
 ACTIVE_WINDOW_SECONDS = 120
 TTL_SECONDS = 14 * 86400

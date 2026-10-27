@@ -38,7 +38,14 @@ def test_routing_and_lease_lifecycle():
     with mock_aws():
         table = boto3.resource("dynamodb").create_table(
             TableName="host-tasks", KeySchema=[{"AttributeName": "task_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"}],
+            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"},
+                                  {"AttributeName": "status", "AttributeType": "S"}],
+            GlobalSecondaryIndexes=[{
+                "IndexName": "by-status",
+                "KeySchema": [{"AttributeName": "status", "KeyType": "HASH"}],
+                "Projection": {"ProjectionType": "INCLUDE", "NonKeyAttributes": [
+                    "kind", "engine", "requires", "created_at", "lease_until", "notify_to", "notified_at"]},
+            }],
             BillingMode="PAY_PER_REQUEST")
         queue = boto3.client("sqs")
         url = queue.create_queue(QueueName="host-jobs")["QueueUrl"]

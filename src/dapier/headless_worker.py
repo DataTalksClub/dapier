@@ -315,6 +315,7 @@ def serve(*, api_url="https://dapier.dtcdev.click", token_file=DEFAULT_TOKEN_FIL
     print(f"dapier worker {worker_id} on {api_url} — polling for agent tasks",
           flush=True)
     while True:
+        poll_started = time.monotonic()
         response = api.call("claim", {"worker": meta})
         job = response.get("job")
         if job:
@@ -322,5 +323,7 @@ def serve(*, api_url="https://dapier.dtcdev.click", token_file=DEFAULT_TOKEN_FIL
                     worker_id=worker_id, worker_meta=meta)
         if once:
             return
-        if not job and engine == "codex":
-            time.sleep(10)
+        if not job:
+            # Pace on the host, including while rolling out from the old API
+            # that spent this interval waiting inside Lambda.
+            time.sleep(max(0, 10 - (time.monotonic() - poll_started)))

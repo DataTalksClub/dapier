@@ -17,7 +17,14 @@ def test_claim_heartbeat_finish_and_no_second_execution():
         table = boto3.resource("dynamodb", region_name="eu-west-1").create_table(
             TableName="host-tasks",
             KeySchema=[{"AttributeName": "task_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"}],
+            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"},
+                                  {"AttributeName": "status", "AttributeType": "S"}],
+            GlobalSecondaryIndexes=[{
+                "IndexName": "by-status",
+                "KeySchema": [{"AttributeName": "status", "KeyType": "HASH"}],
+                "Projection": {"ProjectionType": "INCLUDE", "NonKeyAttributes": [
+                    "kind", "engine", "requires", "created_at", "lease_until", "notify_to", "notified_at"]},
+            }],
             BillingMode="PAY_PER_REQUEST",
         )
         queue = boto3.client("sqs", region_name="eu-west-1")
@@ -57,7 +64,14 @@ def test_completion_emails_forwarding_sender(monkeypatch):
         table = boto3.resource("dynamodb", region_name="eu-west-1").create_table(
             TableName="host-tasks",
             KeySchema=[{"AttributeName": "task_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"}],
+            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"},
+                                  {"AttributeName": "status", "AttributeType": "S"}],
+            GlobalSecondaryIndexes=[{
+                "IndexName": "by-status",
+                "KeySchema": [{"AttributeName": "status", "KeyType": "HASH"}],
+                "Projection": {"ProjectionType": "INCLUDE", "NonKeyAttributes": [
+                    "kind", "engine", "requires", "created_at", "lease_until", "notify_to", "notified_at"]},
+            }],
             BillingMode="PAY_PER_REQUEST",
         )
         queue = boto3.client("sqs", region_name="eu-west-1")
@@ -199,7 +213,14 @@ def test_claim_serves_attachments_only_to_the_live_lease():
         table = boto3.resource("dynamodb", region_name="eu-west-1").create_table(
             TableName="host-tasks",
             KeySchema=[{"AttributeName": "task_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"}],
+            AttributeDefinitions=[{"AttributeName": "task_id", "AttributeType": "S"},
+                                  {"AttributeName": "status", "AttributeType": "S"}],
+            GlobalSecondaryIndexes=[{
+                "IndexName": "by-status",
+                "KeySchema": [{"AttributeName": "status", "KeyType": "HASH"}],
+                "Projection": {"ProjectionType": "INCLUDE", "NonKeyAttributes": [
+                    "kind", "engine", "requires", "created_at", "lease_until", "notify_to", "notified_at"]},
+            }],
             BillingMode="PAY_PER_REQUEST",
         )
         queue = boto3.client("sqs", region_name="eu-west-1")

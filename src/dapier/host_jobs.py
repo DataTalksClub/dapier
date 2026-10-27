@@ -16,7 +16,8 @@ from .host_tasks import tasks_table
 from .host_workers import checkin, meta_of
 
 VISIBILITY_SECONDS = 120
-WAIT_SECONDS = 10
+WAIT_SECONDS = 0
+STATUS_INDEX = "by-status"
 MAX_LOG_CHARS = 12000
 # One attachment download returns at most this many raw bytes (base64 in the
 # JSON envelope) so the response stays under API Gateway's 10 MB payload cap.
@@ -38,7 +39,7 @@ def _queue_url(queue_url=None):
 
 
 def _row(table, task_id):
-    return table.get_item(Key={"task_id": task_id}).get("Item") or {}
+    return table.get_item(Key={"task_id": task_id}, ConsistentRead=True).get("Item") or {}
 
 
 def _delete(queue, receipt, queue_url):
@@ -66,7 +67,7 @@ def _set(table, task_id, fields, condition=None, condition_values=None):
 
 
 def claim(owner, body=None, *, table_ref=None, queue_ref=None, queue_url=None, now=None):
-    """Lease one queued task or return None after a bounded long poll."""
+    """Lease one queued task without waiting; the host paces idle polls."""
     table, queue = tasks_table(table_ref), queue_client(queue_ref)
     # Presence first: an idle worker polls this every ~10s, so the check-in
     # doubles as the worker's heartbeat. Older workers send no meta and
@@ -169,17 +170,42 @@ def _claim_routed(table, owner, meta, now):
     """
     from botocore.exceptions import ClientError
 
-    items, start = [], None
-    while True:
-        page = table.scan(**({"ExclusiveStartKey": start} if start else {}))
-        items.extend(row for row in page.get("Items", [])
-                     if row.get("kind") == "agent" and
-                     (row.get("requires") or row.get("engine") == "codex"))
-        start = page.get("LastEvaluatedKey")
-        if not start:
-            break
+    # The index projects only routing/lease/notification metadata, never large
+    # prompts, logs or results. Existing tasks are backfilled by DynamoDB.
+    items = []
+    for status in ("queued", "running", *sorted(TERMINAL)):
+        start = None
+        while True:
+            page = table.query(
+                IndexName=STATUS_INDEX,
+                KeyConditionExpression="#status = :status",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={":status": status},
+                **({"ExclusiveStartKey": start} if start else {}),
+            )
+            items.extend(row for row in page.get("Items", [])
+                         if row.get("kind") == "agent" and
+                         (row.get("requires") or row.get("engine") == "codex"))
+            start = page.get("LastEvaluatedKey")
+            if not start:
+                break
     items.sort(key=lambda row: (int(row.get("created_at") or 0), row["task_id"]))
-    for row in items:
+    for candidate in items:
+        state = candidate.get("status")
+        if state == "running" and int(candidate.get("lease_until") or 0) > now:
+            continue
+        if state in TERMINAL and (not candidate.get("notify_to") or candidate.get("notified_at")):
+            continue
+        if state == "queued" and (not meta or
+                (candidate.get("engine") or "claude") != (meta.get("engine") or "claude") or
+                not set(candidate.get("requires") or []).issubset(meta.get("capabilities") or [])):
+            continue
+        # GSIs are eventually consistent. Fetch the authoritative row before
+        # returning a prompt or reconciling a lease; conditional writes fence
+        # competing claims and heartbeats after this read.
+        row = _row(table, candidate["task_id"])
+        if row.get("kind") != "agent" or not (row.get("requires") or row.get("engine") == "codex"):
+            continue
         if row.get("status") == "running" and int(row.get("lease_until") or 0) <= now:
             try:
                 _set(table, row["task_id"], {
