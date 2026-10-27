@@ -115,3 +115,26 @@ def test_competing_claim_cannot_overwrite_winner_and_notification_retry_survives
                             notified.append((task_id, row.get("summary"))))
         host_jobs.claim("host", meta, table_ref=table, queue_ref=queue, queue_url=url, now=1001)
         assert notified == [("notify", "finished")]
+
+
+@pytest.mark.parametrize("code,message,backfilling", [
+    ("ValidationException", "Cannot read from backfilling global secondary index: by-status", True),
+    ("ValidationException", "The table does not have the specified index: by-status", False),
+    ("AccessDeniedException", "not authorized", False),
+])
+def test_index_backfill_keeps_sqs_path_available_without_hiding_errors(monkeypatch, code, message, backfilling):
+    from botocore.exceptions import ClientError
+    with lease_fixture() as (table, queue, url):
+        def unavailable(**kwargs):
+            raise ClientError({"Error": {"Code": code, "Message": message}}, "Query")
+        monkeypatch.setattr(table, "query", unavailable)
+        received = []
+        monkeypatch.setattr(queue, "receive_message", lambda **kw: received.append(kw) or {})
+        if backfilling:
+            assert host_jobs.claim("host", table_ref=table, queue_ref=queue,
+                                   queue_url=url)[1] == {"job": None}
+            assert received[0]["WaitTimeSeconds"] == 0
+        else:
+            with pytest.raises(ClientError):
+                host_jobs.claim("host", table_ref=table, queue_ref=queue, queue_url=url)
+            assert not received

@@ -129,7 +129,9 @@ Other Claude tasks retain their existing SQS path. Every worker polls at ten-sec
 `WaitTimeSeconds=0`, so Lambda never bills an idle queue wait. The index
 projects routing metadata rather than prompts, logs or results; candidate
 tasks are read consistently by ID before leasing. Existing tasks are indexed
-automatically when the index is created. Windows token files use owner-only ACLs.
+automatically when the index is created. During the initial index backfill,
+legacy SQS jobs remain available and routed jobs stay queued until the index
+is readable; polling never falls back to a table scan. Windows token files use owner-only ACLs.
 
 Every `dapier worker` process registers itself under a stable id
 (`hostname-pid-random`), sent with each claim, heartbeat, and finish call.

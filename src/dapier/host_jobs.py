@@ -176,13 +176,24 @@ def _claim_routed(table, owner, meta, now):
     for status in ("queued", "running", *sorted(TERMINAL)):
         start = None
         while True:
-            page = table.query(
-                IndexName=STATUS_INDEX,
-                KeyConditionExpression="#status = :status",
-                ExpressionAttributeNames={"#status": "status"},
-                ExpressionAttributeValues={":status": status},
-                **({"ExclusiveStartKey": start} if start else {}),
-            )
+            try:
+                page = table.query(
+                    IndexName=STATUS_INDEX,
+                    KeyConditionExpression="#status = :status",
+                    ExpressionAttributeNames={"#status": "status"},
+                    ExpressionAttributeValues={":status": status},
+                    **({"ExclusiveStartKey": start} if start else {}),
+                )
+            except ClientError as exc:
+                error = exc.response.get("Error", {})
+                # CloudFormation can finish a table update before its new GSI
+                # is readable. Keep the SQS path alive during backfill; routed
+                # tasks remain queued for the next poll. Never fall back to Scan.
+                if (error.get("Code") == "ValidationException" and
+                        error.get("Message") ==
+                        f"Cannot read from backfilling global secondary index: {STATUS_INDEX}"):
+                    return None
+                raise
             items.extend(row for row in page.get("Items", [])
                          if row.get("kind") == "agent" and
                          (row.get("requires") or row.get("engine") == "codex"))
