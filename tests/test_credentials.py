@@ -73,10 +73,7 @@ class VersionedTable(Table):
         if ConditionExpression:
             expected = ExpressionAttributeValues[":expected"]
             current = self.items.get(Item["credential_id"])
-            current_version = current.get("version") if current else None
-            if current_version is None and current is not None:
-                current_version = 0 if expected == 0 else "legacy"
-            if current is not None and current_version != expected:
+            if current is not None and current.get("version") != expected:
                 from botocore.exceptions import ClientError
 
                 raise ClientError(
@@ -141,13 +138,29 @@ def test_api_save_credential_openrouter_rejects_non_keys(monkeypatch):
     assert table.items == {}
 
 
-def test_conditional_write_accepts_legacy_unversioned_item(monkeypatch):
+def test_conditional_write_rejects_legacy_unversioned_item(monkeypatch):
     table = configure_versioned(monkeypatch)
     table.items["oauth#legacy"] = {"credential_id": "oauth#legacy", "value": {"a": 1}}
-    credentials.put_credential_if_version(
-        "oauth#legacy", {"a": 2}, provider="youtube", expected_version=0,
-    )
-    assert credentials.get_credential_record("oauth#legacy")["version"] == 1
+    try:
+        credentials.put_credential_if_version(
+            "oauth#legacy", {"a": 2}, provider="youtube", expected_version=0,
+        )
+    except credentials.VersionConflict as error:
+        assert error.args == ("oauth#legacy",)
+    else:
+        raise AssertionError("unversioned legacy item should conflict, not be taken over")
+    assert credentials.get_credential("oauth#legacy") == {"a": 1}
+
+
+def test_put_over_legacy_unversioned_record_fails_loudly(monkeypatch):
+    table = configure(monkeypatch)
+    table.items["legacy"] = {"credential_id": "legacy", "value": {"a": 1}}
+    try:
+        credentials.put_credential("legacy", {"a": 2}, provider="youtube")
+    except KeyError as error:
+        assert "version" in str(error)
+    else:
+        raise AssertionError("missing version should fail loudly, not reset to 1")
 
 
 def test_credential_shapes_report_key_names_only(monkeypatch):

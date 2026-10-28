@@ -21,13 +21,6 @@ def _table():
     return boto3.resource("dynamodb").Table(os.environ["CREDENTIALS_TABLE"])
 
 
-def _bump(record):
-    try:
-        return int(record.get("version", 0)) + 1
-    except (TypeError, ValueError):
-        return 1
-
-
 def put_credential(credential_id, value, *, provider):
     now = datetime.now(timezone.utc).isoformat()
     record = get_credential_record(credential_id)
@@ -35,7 +28,7 @@ def put_credential(credential_id, value, *, provider):
         "credential_id": credential_id,
         "provider": provider,
         "value": value,
-        "version": _bump(record),
+        "version": int(record["version"]) + 1 if record else 1,
         "updated_at": now,
     })
     return now
@@ -61,16 +54,13 @@ def get_credential(credential_id):
 def put_credential_if_version(credential_id, value, *, provider, expected_version):
     """Write only when the stored version still equals ``expected_version``.
 
-    Legacy items without a version attribute count as version 0. Raises
-    VersionConflict instead of overwriting a newer secret with stale state.
+    Raises VersionConflict instead of overwriting a newer secret with stale
+    state.
     """
     from botocore.exceptions import ClientError
 
     now = datetime.now(timezone.utc).isoformat()
-    try:
-        expected = int(expected_version)
-    except (TypeError, ValueError):
-        expected = 0
+    expected = int(expected_version)
     try:
         _table().put_item(
             Item={
@@ -81,10 +71,9 @@ def put_credential_if_version(credential_id, value, *, provider, expected_versio
                 "updated_at": now,
             },
             ConditionExpression=(
-                "attribute_not_exists(credential_id) OR version = :expected "
-                "OR (attribute_not_exists(version) AND :expected = :zero)"
+                "attribute_not_exists(credential_id) OR version = :expected"
             ),
-            ExpressionAttributeValues={":expected": expected, ":zero": 0},
+            ExpressionAttributeValues={":expected": expected},
         )
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
