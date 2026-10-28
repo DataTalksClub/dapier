@@ -659,8 +659,7 @@ def _fetch_s3_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     an absent object cannot be listed — and falls through. A live fetch
     that cannot run — no stored AWS credential, the bucket unreachable, or
     the bucket empty — falls through too, instead of failing: a sample pull
-    shows the payload shape, it never raises (see the audit note in
-    docs/connector-coverage-audit.md about bare deploys).
+    shows the payload shape, it never raises.
 
     The fallbacks key on the ask (the poll's event, or a dotted event name
     for a per-event ask): a ``file.deleted`` ask is never answered with a

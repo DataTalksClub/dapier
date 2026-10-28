@@ -296,14 +296,9 @@ def test_order_steps_hierarchically_places_parent_before_retried_children():
     ]
 
 
-def test_aisl_recording_agent_workflow_files_are_valid_and_in_sync():
+def test_aisl_recording_agent_workflow_file_is_valid():
     root = Path(__file__).resolve().parents[1]
-    docs_path = root / "docs" / "aisl-recording-agent-workflow.yaml"
-    wf_path = root / "workflows" / "aisl-recording-agent.yaml"
-    assert docs_path.exists() and wf_path.exists()
-    docs_text = docs_path.read_text(encoding="utf-8")
-    wf_text = wf_path.read_text(encoding="utf-8")
-    assert docs_text == wf_text
+    wf_text = (root / "workflows" / "aisl-recording-agent.yaml").read_text(encoding="utf-8")
     parsed = designer_store.parse_workflow(wf_text)
     assert parsed["actions"][0]["type"] == "for_each"
     decision = parsed["actions"][1]

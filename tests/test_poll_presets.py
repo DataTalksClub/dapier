@@ -1,6 +1,6 @@
 """Poll presets: the Sheets "New Spreadsheet Row" and Drive "New File in
 Folder" sources as first-class poll-trigger choices behind their palette
-chips (docs/connector-coverage-audit.md gap 2).
+chips.
 
 Covers the save-time shape (source validate → build_item), the fetch
 transform (values.get / files.list through the shared provider helpers,

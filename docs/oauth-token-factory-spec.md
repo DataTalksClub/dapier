@@ -24,7 +24,7 @@ identity verification, and token response details.
 
 ## Existing Dapier foundation
 
-- `src/admin.py` already implements DTC OIDC browser login through
+- `src/dapier/api/admin/` and `src/dapier/auth/` already implement DTC OIDC browser login through
   `AUTH_BASE_URL`/`AUTH_ISSUER`, validates ID tokens, and issues a Dapier session.
 - The same module has OAuth start/callback handlers, provider endpoints for
   YouTube and Dropbox, connection metadata in `CONNECTIONS_TABLE`, and
@@ -34,7 +34,7 @@ identity verification, and token response details.
 
 Extend these components. Do not create a second auth system, separate public
 OAuth callback Lambda, or a new standalone token-service repository. Separate
-modules inside Dapier are welcome so `src/admin.py` does not grow indefinitely.
+modules inside Dapier are welcome so no single admin module grows indefinitely.
 
 ## Identity and authorization
 

@@ -164,7 +164,7 @@ lives in (`DAPIER_ROOT` to override); it binds 127.0.0.1 only, and
 ### Extending the catalog
 
 Everything the palette and inspector know about action types lives in one
-declarative file, `designer/src/catalog.ts`. When `src/engine.py` grows a new
+declarative file, `designer/src/catalog.ts`. When the engine grows a new
 action, append one object to `actionCatalog` — `type` (the YAML `type` value),
 `label`, optional `icon` (a lucide icon or a product logo from `logos.tsx`),
 and one `fields` entry per YAML key the engine
@@ -584,8 +584,8 @@ Credential values travel only in the request body and are never echoed; like
 the console's write-only credential fields, they cannot be read back.
 After changing requested scopes, reconnect that connection to grant them. See
 [the shared scope-change procedure](docs/connectors/README.md#changing-requested-scopes)
-and the [Google](docs/connectors/google.md) or
-[Dropbox](docs/connectors/dropbox.md) provider guide for provider-specific
+and the [Google](plugins/google/README.md) or
+[Dropbox](plugins/dropbox/README.md) provider guide for provider-specific
 permission steps and the source files to update when changing defaults.
 
 ### API tokens for headless consumers

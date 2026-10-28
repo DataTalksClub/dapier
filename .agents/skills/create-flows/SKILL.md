@@ -51,11 +51,10 @@ dapier runs list --workflow invoice-intake               # 8. verify real runs
   `{steps.*}` templates.
 - `publish` promotes the draft (409 when the draft is stale behind live);
   `discard --yes` throws a draft away; `versions` / `diff` / `rollback`
-  manage history; `on`/`off` (aliases `enable`/`disable`) flip the live
+  manage history; `on`/`off` flip the live
   switch, bulk via `--tag`/`--all`.
 
-A copilot NL→YAML generator exists (`dapier workflows draft "..."`) but author
-the YAML directly — you have the full schema, the model does not.
+Author the YAML directly — you have the full schema.
 
 ## Schema
 
@@ -96,7 +95,6 @@ actions:                      # non-empty, run in order
   (multi-trigger flow). Every trigger needs `connector` and `event`.
 - Email triggers and their actions live only in workflow definitions.
   `dapier emails list|show` is an inventory, not another flow editor.
-  `dapier emails migrate <name>` converts a remaining legacy record unchanged.
 - Legacy shared `flow:` references are retired. Put actions in the workflow;
   reuse another managed workflow with `run_workflow`.
 - Publishing refuses overlapping email routes with 409. To deliberately fan
@@ -212,8 +210,8 @@ run time and checks grants. A connection that exists but lacks user consent is
 not usable — `dapier connections connect <id>` (OAuth) or `dapier connections
 import` (token) first. `s3`/`aws` and `mailchimp` are pseudo connections
 backed by stored API keys referenced as `credential_id`. Scope changes go
-through `dapier connections scopes`; provider setup lives in
-`docs/connectors/*.md`.
+through `dapier connections edit --scopes`; provider setup lives in
+`plugins/<name>/README.md`.
 
 ## Rules
 

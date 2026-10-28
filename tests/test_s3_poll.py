@@ -1,6 +1,5 @@
 """The S3 poll source: a bucket listing as poll items — the boto3-backed
-fetch for the JSON-only generic poller (docs/connector-coverage-audit.md
-gap 3, "no S3 trigger").
+fetch for the JSON-only generic poller.
 
 Covers the save-time shape (bucket/prefix/credential_id validate), the
 boto3 list (JSON items: key, size, last_modified, etag), the first-fire

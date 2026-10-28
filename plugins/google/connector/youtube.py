@@ -170,7 +170,7 @@ register(Action(
                  "video id. An item already gone is {removed: false}, not an "
                  "error. Output: {removed, playlist_item_id}. playlistItems."
                  "delete needs the youtube.force-ssl scope (see "
-                 "docs/connectors/google.md)."),
+                 "plugins/google/README.md)."),
     icon="youtube",
     run=lambda action, event, workflow_id, steps=None: (
         run_youtube_remove_from_playlist(action, event, steps=steps)),
@@ -438,7 +438,7 @@ def _stored_youtube_poll(name):
     triggers, an unknown name and a non-youtube source (the generic poll
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
-    raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
+    raises for want of infrastructure."""
     from src.dapier.triggers import poll_triggers
 
     name = str(name or "").strip().lower()

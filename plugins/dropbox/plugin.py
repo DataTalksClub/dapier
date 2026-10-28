@@ -437,7 +437,7 @@ def _stored_dropbox_poll(name):
     triggers, an unknown name and a non-dropbox source (the generic poll
     connector owns those) fold together: the caller only distinguishes
     live-vs-fallback, so any storage hiccup folds too — sampling never
-    raises for want of infrastructure (see docs/connector-coverage-audit.md)."""
+    raises for want of infrastructure."""
     from src.dapier.triggers import poll_triggers
 
     name = str(name or "").strip().lower()

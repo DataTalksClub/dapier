@@ -181,7 +181,7 @@ def test_calendar_scopes_normalize_deduplicated():
 
 def test_a_calendar_scoped_connection_verifies():
     """Verification is the userinfo.email identity check — the calendar
-    scopes need no adapter changes to pass (docs/connectors/calendar.md)."""
+    scopes need no adapter changes to pass."""
     def transport(method, url, *, headers=None, body=None, timeout=15):
         assert "oauth2/v3/userinfo" in url
         assert headers["authorization"] == "Bearer fresh-token"
