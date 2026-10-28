@@ -37,7 +37,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "expiry_digest_api", "import_connection", "issue_token", "list_for_caller", "resolve_connection", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
+__all__ = ["AGENT_LIST_DEFAULT_LIMIT", "AGENT_LIST_MAX_LIMIT", "connections_discover_api", "connections_test_api", "create_connection", "delete_connection", "expiry_digest_api", "import_connection", "issue_token", "list_for_caller", "resolve_connection", "rewrite_legacy_connections", "revoke_connection_tokens", "show_connection", "start_connect", "update_connection_metadata"]
 
 
 
@@ -404,6 +404,22 @@ def revoke_connection_tokens(event, connection_id):
     connections.put_connection(connections_table, updated)
     audit.emit(connection_id, audit.REVOKE, subject, outcome="ok")
     return _json_response(200, {"connection_id": connection_id, "status": updated["status"]})
+
+
+def rewrite_legacy_connections(event):
+    """Operator-only stored-row rewrite: clear the retired ``display_name``
+    attribute from every connection still carrying it. The cleanup twin of
+    the ``store-check`` count, one step ahead of removing the reference
+    fallback the attribute serves (see records.strip_legacy_display_names).
+    Idempotent; reports which rows moved."""
+    subject, error = require_operator(event, audit.CONNECT)
+    if error:
+        return error
+    connections_table, _ = _tables()
+    rewritten = connections.strip_legacy_display_names(connections_table)
+    for connection_id in rewritten:
+        audit.emit(connection_id, audit.CONNECT, subject, outcome="rewritten")
+    return _json_response(200, {"rewritten": rewritten, "count": len(rewritten)})
 
 
 def delete_connection(event, connection_id):

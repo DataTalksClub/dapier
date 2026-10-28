@@ -87,6 +87,9 @@ def register(sub):
     test_p.add_argument("connection", nargs="+", metavar="CONNECTION", help=REF_HELP)
     conn_sub.add_parser("send-expiry-digest",
                         help="Render and email the connection expiry digest now (operator)")
+    conn_sub.add_parser(
+        "rewrite-legacy",
+        help="Operator: clear the retired display_name attribute from stored connections")
 
 
 def _connection_id(args, api_url, debug, agent=None):
@@ -115,6 +118,8 @@ def run(args, api_url, debug, child=None):
         )
     if args.command == "send-expiry-digest":
         return commands.connections_send_expiry_digest(api_url, debug)
+    if args.command == "rewrite-legacy":
+        return commands.connections_rewrite_legacy(api_url, debug)
     agent = getattr(args, "agent", None)
     connection_id = _connection_id(args, api_url, debug, agent=agent)
     if args.command == "show":

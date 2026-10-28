@@ -587,6 +587,23 @@ def test_connections_revoke(monkeypatch, capsys):
     assert "revoked" in out
 
 
+def test_connections_rewrite_legacy(monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path, body) == ("POST", "/api/agent/connections/rewrite-legacy", {})
+        return {"rewritten": ["legacy-named", "second-one"], "count": 2}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+    assert commands.connections_rewrite_legacy("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "legacy-named, second-one" in out
+
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {"rewritten": [], "count": 0})
+    assert commands.connections_rewrite_legacy("https://api.example.test") == 0
+    out, _ = capsys.readouterr()
+    assert "nothing rewritten" in out
+
+
 def test_overview_prints_operator_summary(monkeypatch, capsys):
     payload = {
         "service": "dapier",
@@ -637,6 +654,11 @@ def test_main_operator_command_parsing(monkeypatch):
                         seen.update(revoked=connection_id) or 0)
     assert main.main(["connections", "revoke", "youtube-personal"]) == 0
     assert seen["revoked"] == "youtube-personal"
+
+    monkeypatch.setattr(commands, "connections_rewrite_legacy",
+                        lambda api_url, debug=False: seen.update(rewrote=True) or 0)
+    assert main.main(["connections", "rewrite-legacy"]) == 0
+    assert seen.get("rewrote")
 
     monkeypatch.setattr(commands, "connections_create",
                         lambda api_url, connection_id, provider, scopes, **kwargs:

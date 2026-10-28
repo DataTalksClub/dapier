@@ -548,3 +548,24 @@ def api_delete_connection(table, connection_id, *, grants_table_ref=None,
         "deleted": True,
         "grants_removed": payload_grants_removed,
     }
+
+
+def strip_legacy_display_names(table):
+    """Maintenance rewrite: drop the retired ``display_name`` attribute from
+    every stored connection still carrying it, and return the rewritten ids.
+
+    The name never labels anything (see ``refs._legacy_name``): it only kept
+    references written with it resolving. Clearing the attribute is what lets
+    that fallback go — the stored-row cleanup ``store_checks`` counts under
+    ``connections_with_display_name``. Nothing else on the row moves (no
+    version bump, no ``updated_at``): the connection itself did not change.
+    """
+    rewritten = []
+    for stored in _scan_all(table):
+        if not str(stored.get("display_name") or "").strip():
+            continue
+        item = dict(stored)
+        item.pop("display_name", None)
+        put_connection(table, item)
+        rewritten.append(item["connection_id"])
+    return sorted(rewritten)

@@ -121,6 +121,8 @@ def _route(event, method, path):
         return connections_test_api(event, test_connection_match.group(1))
     if method == "POST" and path == "/api/agent/connections/import":
         return import_connection(event)
+    if method == "POST" and path == "/api/agent/connections/rewrite-legacy":
+        return rewrite_legacy_connections(event)
     if path == "/api/agent/email-triggers" and method == "GET":
         return email_triggers_api(event, method)
     if path == "/api/agent/email-from" and method in ("GET", "POST", "DELETE"):

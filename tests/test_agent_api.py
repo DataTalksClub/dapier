@@ -574,6 +574,35 @@ def test_revoke_tokens_marks_connection_revoked(monkeypatch):
     assert json.loads(response["body"])["status"] == tokens.STATUS_REVOKED
 
 
+def test_rewrite_legacy_clears_stored_display_names(monkeypatch):
+    stored = {**CONNECTION, "connection_id": "legacy-named", "display_name": "Old label"}
+    clean = {key: value for key, value in CONNECTION.items() if key != "display_name"}
+    tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"},
+                       connections={"youtube-personal": clean,
+                                    "legacy-named": stored})
+    response = agent_api.route(event(), "POST", "/api/agent/connections/rewrite-legacy")
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {"rewritten": ["legacy-named"], "count": 1}
+    rewritten = tables["connections"].items["legacy-named"]
+    assert "display_name" not in rewritten
+    # Only the retired attribute moves: the row is otherwise untouched.
+    assert rewritten["version"] == stored["version"]
+    assert rewritten["updated_at"] == stored["updated_at"]
+
+    again = agent_api.route(event(), "POST", "/api/agent/connections/rewrite-legacy")
+    assert again["statusCode"] == 200
+    assert json.loads(again["body"]) == {"rewritten": [], "count": 0}
+
+
+def test_rewrite_legacy_requires_operator(monkeypatch):
+    configure(monkeypatch, claims={"sub": "user-1", "email": "someone@example.com"},
+              connections={"youtube-personal": dict(CONNECTION)})
+    monkeypatch.setenv("OPERATOR_EMAILS", "op@datatalks.club")
+    response = agent_api.route(event(), "POST", "/api/agent/connections/rewrite-legacy")
+    assert response["statusCode"] == 403
+    assert json.loads(response["body"])["error"] == "Operator authorization required"
+
+
 def test_oauth_clients_roundtrip_over_bearer(monkeypatch):
     configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
     monkeypatch.delenv("DAPIER_SKIP_CONFIG_DB", raising=False)

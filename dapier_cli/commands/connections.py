@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from .. import api
 
-__all__ = ["TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "resolve_connection_id"]
+__all__ = ["TOKEN_PROVIDERS", "YOUTUBE_HUB_URL", "connections_connect", "connections_create", "connections_delete", "connections_discover", "connections_edit", "connections_import", "connections_list", "connections_revoke", "connections_rewrite_legacy", "connections_send_expiry_digest", "connections_show", "connections_test", "print_connection", "print_connections", "print_discovery_items", "print_discovery_resources", "print_hook_setup", "resolve_connection_id"]
 
 
 def _local_expiry(item):
@@ -374,6 +374,17 @@ def connections_revoke(api_url, connection_id, debug=False):
                     f"/api/agent/connections/{connection_id}/tokens", debug=debug)
     print(f"Revoked tokens for {data.get('connection_id', connection_id)}; "
           f"status is now {data.get('status')}.")
+    return 0
+
+
+def connections_rewrite_legacy(api_url, debug=False):
+    data = api.call(api_url, "POST", "/api/agent/connections/rewrite-legacy",
+                    body={}, debug=debug)
+    ids = ", ".join(data.get("rewritten") or [])
+    if not ids:
+        print("No stored connection carries the retired display_name; nothing rewritten.")
+    else:
+        print(f"Removed display_name from {data.get('count')} connection(s): {ids}.")
     return 0
 
 
