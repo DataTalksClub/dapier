@@ -93,6 +93,30 @@ def put_credential_if_version(credential_id, value, *, provider, expected_versio
     return now
 
 
+def credential_shapes():
+    """Every stored credential's key names — shared and connection-owned.
+
+    Values are read only to list their key names; the result never carries
+    one. Operators use this to verify secret-shape migrations.
+    """
+    items = _table().scan(
+        ProjectionExpression="credential_id, provider, #v, updated_at, #val",
+        ExpressionAttributeNames={"#v": "version", "#val": "value"},
+    ).get("Items", [])
+    shapes = [
+        {
+            "credential_id": item.get("credential_id"),
+            "provider": item.get("provider"),
+            "keys": sorted(item["value"]) if isinstance(item.get("value"), dict) else [],
+            "version": item.get("version"),
+            "updated_at": item.get("updated_at"),
+        }
+        for item in items
+    ]
+    shapes.sort(key=lambda shape: shape["credential_id"] or "")
+    return shapes
+
+
 def credential_status(credential_id):
     item = _table().get_item(
         Key={"credential_id": credential_id},

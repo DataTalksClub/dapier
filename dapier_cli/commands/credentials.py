@@ -4,7 +4,7 @@ import json, sys
 
 from .. import api
 
-__all__ = ["credentials_set"]
+__all__ = ["credentials_list", "credentials_set"]
 
 
 CREDENTIAL_FIELDS = {"typefully": ["api_key"], "taskdeck": ["token"], "slack": ["token"],
@@ -56,5 +56,21 @@ def credentials_set(api_url, provider, path, debug=False):
                     body, debug=debug)
     print(f"Stored the {data.get('provider', provider)} credential. "
           "It is live immediately; the value is never shown again.")
+    return 0
+
+
+def credentials_list(api_url, debug=False):
+    """Every stored credential's shape: key names only, never values."""
+    data = api.call(api_url, "GET", "/api/agent/credentials", debug=debug)
+    shapes = data.get("credentials") or []
+    if not shapes:
+        print("No credentials stored.")
+        return 0
+    width = max(len(shape.get("credential_id") or "") for shape in shapes)
+    for shape in shapes:
+        keys = ", ".join(shape.get("keys") or []) or "(no named keys)"
+        updated = (shape.get("updated_at") or "").split(".")[0]
+        print(f"{shape.get('credential_id') or '':<{width}}  "
+              f"{shape.get('provider') or '?':<12} {updated:<20} {keys}")
     return 0
 

@@ -402,6 +402,7 @@ def test_operator_endpoints_reject_non_operators(monkeypatch):
     requests = (
         (event(), "GET", "/api/agent/overview"),
         (event(), "GET", "/api/agent/grants"),
+        (event(), "GET", "/api/agent/credentials"),
         (event({"token": "xoxb-" + "a" * 20}), "PUT", "/api/agent/credentials/slack"),
         (event(), "DELETE", "/api/agent/connections/youtube-personal/tokens"),
         (event({"connection_id": "youtube-team", "provider": "youtube",
@@ -412,6 +413,26 @@ def test_operator_endpoints_reject_non_operators(monkeypatch):
     )
     for request, method, path in requests:
         assert agent_api.route(request, method, path)["statusCode"] == 403
+
+
+def test_operator_can_list_credential_shapes(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    tables["credentials"].put_item(Item={
+        "credential_id": "aws", "provider": "aws",
+        "value": {"role_arn": "arn:aws:iam::1:role/r", "secret_access_key": "private"},
+        "version": 3, "updated_at": "2026-10-28T00:00:00+00:00",
+    })
+
+    response = agent_api.route(event(), "GET", "/api/agent/credentials")
+
+    assert response["statusCode"] == 200
+    body = response["body"]
+    assert json.loads(body)["credentials"] == [{
+        "credential_id": "aws", "provider": "aws",
+        "keys": ["role_arn", "secret_access_key"],
+        "version": 3, "updated_at": "2026-10-28T00:00:00+00:00",
+    }]
+    assert "private" not in body
 
 
 def test_grants_roundtrip_over_bearer(monkeypatch):

@@ -21,7 +21,8 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["credentials_api", "grants_api", "oauth_clients_api", "oauth_clients_view", "tokens_api"]
+__all__ = ["credentials_api", "credentials_view", "grants_api", "oauth_clients_api",
+           "oauth_clients_view", "tokens_api"]
 
 
 
@@ -134,6 +135,15 @@ def oauth_clients_api(event, provider):
     if status == 200:
         audit.emit(f"oauth-client#{payload['provider']}", audit.CONFIG, subject, outcome="ok")
     return _json_response(status, payload)
+
+
+def credentials_view(event):
+    """Operator-only inventory of stored credential shapes: key names,
+    never values."""
+    _, error = require_operator(event, audit.CONFIG)
+    if error:
+        return error
+    return _json_response(200, {"credentials": credentials.credential_shapes()})
 
 
 def credentials_api(event, provider):

@@ -976,6 +976,38 @@ def test_tokens_list_never_prints_secrets(isolated_home, monkeypatch, capsys):
     assert "SECRET" not in out
 
 
+def test_credentials_list_prints_key_names_never_values(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/credentials")
+        return {"credentials": [
+            {"credential_id": "aws", "provider": "aws",
+             "keys": ["role_arn"], "version": 2,
+             "updated_at": "2026-10-28T10:00:00.123456+00:00"},
+            {"credential_id": "slack-main", "provider": "slack",
+             "keys": ["token", "signing_secret"], "version": 7,
+             "updated_at": "2026-10-01T08:30:00.000000+00:00"},
+        ]}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["credentials", "list"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "role_arn" in out and "signing_secret" in out
+    assert "xoxb" not in out and "arn:aws" not in out
+
+
+def test_credentials_list_empty(isolated_home, monkeypatch, capsys):
+    monkeypatch.setattr(commands.api, "call",
+                        lambda *args, **kwargs: {"credentials": []})
+
+    rc = main.main(["credentials", "list"])
+
+    assert rc == 0
+    assert "No credentials stored" in capsys.readouterr().out
+
+
 def test_tokens_revoke(isolated_home, monkeypatch, capsys):
     calls = []
 

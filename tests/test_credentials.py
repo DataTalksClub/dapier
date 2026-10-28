@@ -16,6 +16,9 @@ class Table:
             item = {key: item[key] for key in ("credential_id", "updated_at")}
         return {"Item": item} if item else {}
 
+    def scan(self, **kwargs):
+        return {"Items": [dict(item) for item in self.items.values()]}
+
 
 def configure(monkeypatch):
     table = Table()
@@ -145,3 +148,37 @@ def test_conditional_write_accepts_legacy_unversioned_item(monkeypatch):
         "oauth#legacy", {"a": 2}, provider="youtube", expected_version=0,
     )
     assert credentials.get_credential_record("oauth#legacy")["version"] == 1
+
+
+def test_credential_shapes_report_key_names_only(monkeypatch):
+    configure(monkeypatch)
+    credentials.put_credential("aws", {"role_arn": "arn:aws:iam::1:role/r",
+                                       "secret_value": "x"}, provider="aws")
+    credentials.put_credential("conn-slack-abc", {"token": "xoxb-private",
+                                                  "signing_secret": "private"},
+                               provider="slack")
+
+    shapes = credentials.credential_shapes()
+
+    assert [shape["credential_id"] for shape in shapes] == ["aws", "conn-slack-abc"]
+    assert shapes[0] == {
+        "credential_id": "aws", "provider": "aws",
+        "keys": ["role_arn", "secret_value"],
+        "version": 1, "updated_at": shapes[0]["updated_at"],
+    }
+    assert shapes[1]["keys"] == ["signing_secret", "token"]
+    flat = repr(shapes)
+    assert "xoxb-private" not in flat and "private" not in flat
+
+
+def test_credential_shapes_non_dict_value_has_no_keys(monkeypatch):
+    configure(monkeypatch)
+    table = credentials._table()
+    table.put_item(Item={"credential_id": "legacy", "provider": "slack",
+                         "value": "xoxb-raw-token"})
+
+    shapes = credentials.credential_shapes()
+
+    assert shapes == [{"credential_id": "legacy", "provider": "slack",
+                       "keys": [], "version": None, "updated_at": None}]
+    assert "xoxb-raw-token" not in repr(shapes)

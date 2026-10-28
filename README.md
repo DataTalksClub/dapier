@@ -556,6 +556,7 @@ the CLI — the commands drive the same operator-gated API as the console:
 ```bash
 dapier overview                       # workflows, connections, credentials, recent executions
 dapier overview --section workflows   # only this block; returns JSON
+dapier credentials list               # stored credentials' key names, never values
 dapier credentials set slack --file slack-token.txt   # or --file - for stdin
 dapier grants list [--connection youtube-personal]
 dapier grants save grant.json         # {"connection_id", "subject", "agent", "operations"}

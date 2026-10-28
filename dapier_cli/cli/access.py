@@ -8,6 +8,7 @@ GROUPS = ("credentials", "grants", "tokens", "oauth-clients",)
 def register(sub):
     cred_p = sub.add_parser("credentials", help="Provider credentials used by workflows")
     cred_sub = cred_p.add_subparsers(dest="command", required=True)
+    cred_sub.add_parser("list", help="List stored credentials' key names (never values)")
     cred_set_p = cred_sub.add_parser("set", help="Store a credential (Slack bot token, Typefully or OpenRouter API key, or AWS keys as JSON)")
     cred_set_p.add_argument("provider")
     cred_set_p.add_argument("--file", required=True,
@@ -52,6 +53,8 @@ def register(sub):
 
 def run(args, api_url, debug, child=None):
     if args.group == "credentials":
+            if args.command == "list":
+                return commands.credentials_list(api_url, debug)
             if args.command == "set":
                 return commands.credentials_set(api_url, args.provider, args.file, debug)
             return 2
