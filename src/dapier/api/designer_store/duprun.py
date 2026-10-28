@@ -235,12 +235,6 @@ def api_test_code(source, body, operator=None):
     return 200, report
 
 
-# Top-level key order for workflow YAML the server writes; the designer
-# client emits the same order. Stored dicts keep whatever order they were
-# parsed in — this only applies at dump time.
-WORKFLOW_KEY_ORDER = ("id", "enabled", "trigger", "triggers", "actions", "flows", "flow")
-
-
 # The git-sync seams resolve through the package at call time, so tests
 # patching designer_store.<name> reach every caller; the facade re-binds
 # the real implementations after the star imports.

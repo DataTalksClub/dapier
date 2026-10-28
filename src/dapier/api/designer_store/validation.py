@@ -126,7 +126,7 @@ def filename_for(workflow_id):
 # Top-level key order for workflow YAML the server writes; the designer
 # client emits the same order. Stored dicts keep whatever order they were
 # parsed in — this only applies at dump time.
-WORKFLOW_KEY_ORDER = ("id", "name", "enabled", "trigger", "triggers", "actions", "flows", "flow")
+WORKFLOW_KEY_ORDER = ("id", "name", "enabled", "trigger", "triggers", "actions")
 
 
 def ordered_workflow(workflow):

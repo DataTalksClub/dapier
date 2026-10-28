@@ -42,7 +42,7 @@ def _collect_ids(value, where, found):
                     found.append((item.strip(), where))
             else:
                 child = where
-                if where == "workflow" and key in ("trigger", "actions", "flow"):
+                if where == "workflow" and key in ("trigger", "actions"):
                     child = "trigger" if key == "trigger" else "step"
                 _collect_ids(item, child, found)
     elif isinstance(value, list):

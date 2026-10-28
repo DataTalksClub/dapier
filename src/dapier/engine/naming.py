@@ -294,10 +294,6 @@ def action_label(kind):
 
 def _actions_of(workflow):
     actions = workflow.get("actions")
-    if not isinstance(actions, list) and workflow.get("flow"):
-        flows = workflow.get("flows") if isinstance(workflow.get("flows"), dict) else {}
-        bound = flows.get(workflow["flow"]) if isinstance(flows, dict) else None
-        actions = bound.get("actions") if isinstance(bound, dict) else None
     return actions if isinstance(actions, list) else []
 
 

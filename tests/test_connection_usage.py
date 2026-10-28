@@ -23,7 +23,7 @@ def workflow_item(workflow_id, *, enabled=True, actions=None, trigger=None, flow
     }
 
 
-def test_collect_walks_trigger_actions_and_flow_nodes():
+def test_collect_walks_trigger_and_actions():
     items = [
         workflow_item(
             "used-everywhere",
@@ -33,18 +33,16 @@ def test_collect_walks_trigger_actions_and_flow_nodes():
             ],
             trigger={"connector": "calendar", "event": "event.started",
                      "connection_id": "google-calendar"},
-            flow={"nodes": [{"step": {"type": "slack_post", "connection_id": "slack"}}]},
         ),
         workflow_item("unused", actions=[{"type": "webhook", "url": "https://x"}]),
     ]
     usage = connection_usage.collect(workflows=items, hooks=[])
 
-    assert set(usage) == {"google-sheets", "google-drive", "google-calendar", "slack"}
+    assert set(usage) == {"google-sheets", "google-drive", "google-calendar"}
     sheets = usage["google-sheets"][0]
     assert sheets == {"ref": "used-everywhere", "kind": "workflow",
                       "enabled": True, "where": "step"}
     assert usage["google-calendar"][0]["where"] == "trigger"
-    assert usage["slack"][0]["where"] == "step"
 
 
 def test_collect_deduplicates_and_keeps_disabled_flags():
