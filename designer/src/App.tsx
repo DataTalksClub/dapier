@@ -97,11 +97,8 @@ const CONNECTION_STATUS_LABELS: Record<string, string> = {
   revoked: "revoked",
 };
 
-/** What to call a connection: its display name, or the verified identity. */
+/** What to call a connection: the verified identity. */
 function connectionTitle(connection: ConnectionOption): string {
-  if (connection.display_name && connection.display_name !== connection.connection_id) {
-    return connection.display_name;
-  }
   return connection.account_title || connection.connection_id;
 }
 
@@ -134,7 +131,7 @@ function nodeListLabel(shape: DiagramShape): string {
   return [nodeTitle(shape), clipped].filter(Boolean).join(" · ");
 }
 
-/** "display_name · status" for the datalist entries and the selected hint. */
+/** "<title> · status" for the datalist entries and the selected hint. */
 function connectionHint(connection: ConnectionOption): string {
   const title = connectionTitle(connection);
   const status = CONNECTION_STATUS_LABELS[connection.status ?? ""] ?? connection.status;

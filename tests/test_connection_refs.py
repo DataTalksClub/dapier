@@ -221,16 +221,16 @@ def test_slack_tokens_in_one_workspace_are_told_apart_by_who_they_act_as():
     person = {"connection_id": "slack", "provider": "slack", "status": "connected",
               "verified_account_id": "T01ATQK62F8", "account_title": "DataTalks.Club",
               "account_identity": {"kind": "user", "name": "Alexey Grigorev"},
-              # A retired display name left on an old record never labels it.
+              # A leftover retired display_name is dead weight: nothing reads it.
               "display_name": "DTC Slack workspace"}
     rows = refs.with_refs([dict(app), dict(person)])
     assert rows[0]["refs"] == ["slack DataTalks.Club / Au-Tomator"]
     assert rows[1]["refs"] == ["slack DataTalks.Club / Alexey Grigorev"]
     assert refs.resolve([app, person], "slack au-tomator")["connection_id"] == "slack-automator"
     assert refs.resolve([app, person], "slack Alexey Grigorev")["connection_id"] == "slack"
-    # References written with the retired display name keep resolving.
-    assert refs.resolve([app, person],
-                        "slack DataTalks.Club / DTC Slack workspace")["connection_id"] == "slack"
+    # A reference written with the retired display name matches nothing.
+    with pytest.raises(refs.RefError):
+        refs.resolve([app, person], "slack DTC Slack workspace")
     with pytest.raises(refs.RefError) as exc:
         refs.resolve([app, person], "slack DataTalks.Club")
     assert "slack DataTalks.Club / Au-Tomator (connected)" in exc.value.candidates

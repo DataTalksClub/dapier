@@ -153,7 +153,6 @@ export function postConnectionsToDesigner() {
   const connections = (state.data.connections || []).map((connection) => ({
     connection_id: connection.connection_id,
     provider: connection.provider,
-    display_name: connection.display_name || '',
     account_title: connection.account_title || '',
     status: connection.status || '',
     refs: connection.refs || [],

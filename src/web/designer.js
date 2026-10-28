@@ -22966,9 +22966,6 @@
     revoked: "revoked"
   };
   function connectionTitle(connection) {
-    if (connection.display_name && connection.display_name !== connection.connection_id) {
-      return connection.display_name;
-    }
     return connection.account_title || connection.connection_id;
   }
   function connectionRef(connection, nodeType, others = []) {

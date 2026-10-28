@@ -50,13 +50,6 @@ def _nickname(connection):
     return name if name and name not in plain else None
 
 
-def _legacy_name(connection):
-    """A retired display name still stored on older records. It never
-    labels anything; it only keeps references written with it resolving."""
-    name = str(connection.get("display_name") or "").strip()
-    return name or None
-
-
 def _service_ids_of(connection):
     return [service["id"] for service in connection_services.services_for(connection)]
 
@@ -102,9 +95,9 @@ def _names(connection):
     """Every spelling of the account a reference fragment may match."""
     account = account_of(connection) or ""
     names = [account]
-    for nickname in (_nickname(connection), _legacy_name(connection)):
-        if nickname:
-            names += [nickname, f"{account} / {nickname}"]
+    nickname = _nickname(connection)
+    if nickname:
+        names += [nickname, f"{account} / {nickname}"]
     names += [str(connection.get(key) or "") for key in
               ("account_title", "verified_account_id", "expected_account_id")]
     return [name.lower() for name in names if name]

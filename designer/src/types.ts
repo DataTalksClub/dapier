@@ -127,7 +127,6 @@ export interface GitStatus {
 export interface ConnectionOption {
   connection_id: string;
   provider: string;
-  display_name?: string;
   account_title?: string;
   status?: string;
   /** "<service> <account>" references for this connection (drive alexey@…),
