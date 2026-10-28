@@ -26,14 +26,11 @@ SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
          for archive naming is the chosen checksum's prefix, or for merges
          a hash over the sorted checksums.
   2. email-date — format the email date in UTC
-  3. clean-subject — a Python code step removes forwarding/reply prefixes,
-     "Invoice Available" and account/invoice brackets; AWS subjects become
-     "Amazon Web Services".
-  4. make-document — merge_pdfs turns triage's plan into exactly one
+  3. make-document — merge_pdfs turns triage's plan into exactly one
      document: a single attachment passes through untouched (bytes and
      checksum stay the original's), several merge page-wise in email order
      into `invoice-document/{event_id}.pdf` in the artifacts bucket.
-  5. file-to-dataops — document_step points at make-document, so the intake
+  4. file-to-dataops — document_step points at make-document, so the intake
      stages exactly the selected document (transfer/ prefix, sha256 in
      object metadata) and posts the envelope to the DataOps connection's
      origin (`/api/v1/intake/email-documents`) with x-dataops-intake-secret.
@@ -41,7 +38,7 @@ SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
      counterparty/transactionDate/invoiceNumber — can name the file. An exact duplicate
      returns its existing preview (idempotent replay). A 409 means the
      immutable source changed and remains an error.
-  6. build-filename — a Python code step reads prior step outputs via
+  5. build-filename — a Python code step reads prior step outputs via
      `steps` and builds the Dropbox name: the preview's transaction date,
      counterparty and invoice number when present, else the email date;
      a missing company produces an explicit held_for_review result, never
@@ -49,7 +46,7 @@ SES (invoice@dtcdev.click) → email connector → invoice-intake workflow:
      stay unique. Body-only mail renders to PDF first (the else branch,
      completed by invoice-body-completion, which runs the same
      intake → build-filename → archive order).
-  7. archive-if-company — archives only when build-filename produced a
+  6. archive-if-company — archives only when build-filename produced a
      filename. Otherwise manual-review records the missing_company reason
      and DataOps intake/invoice references in the run history (Console and
      `dapier runs show`). The document stays in DataOps Finance review; no

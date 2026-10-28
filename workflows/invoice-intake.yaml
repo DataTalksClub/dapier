@@ -229,33 +229,6 @@ actions:
     value: '{date}'
     timezone: UTC
     format: '%Y-%m-%d'
-  - id: clean-subject
-    type: code
-    code: |
-      import re
-      subject = str(input.get("subject") or "").strip()
-      subject = re.sub(r"^(?:(?:fwd?|re)\s*:\s*)+", "", subject, flags=re.I).strip()
-      subject = re.sub(r"\s*\[(?:account|invoice\s*id)\s*:[^\]]*\]", "", subject, flags=re.I).strip()
-      subject = re.sub(r"\s+Invoice\s+Available\b.*$", "", subject, flags=re.I).strip()
-      if re.search(r"\bAmazon\s+Web\s+Services\b", subject, flags=re.I):
-          subject = "Amazon Web Services"
-      output = {"subject": subject or "Invoice"}
-    tests:
-    - name: forward prefix and receipt suffix come off
-      input:
-        subject: 'Fwd: Your Google Play Order Receipt from Oct 2, 2026'
-      expected:
-        subject: Your Google Play Order Receipt from Oct 2, 2026
-    - name: AWS subjects normalize
-      input:
-        subject: 'Fwd: Amazon Web Services Invoice Available [Account: 1234]'
-      expected:
-        subject: Amazon Web Services
-    - name: an empty subject falls back to Invoice
-      input:
-        subject: ''
-      expected:
-        subject: Invoice
   - id: make-document
     type: merge_pdfs
     plan_step: triage
@@ -313,10 +286,6 @@ actions:
         route.then.email-date:
           output:
             formatted: '2026-10-04'
-        route.then.clean-subject:
-          output:
-            result:
-              subject: Acme
         triage:
           output:
             result:
@@ -335,10 +304,6 @@ actions:
         route.then.email-date:
           output:
             formatted: '2026-10-19'
-        route.then.clean-subject:
-          output:
-            result:
-              subject: Invoice F-0007-2026
         triage:
           output:
             result:
@@ -360,10 +325,6 @@ actions:
         route.then.email-date:
           output:
             formatted: '2026-10-04'
-        route.then.clean-subject:
-          output:
-            result:
-              subject: Acme
         triage:
           output:
             result:
@@ -382,10 +343,6 @@ actions:
         route.then.email-date:
           output:
             formatted: '2026-10-04'
-        route.then.clean-subject:
-          output:
-            result:
-              subject: Acme
         triage:
           output:
             result:

@@ -2,8 +2,8 @@
 
 The canonical `workflows/invoice-intake.yaml` must satisfy the same
 save-time validation the API enforces, so the file cannot rot away from
-what a live workflow would accept — and its code steps (triage, subject
-cleanup, forwarded-header stripping) must behave as their tests claim.
+what a live workflow would accept — and its code steps (triage,
+forwarded-header stripping) must behave as their tests claim.
 """
 from pathlib import Path
 
@@ -94,10 +94,10 @@ def test_attachment_branch_builds_and_archives_one_document():
     branch = next(action for action in workflow["actions"]
                   if action.get("id") == "route")["then"]
     assert [action["id"] for action in branch] == [
-        "email-date", "clean-subject", "make-document", "file-to-dataops",
+        "email-date", "make-document", "file-to-dataops",
         "build-filename", "archive-if-company",
     ]
-    make_document, intake, build_filename, archive = branch[2], branch[3], branch[4], branch[5]["then"][0]
+    make_document, intake, build_filename, archive = branch[1], branch[2], branch[3], branch[4]["then"][0]
     assert make_document["type"] == "merge_pdfs"
     assert make_document["plan_step"] == "triage"
     # DataOps runs before the archive so its invoice preview can name the
@@ -113,18 +113,6 @@ def test_attachment_branch_builds_and_archives_one_document():
 
     report = run_code_tests(build_filename)
     assert report["failed"] == 0, report
-
-
-def test_subject_cleanup_still_normalizes_vendors():
-    from src.dapier.engine.actions.code import run_code
-
-    clean_subject = find_action(shipped_workflow(), "clean-subject")
-    event = {"data": {"subject": "Fwd: Stripe receipt [Invoice ID: INV-1]"}}
-    assert run_code(clean_subject, event)["result"]["subject"] == "Stripe receipt"
-    event = {"data": {"subject": "Re: Amazon Web Services Invoice Available [Account: 123]"}}
-    assert run_code(clean_subject, event)["result"]["subject"] == "Amazon Web Services"
-    event = {"data": {"subject": ""}}
-    assert run_code(clean_subject, event)["result"]["subject"] == "Invoice"
 
 
 def test_body_only_branch_strips_and_renders():
@@ -171,7 +159,6 @@ def test_missing_company_holds_for_review_without_crashing():
     event = {"data": {}}
     steps = {
         "route.then.email-date": {"output": {"formatted": "2026-10-19"}},
-        "route.then.clean-subject": {"output": {"result": {"subject": "Invoice F-0007-2026"}}},
         "triage": {"output": {"result": {"document_key": "f763650d2764"}}},
         "route.then.file-to-dataops": {
             "output": {
