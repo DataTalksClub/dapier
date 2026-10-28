@@ -1,11 +1,10 @@
-"""Hub flow integration: canonical Hub intake/session orchestration."""
+"""Hub flow integration: canonical Hub session orchestration."""
 from src.dapier.connectors.registry import Action, Connector, connector, register
 from src.dapier.connectors import registry
 from src.dapier.connectors.trigger_discovery import TriggerDiscovery, register_trigger_discovery
 from src.dapier.triggers.poll_sources import PollSource, register_source
 
 from plugins.hub.action import run_hub_session
-from plugins.hub import intake  # noqa: F401 (registration of the existing intake action)
 from plugins.hub import completions
 
 def validate_session(action):

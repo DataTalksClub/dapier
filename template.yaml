@@ -35,7 +35,7 @@ Parameters:
   HubIntakeUrl:
     Type: String
     Default: https://hub.dtcdev.click/api/intake/tasks
-    Description: Hub intake create URL used by /hooks/developer and hub_intake action
+    Description: Hub intake create URL used by /hooks/developer and the hub_session action
 
   DomainCertificateArn:
     Type: String

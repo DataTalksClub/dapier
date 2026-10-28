@@ -162,21 +162,6 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
-    type: "hub_intake",
-    label: "Hub intake",
-    icon: Mail,
-    description: "Create a Hub intake task (and optionally assign/wake Developer).",
-    fields: [
-      { key: "title", label: "Title", required: true, placeholder: "dapier event" },
-      { key: "text", label: "Body (templated)", type: "textarea", placeholder: "Event for Developer" },
-      { key: "project", label: "Hub project", default: "dapier" },
-      { key: "key", label: "Idempotency key (templated)" },
-      { key: "source_type", label: "Source type", type: "select", options: ["chat", "voice", "forwarded", "unknown"], default: "forwarded" },
-      { key: "source_reference", label: "Source reference (templated)" },
-      { key: "wake", label: "Assign/wake after create", type: "select", options: ["true", "false"], default: "true" }
-    ]
-  },
-  {
     type: "webhook",
     label: "Webhook",
     icon: Webhook,
@@ -1938,7 +1923,6 @@ const stepCategories: Record<string, Exclude<StepSection, "app">> = {
   cmp_read_course: "data",
   http_request: "data",
   webhook: "data",
-  hub_intake: "data",
   render_html_to_pdf: "data",
   merge_pdfs: "data",
   dataops: "data"

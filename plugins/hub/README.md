@@ -24,7 +24,7 @@ Workflow storage (`STORAGE_TABLE`) persists the retry snapshots.
 
 Intake 17ae8720-c809-457a-89f1-8f82bea55af2 still requires service identity
 provisioning, live attachment/completion proof, live migration
-and runtime retirement. Existing `hub_intake` behavior remains available.
+and runtime retirement.
 No live launch readiness is claimed before credential setup and live proof.
 
 The action runner supplies a `DynamoJournal` scoped to the workflow and

@@ -274,21 +274,3 @@ def test_cli_can_save_hub_session_through_shared_workflow_api(monkeypatch, tmp_p
     monkeypatch.setattr(commands.api, "call", call)
     assert main.main(["workflows", "save", str(path)]) == 0
     assert calls == [("PUT", "/api/agent/designer/workflows")]
-
-
-def test_legacy_create_only_intake_survives_plugin_move(monkeypatch):
-    from plugins.hub.intake_action import run_hub_intake
-    from src.dapier.triggers.intake import developer_webhook
-
-    monkeypatch.setattr(developer_webhook, "hub_bearer_token", lambda: "fixture-token")
-    calls = []
-
-    def transport(method, url, *, headers, body):
-        calls.append(json.loads(body))
-        return 201, {"task": {"id": "10000000-0000-4000-8000-000000000001", "version": 1}}
-    result = run_hub_intake({"title": "File task", "text": "Instructions", "wake": False},
-                            {"id": "event"}, transport=transport)
-    assert result["hub_task_id"] == "10000000-0000-4000-8000-000000000001"
-    assert result["assign"] is None
-    assert len(calls) == 1
-    assert registry.ACTIONS["hub_intake"].type == "hub_intake"

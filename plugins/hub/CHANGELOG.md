@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Retire the create-only `hub_intake` action: no workflow uses it;
+  `hub_session` is the Hub path for workflows.
+
 ## 0.1.0
 
 - Register `hub_session` in the shared action catalog with required acceptance

@@ -50,7 +50,6 @@ Then `hub intake assign <id> …` to queue a Developer session.
 | Source | How it reaches its bot |
 | --- | --- |
 | Explicit POST to `/hooks/developer` | Hub intake (+ assign when `wake`) |
-| Workflow action `hub_intake` | Same Hub path from any workflow |
 | `dev@dtcdev.click` | SES route `dev` → dapier email event → `dev-mailbox` workflow → Developer bot webhook |
 | `tofu@dtcdev.click` | SES route `tofu` → dapier email event → `tofu-mailbox` workflow → Tofu Grok bot webhook |
 | `orin@dtcdev.click` | SES route `orin` → dapier email event → `orin-mailbox` workflow → Orin Grok bot webhook |
