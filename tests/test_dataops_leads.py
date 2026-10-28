@@ -122,7 +122,7 @@ class EnvelopeTests(unittest.TestCase):
                 "subject": "Data Bites Weekly #42",
                 "receivedAt": "2026-10-10T08:00:00Z",
             },
-            "sponsors": [{"name": "Acme Cloud", "url": "https://acme.example",
+            "sponsors": [{"name": "Acme Cloud", "url": "https://acme.example/",
                           "category": "tool", "blurb": "Try Acme free",
                           "context": "mid-roll"}],
         }
@@ -136,84 +136,33 @@ class EnvelopeTests(unittest.TestCase):
                                  sponsors=[{"name": "Acme"}])
         assert body(steps=steps)["newsletter"]["name"] == "Morning Brew"
 
-    def test_non_https_and_junk_urls_are_omitted_not_fatal(self):
-        steps = extraction_steps(sponsors=[
-            {"name": "A", "url": "http://plain.example/"},
-            {"name": "B", "url": "not a url"},
-            {"name": "C", "url": "https://user:pass@evil.example/"},
-            {"name": "D"},
-        ])
-        sponsors = body(steps=steps)["sponsors"]
-        assert sponsors == [{"name": "A"}, {"name": "B"}, {"name": "C"}, {"name": "D"}]
-
-    def test_hallucinated_urls_are_omitted_name_kept(self):
-        # Live cases: the extractor composed URLs from the schema field
-        # names / placeholder tokens when the email only linked through a
-        # redirect. The sponsor name is honest; the URL is junk.
-        steps = extraction_steps(sponsors=[
-            {"name": "micro1",
-             "url": "https://www.micro1.ai/category/service/blurb/context"},
-            {"name": "Union.ai", "url": "https://union.ai/tbd-placeholder-removed"},
-        ])
-        sponsors = body(steps=steps)["sponsors"]
-        assert sponsors == [{"name": "micro1"}, {"name": "Union.ai"}]
-
-    def test_single_schema_word_path_segment_is_kept(self):
-        # A real section path (one schema-ish word) is not a hallucination.
-        steps = extraction_steps(sponsors=[
-            {"name": "Acme", "url": "https://acme.example/category/launch"},
-            {"name": "Beta", "url": "https://beta.example/"},
-        ])
-        sponsors = body(steps=steps)["sponsors"]
-        assert sponsors == [
-            {"name": "Acme", "url": "https://acme.example/category/launch"},
-            {"name": "Beta", "url": "https://beta.example"},
+    def test_raw_sponsors_are_forwarded_unchanged_for_dataops_to_clean(self):
+        sponsors = [
+            {"name": "  Acme   Cloud ", "url": "HTTPS://ACME.example:443/", "blurb": " first\n placement "},
+            {"name": "Different reading", "url": "https://acme.example"},
+            {"name": "Micro", "url": "https://micro.example/category/service/blurb/context"},
+            {"name": "Union", "url": "https://union.example/tbd-placeholder-removed"},
+            {"name": "Plain", "url": "http://plain.example"},
+            {"name": "Credentials", "url": "https://user:pass@evil.example"},
+            {"name": "Junk", "url": "not a URL"}, {"name": " "}, "junk",
+            {"name": "Long " + "x" * 250, "context": "x" * 2500},
         ]
+        steps = extraction_steps(sponsors=sponsors)
+        snapshot = deepcopy(steps)
+        assert body(steps=steps)["sponsors"] == sponsors
+        assert steps == snapshot
 
-    def test_duplicates_collapse_case_insensitively_first_wins(self):
-        steps = extraction_steps(sponsors=[
-            {"name": "Acme Cloud", "url": "https://acme.example/", "blurb": "first"},
-            {"name": "acme cloud", "url": "https://ACME.example", "blurb": "dup"},
-            {"name": "Beta DB", "url": "", "context": "sidebar"},
-        ])
-        sponsors = body(steps=steps)["sponsors"]
-        assert sponsors == [
-            {"name": "Acme Cloud", "url": "https://acme.example", "blurb": "first"},
-            {"name": "Beta DB", "context": "sidebar"},
-        ]
-
-    def test_same_link_under_different_name_readings_collapses(self):
-        steps = extraction_steps(sponsors=[
-            {"name": "Drive", "url": "https://acme.example/guide"},
-            {"name": "Drive Fund Admin Data Quality Without Scrambling",
-             "url": "https://acme.example/guide/"},
-        ])
-        assert body(steps=steps)["sponsors"] == [
-            {"name": "Drive", "url": "https://acme.example/guide"}]
-
-    def test_nameless_entries_drop_out(self):
-        steps = extraction_steps(sponsors=[
-            {"name": "", "url": "", "blurb": "footer link"},
-            {"url": "https://gamma.example"},
-            {"name": "Gamma", "url": "https://gamma.example"},
-        ])
-        assert body(steps=steps)["sponsors"] == [
-            {"name": "Gamma", "url": "https://gamma.example"}]
-
-    def test_empty_sponsors_posts_the_issue_with_no_sponsors(self):
-        envelope = body(steps=extraction_steps(sponsors=[]))
-        assert envelope["sponsors"] == []
-        assert envelope["newsletter"]["name"] == "Data Bites Weekly"
-        assert envelope["messageId"] == "<abc123@example.test>"
-
-    def test_sponsors_dropped_by_normalization_post_an_empty_list(self):
-        envelope = body(steps=extraction_steps(sponsors=[{"name": "  "}, "junk"]))
-        assert envelope["sponsors"] == []
-
-    def test_more_than_twenty_sponsors_fails_loudly(self):
+    def test_more_than_twenty_sponsors_are_forwarded_for_dataops_to_validate(self):
         sponsors = [{"name": f"Sponsor {i}"} for i in range(21)]
-        with self.assertRaisesRegex(ValueError, "at most 20"):
-            body(steps=extraction_steps(sponsors=sponsors))
+        assert body(steps=extraction_steps(sponsors=sponsors))["sponsors"] == sponsors
+
+    def test_newsletter_metadata_is_forwarded_without_domain_cleansing(self):
+        event = email_event(subject=" Raw\n subject ", sender={"addresses": [" news@example.test "]})
+        result = body(event=event, steps=extraction_steps(newsletter="  Raw   Weekly ", sponsors=[]))
+        assert result["newsletter"]["name"] == "  Raw   Weekly "
+        assert result["newsletter"]["subject"] == " Raw\n subject "
+        assert result["newsletter"]["sender"] == " news@example.test "
+        assert result["sponsors"] == []
 
     def test_missing_extraction_step_fails_loudly(self):
         with self.assertRaisesRegex(ValueError, "extract-sponsors"):
@@ -291,7 +240,7 @@ class PostTests(unittest.TestCase):
     def test_deepcopy_of_event_is_untouched(self):
         event = email_event()
         snapshot = deepcopy(event)
-        body(steps=extraction_steps(sponsors=[{"name": "Acme"}]))
+        body(event=event, steps=extraction_steps(sponsors=[{"name": "Acme"}]))
         assert event == snapshot
 
 

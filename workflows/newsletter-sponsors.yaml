@@ -102,8 +102,8 @@ actions:
   # engine.actions.dataops._leads_intake_body from this event plus the
   # extraction above: messageId/sender/subject/date from the email,
   # newsletter name and sponsors from steps.extract-sponsors.output.data.
-  # Normalization (trim, https-only URLs, within-email dedup, 20-cap) lives
-  # in that builder — no code step needed (code steps see event data only).
+  # The builder forwards sponsors unchanged. DataOps owns URL/whitespace
+  # cleansing, hallucinated URL removal, within-email dedup and the 20-cap.
   # Same auth as the invoice intake: the dapier.dataops secret lands in
   # x-dataops-intake-secret. An issue with no forwardable sponsors posts
   # sponsors: [] so DataOps records it as checked; a real failure fails the run.

@@ -16,14 +16,8 @@ from .templating import render
 
 STAGING_PREFIX = "transfer/"
 
-# Newsletter-sponsors leads intake (DataOps contract 2026-10-10). Dapier is
-# only the pipe: one LLM extraction plus this formatter; sponsor records,
-# dedup across emails, outreach and review live in DataOps. The intake
-# accepts 0-20 sponsors per POST — an issue with none is still recorded on
-# its newsletter (checked, no paid placements) — and dedups per lead on
-# sha256("lead:"+messageId+name+url), so this builder normalizes within one
-# email only (trim/collapse, https-only URLs, within-email dedup, caps) and
-# fails loudly on anything the intake would reject.
+# DataOps owns sponsor validation, URL cleansing and lead identity/dedup.
+# Dapier only wraps the raw extraction in the intake transport envelope.
 LEADS_VERSION = "2026-10-10"
 # Paths under the DataOps connection's https origin. The origin is stored
 # on the connection (`dapier connections edit dataops --url https://…`);
@@ -31,8 +25,6 @@ LEADS_VERSION = "2026-10-10"
 LEADS_PATH = "/api/v1/intake/leads"
 DOCUMENTS_PATH = "/api/v1/intake/email-documents"
 _LEADS_RECEIVED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
-_LEADS_WS_RE = re.compile(r"\s+")
-MAX_LEADS_SPONSORS = 20
 
 
 def _s3():
@@ -293,60 +285,6 @@ def _step_document(ref, route, message_id, action, steps):
     }
 
 
-def _collapse_ws(text):
-    return _LEADS_WS_RE.sub(" ", str(text or "")).strip()
-
-
-def _leads_norm_name(name):
-    return _collapse_ws(name).lower()
-
-
-def _leads_norm_url(url):
-    """The intake's identity form: lowercase host, no default port, no
-    trailing slash, no fragment. Returns None when there is no usable URL."""
-    text = str(url or "").strip()
-    if not text:
-        return None
-    if not re.match(r"^https://", text, flags=re.I):
-        return None
-    if re.search(r"\s", text) or "@" in text.split("/", 3)[2]:
-        return None
-    lowered = re.sub(r"^https://", "https://", text, flags=re.I)
-    host_rest = lowered[len("https://"):]
-    host, _, rest = host_rest.partition("/")
-    host = host.lower()
-    if host.endswith(":443"):
-        host = host[:-4]
-    rest = rest.split("#", 1)[0].rstrip("/")
-    return f"https://{host}" + (f"/{rest}" if rest else "")
-
-
-# Schema field names the extractor echoes when it invents a URL instead of
-# copying one from the email (live case: micro1 ->
-# https://www.micro1.ai/category/service/blurb/context). Two or more of
-# these as path segments means the URL was composed, not copied; a single
-# one (e.g. a real /category/ section) still passes.
-_SCHEMA_PATH_WORDS = frozenset({"category", "blurb", "context"})
-_PLACEHOLDER_PATH_RE = re.compile(r"tbd|placeholder", re.IGNORECASE)
-
-
-def _leads_placeholder_url(normalized):
-    """True when a normalized https URL looks composed, not copied.
-
-    The extractor must omit url when the email only links through a
-    redirect/tracking host, but it sometimes hallucinates one from the
-    schema field names or placeholder tokens instead (live cases:
-    .../category/service/blurb/context, .../tbd-placeholder-removed).
-    Forwarding those pollutes DataOps with junk leads, so the builder
-    drops the URL and keeps the sponsor name.
-    """
-    rest = normalized[len("https://"):].partition("/")[2]
-    segments = [seg.lower() for seg in rest.split("/") if seg]
-    if sum(seg in _SCHEMA_PATH_WORDS for seg in segments) >= 2:
-        return True
-    return any(_PLACEHOLDER_PATH_RE.search(seg) for seg in segments)
-
-
 def _extraction_data(action, steps):
     """The ai_complete reply shape for the sponsors step: prefer the
     configured ``extraction_step`` (default ``extract-sponsors``), else any
@@ -388,73 +326,25 @@ def _leads_newsletter_name(data, fallback):
     if isinstance(raw, dict):
         for key in ("name", "title"):
             if str(raw.get(key) or "").strip():
-                return _collapse_ws(raw[key])[:200]
-    elif str(raw or "").strip():
-        return _collapse_ws(raw)[:200]
-    return _collapse_ws(fallback)[:200] or "Newsletter"
+                return raw[key]
+        return fallback
+    return raw or fallback
 
 
 def _leads_intake_body(action, event, *, steps=None):
-    """Build the DataOps sponsors-leads envelope (contract 2026-10-10).
-
-    Event metadata (messageId/sender/subject/date) comes from the email
-    event; the newsletter name and sponsor mentions come from the
-    extraction step. An issue with no sponsors posts ``sponsors: []`` so
-    DataOps records it. Normalization is within-email only — cross-email
-    dedup is the intake's idempotency rule. Raises ValueError (fails the
-    step) on anything the intake would reject, so problems read loudly
-    instead of posting a 4xx the autoretry would pace pointlessly."""
+    """Wrap the raw extraction; all sponsor cleansing belongs to DataOps."""
     data = event.get("data", {})
     source_data = data.get("source_event", {}).get("data", data)
-    message_id = str(data.get("message_id") or source_data.get("message_id") or "").strip()
-    if not message_id or len(message_id) > 500:
-        raise ValueError("leads intake requires an email message_id (max 500 chars)")
+    message_id = data.get("message_id") or source_data.get("message_id")
+    if not message_id:
+        raise ValueError("leads intake requires an email message_id")
     sender = source_data.get("sender", {})
     sender_value = (sender.get("addresses") or [sender.get("header") or "unknown@example.com"])[0]
-    sender_value = _collapse_ws(sender_value)[:320] or "unknown@example.com"
-    subject = _collapse_ws(source_data.get("subject") or "Inbound email")[:500] or "Inbound email"
+    subject = source_data.get("subject") or "Inbound email"
     received = _received_at(source_data.get("date") or event.get("occurred_at"))
     if not _LEADS_RECEIVED_RE.match(received or ""):
         raise ValueError(f"leads intake needs a parseable email date, got {received!r}")
-
     extraction = _extraction_data(action, steps)
-    raw_sponsors = extraction.get("sponsors") or []
-    sponsors = []
-    seen = set()
-    for entry in raw_sponsors:
-        if not isinstance(entry, dict):
-            continue
-        name = _collapse_ws(entry.get("name"))[:200]
-        if not name:
-            continue
-        url = _leads_norm_url(entry.get("url"))
-        if url is not None and _leads_placeholder_url(url):
-            url = None
-        # Same link under different name readings is one sponsor: dedup on
-        # the URL when there is one, else on the normalized name.
-        key = url if url else f"name:{_leads_norm_name(name)}"
-        if key in seen:
-            continue
-        seen.add(key)
-        sponsor = {"name": name}
-        if url:
-            sponsor["url"] = url
-        # Category passes through (truncated) for the intake's triage; the
-        # extraction schema already constrains it to the known taxonomy, so
-        # an unknown value rides along rather than failing the forward.
-        category = _collapse_ws(entry.get("category"))[:40]
-        if category:
-            sponsor["category"] = category
-        blurb = _collapse_ws(entry.get("blurb"))[:2000]
-        if blurb:
-            sponsor["blurb"] = blurb
-        context = _collapse_ws(entry.get("context"))[:2000]
-        if context:
-            sponsor["context"] = context
-        sponsors.append(sponsor)
-    if len(sponsors) > MAX_LEADS_SPONSORS:
-        raise ValueError(
-            f"leads intake accepts at most {MAX_LEADS_SPONSORS} sponsors, got {len(sponsors)}")
     return {
         "version": LEADS_VERSION,
         "messageId": message_id,
@@ -464,5 +354,5 @@ def _leads_intake_body(action, event, *, steps=None):
             "subject": subject,
             "receivedAt": received,
         },
-        "sponsors": sponsors,
+        "sponsors": extraction["sponsors"],
     }

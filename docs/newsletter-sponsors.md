@@ -3,8 +3,8 @@
 Newsletter emails routed to `newsletter@dtcdev.click` are read for paid
 sponsor mentions and filed into the DataOps sponsors-leads intake
 (`POST /api/v1/intake/leads`, contract `2026-10-10`). Dapier is only the
-pipe — transport, extraction and formatting; sponsor records, outreach and
-review live in DataOps. The canonical definition is
+pipe — transport, extraction and envelope formatting. Sponsor cleansing,
+validation, deduplication, records, outreach and review live in DataOps. The canonical definition is
 `workflows/newsletter-sponsors.yaml`, live and `enabled: true`; the file
 mirrors the published definition. Nothing in Dapier keeps sponsor state.
 
@@ -42,10 +42,12 @@ SES (newsletter@dtcdev.click) → email connector → newsletter-sponsors workfl
      dapier/dataops secret as x-dataops-intake-secret, the same auth as
      the invoice intake. The envelope is built by
      engine.actions.dataops._leads_intake_body from the email event plus
-     the extraction (normalization: trim, https-only URLs, within-email
-     dedup on name|url first-wins, 20-cap). An issue with no forwardable
-     sponsors posts `sponsors: []`: DataOps records every issue on its
-     newsletter, sponsors or not. A forward failure fails the run.
+     the extraction. It forwards the sponsors array unchanged, including
+     duplicate mentions, invalid URLs and whitespace. DataOps trims and
+     caps text, drops unusable or hallucinated URLs while retaining names,
+     drops nameless entries, deduplicates by URL (otherwise normalized name),
+     then validates the 20-sponsor limit. First mention wins. An empty
+     cleaned array still records the issue in DataOps. A forward failure fails the run.
 ```
 
 Each email is one SQS message, so concurrent newsletters file concurrently.
@@ -85,12 +87,17 @@ stubbed, so it verifies transport rather than model accuracy.
 }
 ```
 
-`version` is exactly `2026-10-10`. `sponsors` carries 0–20 entries (an
-empty array records an issue that had no paid placements);
-`url` is optional (omit when unknown or not `https:` — the builder drops
+`version` is exactly `2026-10-10`. `sponsors` carries the raw extraction array; DataOps accepts 0–20 entries
+after cleansing (an empty cleaned array records the issue);
+`url` is optional (omit when unknown or not `https:` — DataOps drops
 junk URLs rather than failing); `category` is optional (one of
 tool/product/service/event/course/book/job/community/other, max 40);
 `blurb`/`context` are optional (max 2000).
+Response lead/failure indices refer to original request positions, even when
+DataOps filters or deduplicates entries. Existing source identities and
+idempotency conflicts remain unchanged. Deploy the DataOps receiver change
+before deploying the raw Dapier forwarder.
+
 `receivedAt` is strict UTC `YYYY-MM-DDTHH:MM:SS[.mmm]Z`. No extra keys at
 any level. Tests: `tests/test_dataops_leads.py`.
 
