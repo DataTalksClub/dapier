@@ -46,7 +46,6 @@ _CONNECTOR_NOUNS = {
     "google-calendar": "Calendar",
     "youtube": "YouTube",
     "s3": "S3",
-    "rss": "RSS",
     "ai": "AI",
 }
 

@@ -241,7 +241,7 @@ def test_reset_to_now_jumps_a_watermark_past_waiting_items(dynamo):
 def test_reset_to_now_marks_a_page_seen_and_parks_the_cursor(dynamo):
     from src.dapier.triggers import seen
 
-    polls = FakePollTable([poll(cursor_mode="next_cursor", source="rss")])
+    polls = FakePollTable([poll(cursor_mode="next_cursor")])
     with patch.object(poll_triggers, "fetch_page_response",
                       return_value=([{"id": "a"}, {"id": "b"}], "b")):
         status, payload = poll_triggers.api_reset("orders", {"to": "now"}, "op", table_ref=polls)
@@ -254,7 +254,7 @@ def test_reset_to_now_marks_a_page_seen_and_parks_the_cursor(dynamo):
 def test_reset_to_a_date_sets_a_timestamp_position(dynamo):
     from src.dapier.triggers import seen
 
-    polls = FakePollTable([poll(cursor_mode="next_cursor", source="rss")])
+    polls = FakePollTable([poll(cursor_mode="next_cursor")])
     poll_triggers.put_cursor("orders", "2026-10-08T07:20:58.154Z")
     seen.remember("poll#orders", "orders-x")
 
@@ -286,7 +286,7 @@ def test_activity_lists_poll_items_with_their_runs(dynamo):
                          "source": "orders", "received_at": "2026-10-08T11:00:00+00:00",
                          "status": "unmatched", "matched": [],
                          "data": {"poll": "orders", "item_id": "2"}})
-    inbox.put_item(Item={"inbox_id": "feed-1", "connector": "rss", "event": "item.new",
+    inbox.put_item(Item={"inbox_id": "feed-1", "connector": "youtube", "event": "item.new",
                          "source": "feed", "received_at": "2026-10-08T12:00:00+00:00",
                          "status": "matched", "matched": ["blog"],
                          "data": {"poll": "feed", "item_id": "x"}})
@@ -372,7 +372,7 @@ def test_admin_route_maps_errors():
     with patch.object(poll_triggers, "api_reset", side_effect=TriggerError("to must be 'now' or 'date'")):
         response, _ = route_admin("POST", "/api/admin/poll-triggers/orders/reset", body={})
     assert response["statusCode"] == 400
-    with patch.object(poll_triggers, "api_reset", side_effect=RuntimeError("rss fetch failed")):
+    with patch.object(poll_triggers, "api_reset", side_effect=RuntimeError("fetch failed")):
         response, _ = route_admin("POST", "/api/admin/poll-triggers/orders/reset",
                                   body={"to": "now"})
     assert response["statusCode"] == 502
@@ -517,4 +517,4 @@ def test_cli_watches_names_every_provider_target():
     from dapier_cli.commands import polls as poll_commands
 
     assert poll_commands._poll_target({"source": "dropbox.files", "path": "/Invoices"}) == "dropbox.files /Invoices"
-    assert poll_commands._poll_target({"source": "rss", "url": "https://x.test/feed"}) == "rss https://x.test/feed"
+    assert poll_commands._poll_target({"source": "youtube.videos", "channel_id": "UC1"}) == "youtube.videos UC1"

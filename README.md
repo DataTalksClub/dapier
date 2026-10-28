@@ -519,7 +519,7 @@ dapier schedules run morning-digest    # Run now (a manual fire via the event qu
 dapier schedules pause morning-digest  # / resume: the rule's state, noted in history
 ```
 
-Poll triggers check a source (an API, RSS feed, Drive/Dropbox folder, sheet,
+Poll triggers check a source (an API, Drive/Dropbox folder, sheet,
 ...) on a schedule and start their workflow once per new item. The console's
 Workflows › Polls tab is their health monitor, and the CLI reaches the same
 API:

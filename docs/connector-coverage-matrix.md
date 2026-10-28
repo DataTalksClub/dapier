@@ -85,20 +85,20 @@ Designer catalog mirror (`designer/src/catalog.ts`) is in sync with the
 registry — `tests/test_designer_pickers.py` green; bundle
 (`src/web/designer.js`) rebuilt after the last catalog edit.
 
-## Triggers: 17/18 palette connectors have sample discovery
+## Triggers: every palette connector but ai has sample discovery
 
-17 palette connectors (ai, custom, dropbox, email, gmail, google-calendar,
-google-drive, google-sheets, poll, renderer, rss, s3, schedule,
-slack, telegram, youtube, zoom) declare 36 events. 17 register
+The palette connectors (ai, custom, dropbox, email, gmail, google-calendar,
+google-drive, google-sheets, poll, renderer, s3, schedule,
+slack, telegram, youtube, zoom) declare their events. All but `ai` register
 `TriggerDiscovery(kind="sample")`, live where the provider allows (slack:
 the newest channel message, delivery-shaped via
 `triggers.intake.slack_events.event_data`), else history-first with
 synthetic fallback — and multi-event connectors (dropbox, zoom, email,
 google-drive, s3, telegram, slack) serve one documented payload
 per declared event. `ai` is action-side only (`ai_complete`): it declares
-no events and needs no sample. Field options (`kind="options"`): all 28
-registry discovery resources plus `poll.triggers` / `schedule.triggers`
-(30 option listings; the set-equality invariant is pinned in
+no events and needs no sample. Field options (`kind="options"`): every
+registry discovery resource plus `poll.triggers` / `schedule.triggers`
+(the set-equality invariant is pinned in
 `tests/test_options_breadth.py`). Extras beyond the palette: dataops,
 webhook — used by trigger setup flows.
 

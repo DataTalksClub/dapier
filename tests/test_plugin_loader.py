@@ -145,7 +145,7 @@ def test_real_tree_loads_every_plugin():
     import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
 
     manifests = plugins.load_all()
-    expected = {"slack", "rss", "telegram", "dropbox", "aws", "zoom",
+    expected = {"slack", "telegram", "dropbox", "aws", "zoom",
                 "google"}
     assert expected <= set(manifests), set(manifests)
     for name in expected:
@@ -177,7 +177,7 @@ def test_real_tree_loads_every_plugin():
         assert action in registry.ACTIONS, action
 
     # poll sources
-    for source in ("slack.messages", "rss",
+    for source in ("slack.messages",
                    "dropbox.files", "s3", "zoom.recordings",
                    "google-sheets.rows", "google-drive.files",
                    "google-calendar.events", "gmail.messages", "youtube.videos"):

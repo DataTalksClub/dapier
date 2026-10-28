@@ -109,7 +109,7 @@ class TestRegistrationShape:
             "dropbox.files", "gmail.messages", "google-calendar.events",
             "google-drive.deletions", "google-drive.files",
             "google-drive.updates", "google-sheets.rows",
-            "google-sheets.updates", "hub.sessions", "rss", "s3",
+            "google-sheets.updates", "hub.sessions", "s3",
             "s3.deletions", "s3.updates", "slack.messages", "youtube.videos",
             "zoom.recordings"]
 

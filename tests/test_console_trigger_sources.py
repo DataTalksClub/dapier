@@ -17,10 +17,9 @@ WEB = Path(__file__).resolve().parents[1] / "src" / "web"
 
 # Sources that must stay OUT of the connection-requiring list the console
 # validates against: credential-backed ones (the three s3 sources share the
-# stored aws keys) and rss, which polls a public feed URL and needs no auth at
-# all. Hub uses its scoped service identity rather than an OAuth connection.
+# stored aws keys). Hub uses its scoped service identity rather than an OAuth connection.
 CREDENTIAL_SOURCES = {"s3", "s3.updates", "s3.deletions",
-                      "rss", "hub.sessions"}
+                      "hub.sessions"}
 
 
 def _select_sources():

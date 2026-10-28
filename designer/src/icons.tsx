@@ -50,7 +50,6 @@ const ICON_NODES: Record<string, string> = {
   "refresh-cw": "<path d='M 3 12 a9 9 0 0 1 9 -9 9.75 9.75 0 0 1 6.74 2.75 L 21 8'/><path d='M 21 3 v 5 h -5'/><path d='M 21 12 a9 9 0 0 1 -9 9 9.75 9.75 0 0 1 -6.74 -2.75 L 3 16'/><path d='M 8 16 H 3 v 5'/>",
   "rotate-ccw": "<path d='M 3 12 a9 9 0 1 0 9 -9 9.75 9.75 0 0 0 -6.74 2.75 L 3 8'/><path d='M 3 3 v 5 h 5'/>",
   "rotate-cw": "<path d='M 21 12 a9 9 0 1 1 -9 -9 c 2.52 0 4.94 1.01 6.74 2.75 L 21 8'/><path d='M 21 3 v 5 h -5'/>",
-  "rss": "<path d='M 4 11 a9 9 0 0 1 9 9'/><path d='M 4 4 a16 16 0 0 1 16 16'/><circle cx='5' cy='19' r='1.01'/>",
   "scroll-text": "<path d='M 15 12 h -5'/><path d='M 15 8 h -5'/><path d='M 19 17 V 5 a2 2 0 0 0 -2 -2 H 4'/><path d='M 8 21 h 12 a2 2 0 0 0 2 -2 v -1.01 a1.01 1.01 0 0 0 -1.01 -1.01 H 11 a1.01 1.01 0 0 0 -1.01 1.01 v 1.01 a2 2 0 1 1 -4 0 V 5 a2 2 0 1 0 -4 0 v 2 a1.01 1.01 0 0 0 1.01 1.01 h 3'/>",
   "search": "<path d='m 21 21 -4.33 -4.33'/><circle cx='11' cy='11' r='8'/>",
   "send": "<path d='M 14.54 21.69 a0.49 0.49 0 0 0 0.93 -0.03 l 6.5 -19 a0.49 0.49 0 0 0 -0.63 -0.63 l -19 6.5 a0.49 0.49 0 0 0 -0.03 0.93 l 7.94 3.18 a2 2 0 0 1 1.11 1.11 z'/><path d='m 21.86 2.15 -10.94 10.94'/>",
@@ -136,7 +135,6 @@ export const Plus = makeIcon("plus");
 export const RefreshCw = makeIcon("refresh-cw");
 export const RotateCcw = makeIcon("rotate-ccw");
 export const RotateCw = makeIcon("rotate-cw");
-export const Rss = makeIcon("rss");
 export const ScrollText = makeIcon("scroll-text");
 export const Search = makeIcon("search");
 export const Send = makeIcon("send");

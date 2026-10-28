@@ -1,4 +1,4 @@
-import { Bot, Braces, Calendar, Clock, Code2, Copy, DatabaseZap, FileText, Filter, Folder, GitBranch, GitMerge, Globe, Layers, ListTree, Mail, RefreshCw, Rss, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
+import { Bot, Braces, Calendar, Clock, Code2, Copy, DatabaseZap, FileText, Filter, Folder, GitBranch, GitMerge, Globe, Layers, ListTree, Mail, RefreshCw, Send, Sparkles, Table, Timer, Video, Webhook, Workflow } from "./icons";
 import type { ReactNode } from "react";
 import { DropboxLogo, MailLogo, S3Logo, SheetsLogo, SlackLogo, TelegramLogo, YouTubeLogo } from "./logos";
 
@@ -1786,7 +1786,6 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
   { name: "gmail", label: "Gmail", logo: Mail, events: ["message.received"] },
   { name: "s3", label: "S3", logo: S3Logo, events: ["file.created", "file.updated", "file.deleted"] },
-  { name: "rss", label: "RSS", logo: Rss, events: ["item.new"] },
   { name: "renderer", label: "Renderer", logo: FileText, events: ["job.completed"] },
   { name: "schedule", label: "Schedule", logo: Clock, events: ["schedule.triggered"] },
   { name: "poll", label: "Poll", logo: RefreshCw, events: ["item.new"] },
@@ -1814,7 +1813,6 @@ export const connectorEventInfo: Record<string, [label: string, description: str
   "google-sheets/row.updated": ["Row changed", "An existing row in the watched worksheet is edited"],
   "poll/item.new": ["New item", "A polled API returns an item not seen before"],
   "renderer/job.completed": ["Render finished", "A renderer job finished and its output is ready"],
-  "rss/item.new": ["New feed item", "The feed publishes an entry not seen before"],
   "s3/file.created": ["Object added", "A new object lands in the watched S3 bucket or prefix"],
   "s3/file.updated": ["Object changed", "An object in the watched bucket is overwritten"],
   "s3/file.deleted": ["Object deleted", "An object is removed from the watched bucket"],

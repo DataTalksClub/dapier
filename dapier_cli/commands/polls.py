@@ -24,8 +24,7 @@ def _poll_target(item):
     if item.get("source") and item.get("source") != "http":
         target = (item.get("bucket") or item.get("spreadsheet_id")
                   or item.get("folder_id") or item.get("for_email") or item.get("path")
-                  or item.get("channel_id") or item.get("calendar_id")
-                  or item.get("url") or "")
+                  or item.get("channel_id") or item.get("calendar_id") or "")
         return f"{item['source']} {target}".strip()
     return f"{item.get('method', 'GET')} {item.get('url', '')}".strip()
 

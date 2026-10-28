@@ -46,7 +46,7 @@ const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-sheets.updates',
 /* What a poll watches, in words: the source's kind of thing, then its target. */
 const SOURCE_LABELS = {
   'hub.sessions': 'Hub sessions',
-  http: 'API', rss: 'RSS feed', s3: 'S3 bucket', 's3.updates': 'S3 changes', 's3.deletions': 'S3 deletions',
+  http: 'API', s3: 'S3 bucket', 's3.updates': 'S3 changes', 's3.deletions': 'S3 deletions',
   'google-sheets.rows': 'Sheet rows', 'google-sheets.updates': 'Sheet row edits',
   'google-drive.files': 'Drive folder', 'google-drive.updates': 'Drive changes',
   'google-drive.deletions': 'Drive deletions', 'google-calendar.events': 'Calendar',
@@ -496,11 +496,10 @@ $('#poll-form').addEventListener('submit', async (event) => {
   $('#poll-error').textContent = '';
   try {
     const source = form.source.value;
-    /* rss polls a public feed URL like the HTTP source — no connection, the
-       URL field carries the target. Other provider sources blank it and take
-       their params through Options. */
-    const urlSource = !source || source === 'rss';
-    if (urlSource && !form.url.value.trim()) throw new Error('URL is required for the HTTP and RSS sources');
+    /* Only the HTTP source carries a URL; provider sources blank it and
+       take their params through Options. */
+    const urlSource = !source;
+    if (urlSource && !form.url.value.trim()) throw new Error('URL is required for the HTTP source');
     if (CONNECTION_POLL_SOURCES.includes(source) && !form.connection_id.value.trim()) {
       throw new Error(`${source} needs a connection (the connected account to poll)`);
     }
