@@ -1243,36 +1243,6 @@ def api_replay_failed(workflow_id, *, queue=None):
     }
 
 
-def _workflow_poll_name(workflow_id, connector):
-    """The stored poll trigger bound to this workflow (its ``flow:`` key)
-    that serves the workflow's own connector — the name the connector's
-    live sample branch keys on (every provider sample fetch treats
-    ``event`` as the stored poll name). Generic HTTP polls qualify only
-    for the generic ``poll`` connector. None when the workflow has no
-    matching stored poll, so the sample falls through to
-    history/synthetic unchanged."""
-    from ..triggers import poll_sources, poll_triggers
-
-    try:
-        items = poll_triggers.load_items()
-    except Exception:
-        return None
-    for item in items or []:
-        if str(item.get("flow") or "").strip() != workflow_id:
-            continue
-        try:
-            source = poll_sources.stored_source(item)
-        except Exception:
-            source = None
-        if source is None:
-            if connector == "poll":
-                return str(item.get("poll_id") or "")
-            continue
-        if source.connector == connector:
-            return str(item.get("poll_id") or "")
-    return None
-
-
 def api_trigger_sample(workflow_id, visible=None):
     """The trigger input an author can fill ``{trigger.*}`` templates from.
 
@@ -1332,8 +1302,7 @@ def api_trigger_sample(workflow_id, visible=None):
     try:
         discovered = trigger_discovery.discover(
             connector, kind="sample",
-            event=_workflow_poll_name(workflow_id, connector)
-            or trigger.get("event") or None)
+            event=trigger.get("event") or None)
     except trigger_discovery.DiscoveryNotFound as exc:
         return 404, {"error": str(exc)}
     except trigger_discovery.DiscoveryUpstream as exc:
