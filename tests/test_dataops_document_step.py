@@ -45,7 +45,7 @@ def run(steps=STEPS, event=None, action=None):
     with patch("src.dapier.engine.actions.base.secrets_value", return_value="tok"), \
          patch("src.dapier.engine.actions.base._connected_connection",
                return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
-         patch("src.dapier.engine.actions.dataops._s3_bytes", return_value=BODY), \
+         patch("src.dapier.engine.actions.base._s3_body", return_value=BODY), \
          patch("src.dapier.engine.actions.dataops._stage_document",
                side_effect=lambda key, body, ct, checksum: f"s3://stage/{key}") as stage, \
          patch("src.dapier.engine.actions.base._json_request", side_effect=fake_request):
@@ -117,7 +117,7 @@ def test_the_staging_key_never_carries_whitespace():
     with patch("src.dapier.engine.actions.base.secrets_value", return_value="tok"), \
          patch("src.dapier.engine.actions.base._connected_connection",
                return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
-         patch("src.dapier.engine.actions.dataops._s3_bytes", return_value=BODY), \
+         patch("src.dapier.engine.actions.base._s3_body", return_value=BODY), \
          patch("boto3.client", return_value=s3), \
          patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
          patch("src.dapier.engine.actions.base._json_request", request):

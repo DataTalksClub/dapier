@@ -70,9 +70,6 @@ def _stage_document(key, body, content_type, checksum):
     return f"s3://{bucket}/{key}"
 
 
-def _s3_bytes(bucket, key):
-    return _s3().get_object(Bucket=bucket, Key=key)["Body"].read()
-
 
 def _received_at(value):
     """Second-precision UTC Z form — the only timestamp shape the DataOps
@@ -222,7 +219,7 @@ def _email_intake_body(action, event, *, steps=None):
                 continue  # ToS/legal boilerplate never belongs in the document intake
             ref = attachment.get("s3") or {}
             if ref.get("bucket") and ref.get("key"):
-                body = _s3_bytes(ref["bucket"], ref["key"])
+                body = base._s3_body(ref)
                 filename = base._safe_filename(attachment.get("filename") or "attachment")
                 content_type = attachment.get("content_type") or "application/octet-stream"
                 storage_uri = _stage_document(
@@ -239,7 +236,7 @@ def _email_intake_body(action, event, *, steps=None):
                 })
         output = data.get("output") or {}
         if output.get("bucket") and output.get("key"):
-            body = _s3_bytes(output["bucket"], output["key"])
+            body = base._s3_body(output)
             filename = base._safe_filename(action.get("filename", "invoice-email.pdf"))
             content_type = data.get("content_type", "application/pdf")
             checksum = f"sha256:{data['checksum']}"
@@ -278,7 +275,7 @@ def _step_document(ref, route, message_id, action, steps):
     document = output.get("output") if isinstance(output.get("output"), dict) else {}
     if not (isinstance(document, dict) and document.get("bucket") and document.get("key")):
         raise ValueError(f"dataops document_step '{ref}' does not reference a stored file")
-    body = _s3_bytes(document["bucket"], document["key"])
+    body = base._s3_body(document)
     filename = base._safe_filename(str(document.get("filename") or output.get("filename") or "").strip()
                                    or action.get("filename") or "invoice-document.pdf")
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
