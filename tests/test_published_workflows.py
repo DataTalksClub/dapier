@@ -8,6 +8,7 @@ import yaml
 from src.dapier.api import designer_store
 from src.dapier.engine import matching
 from src.dapier.triggers import published_workflows
+from src.dapier.triggers import dynamo
 
 WORKFLOW_YAML = """\
 id: test-flow
@@ -462,5 +463,5 @@ def test_list_versions_caps_the_scan_and_keeps_newest_first(published, monkeypat
 
     versions = published_workflows.list_versions("test-flow", table_ref=table)
 
-    assert table.scan_limits == [published_workflows.SCAN_LIMIT]
+    assert table.scan_limits == [dynamo.SCAN_LIMIT]
     assert [version["revision"] for version in versions] == [4, 3, 2, 1]

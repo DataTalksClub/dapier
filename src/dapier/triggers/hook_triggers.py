@@ -63,18 +63,16 @@ import os
 import re
 import secrets
 from datetime import datetime, timezone
-from decimal import Decimal
 
 from ..connections.providers import telegram_api
 from .intake.mailchimp_webhooks import EVENT_TYPES as MAILCHIMP_EVENT_TYPES
 
 logger = logging.getLogger(__name__)
 from .email_triggers import NAME_PATTERN, TriggerError
+from .dynamo import decode_numbers, scan_all
 
 TABLE_ENV = "HOOK_TRIGGERS_TABLE"
 BASE_URL_ENV = "HOOKS_BASE_URL"
-# DynamoDB scan page size, not a cutoff: load_items walks pages to exhaustion.
-SCAN_LIMIT = 200
 
 KINDS = ("webhook", "telegram", "mailchimp", "youtube")
 WEBHOOK_EVENT = "request.received"
@@ -494,37 +492,10 @@ def get_table(table_ref=None):
     return boto3.resource("dynamodb").Table(name)
 
 
-def _decode_numbers(value):
-    """DynamoDB's resource API returns Decimals; engine params must stay JSON-safe."""
-    if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value() else float(value)
-    if isinstance(value, dict):
-        return {key: _decode_numbers(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_decode_numbers(item) for item in value]
-    return value
-
-
-def _scan_all(table):
-    """Read every scan page: a single Limit=200 scan silently dropped
-    trigger #201 and beyond — it would stop firing with no error anywhere.
-    Same walk as published_workflows._scan_all (the managed-store loader)."""
-    items, start = [], None
-    while True:
-        kwargs = {"Limit": SCAN_LIMIT}
-        if start:
-            kwargs["ExclusiveStartKey"] = start
-        page = table.scan(**kwargs)
-        items.extend(page.get("Items", []))
-        start = page.get("LastEvaluatedKey")
-        if not start:
-            return items
-
-
 def load_items(table_ref=None):
     return sorted(
-        ({key: _decode_numbers(value) for key, value in item.items()}
-         for item in _scan_all(get_table(table_ref))),
+        ({key: decode_numbers(value) for key, value in item.items()}
+         for item in scan_all(get_table(table_ref))),
         key=lambda item: item.get("hook_id", ""),
     )
 
@@ -532,7 +503,7 @@ def load_items(table_ref=None):
 def get_item(name, table_ref=None):
     name = validate_name(name)
     item = get_table(table_ref).get_item(Key={"hook_id": name}).get("Item")
-    return {key: _decode_numbers(value) for key, value in item.items()} if item else None
+    return {key: decode_numbers(value) for key, value in item.items()} if item else None
 
 
 def telegram_event_for(update):

@@ -13,7 +13,7 @@ import math
 import unittest
 
 from src.dapier.triggers import (
-    hook_triggers, poll_triggers, schedule_triggers,
+    dynamo, hook_triggers, poll_triggers, schedule_triggers,
 )
 
 
@@ -75,15 +75,15 @@ class PagedTableSanityTests(unittest.TestCase):
     def test_stub_pages_like_dynamodb_and_hides_the_rest(self):
         table = PagedTable(
             [{"name": name_for(index)} for index in range(COUNT)], key="name")
-        page = table.scan(Limit=hook_triggers.SCAN_LIMIT)
-        self.assertEqual(len(page["Items"]), hook_triggers.SCAN_LIMIT)
+        page = table.scan(Limit=dynamo.SCAN_LIMIT)
+        self.assertEqual(len(page["Items"]), dynamo.SCAN_LIMIT)
         self.assertEqual([item["name"] for item in page["Items"]],
-                         [name_for(index) for index in range(hook_triggers.SCAN_LIMIT)])
+                         [name_for(index) for index in range(dynamo.SCAN_LIMIT)])
         self.assertIn("LastEvaluatedKey", page)
-        follow_up = table.scan(Limit=hook_triggers.SCAN_LIMIT,
+        follow_up = table.scan(Limit=dynamo.SCAN_LIMIT,
                                ExclusiveStartKey=page["LastEvaluatedKey"])
         self.assertEqual([item["name"] for item in follow_up["Items"]],
-                         [name_for(index) for index in range(hook_triggers.SCAN_LIMIT, COUNT)])
+                         [name_for(index) for index in range(dynamo.SCAN_LIMIT, COUNT)])
         self.assertNotIn("LastEvaluatedKey", follow_up)
 
 
@@ -112,7 +112,7 @@ class StoreWalkContract:
         self.assertEqual(len(names), COUNT)
         self.assertEqual(len(set(names)), COUNT)
         self.assertEqual(names, sorted(names))
-        self.assertGreaterEqual(table.scans, math.ceil(COUNT / store.SCAN_LIMIT))
+        self.assertGreaterEqual(table.scans, math.ceil(COUNT / dynamo.SCAN_LIMIT))
 
     def test_single_page_table_still_loads(self):
         store = self.store()

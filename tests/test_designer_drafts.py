@@ -19,6 +19,7 @@ from src.dapier.api import agent as agent_api
 from src.dapier.api import designer_store
 from src.dapier.engine import matching
 from src.dapier.triggers import published_workflows
+from src.dapier.triggers import dynamo
 
 WORKFLOW_YAML = """\
 id: test-flow
@@ -390,7 +391,7 @@ def test_auto_pause_stales_a_draft(git_sync, store, monkeypatch):
 
 
 def test_a_draft_only_workflow_fires_nothing_even_when_enabled(git_sync, store, monkeypatch):
-    monkeypatch.setattr(published_workflows, "SCAN_LIMIT", 2)  # exercise paging too
+    monkeypatch.setattr(dynamo, "SCAN_LIMIT", 2)  # exercise paging too
     assert designer_store.api_save({"yaml": WORKFLOW_YAML}, operator="op-1")[0] == 200
     assert matching.all_workflows() == []
 

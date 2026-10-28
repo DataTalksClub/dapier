@@ -22,10 +22,9 @@ draft-blind — a draft-only workflow fires nothing until it is published.
 
 import os
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from .dynamo import decode_numbers, scan_all
 
 TABLE_ENV = "PUBLISHED_WORKFLOWS_TABLE"
-SCAN_LIMIT = 200
 MAX_VERSIONS = 20
 
 
@@ -59,17 +58,6 @@ def _scrub(value):
     return value
 
 
-def _decode_numbers(value):
-    """The resource API returns Decimals; the engine needs JSON-safe values."""
-    if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value() else float(value)
-    if isinstance(value, dict):
-        return {key: _decode_numbers(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_decode_numbers(item) for item in value]
-    return value
-
-
 def resolve_owner(item):
     """The owner a reader sees: the stamped ``owner``, else the item's
     informational ``published_by`` (every item predating G17 has one), else
@@ -81,7 +69,7 @@ def _decode_item(item):
     """Decode one stored item for readers: Decimals to JSON-safe numbers and
     ``owner`` resolved (see resolve_owner) — every live-item read answers
     with an owner, backfilled from published_by when the stamp predates it."""
-    decoded = {key: _decode_numbers(value) for key, value in item.items()}
+    decoded = {key: decode_numbers(value) for key, value in item.items()}
     decoded["owner"] = resolve_owner(decoded)
     return decoded
 
@@ -178,7 +166,7 @@ def get_draft(workflow_id, table_ref=None):
     item = get_table(table_ref).get_item(
         Key={"workflow_id": draft_key(workflow_id)},
     ).get("Item")
-    return {key: _decode_numbers(value) for key, value in item.items()} if item else None
+    return {key: decode_numbers(value) for key, value in item.items()} if item else None
 
 
 def delete_draft(workflow_id, table_ref=None):
@@ -200,27 +188,13 @@ def get_item(workflow_id, table_ref=None):
     return _decode_item(item) if item else None
 
 
-def _scan_all(table):
-    """Read every page; the managed table is the complete runtime catalog."""
-    items, start = [], None
-    while True:
-        kwargs = {"Limit": SCAN_LIMIT, "ConsistentRead": True}
-        if start:
-            kwargs["ExclusiveStartKey"] = start
-        page = table.scan(**kwargs)
-        items.extend(page.get("Items", []))
-        start = page.get("LastEvaluatedKey")
-        if not start:
-            return items
-
-
 def load_items(table_ref=None, include_drafts=False):
     # Version records and draft records share the table; only live items
     # belong in the engine merge and the designer list — a draft must never
     # fire or appear as live state. Callers that surface drafts (the list's
     # draft-only rows, the draft endpoints) ask for them explicitly.
     items = [
-        item for item in _scan_all(get_table(table_ref))
+        item for item in scan_all(get_table(table_ref), consistent=True)
         if not item.get("version_of")
         and (include_drafts or not item.get("draft_of"))
     ]
@@ -237,11 +211,11 @@ def list_versions(workflow_id, table_ref=None):
     must be read before filtering this workflow's history.
     """
     versions = [
-        item for item in _scan_all(get_table(table_ref))
+        item for item in scan_all(get_table(table_ref), consistent=True)
         if item.get("version_of") == workflow_id
     ]
     return sorted(
-        ({key: _decode_numbers(value) for key, value in item.items()} for item in versions),
+        ({key: decode_numbers(value) for key, value in item.items()} for item in versions),
         key=lambda item: int(item.get("revision") or 0),
         reverse=True,
     )
@@ -251,7 +225,7 @@ def get_version(workflow_id, revision, table_ref=None):
     item = get_table(table_ref).get_item(
         Key={"workflow_id": version_key(workflow_id, revision)},
     ).get("Item")
-    return {key: _decode_numbers(value) for key, value in item.items()} if item else None
+    return {key: decode_numbers(value) for key, value in item.items()} if item else None
 
 
 def diff_versions(workflow_id, from_revision, to_revision, table_ref=None):

@@ -21,17 +21,15 @@ import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 from . import schedule_times
 from .email_triggers import NAME_PATTERN, TriggerError
+from .dynamo import decode_numbers, scan_all
 
 logger = logging.getLogger(__name__)
 
 TABLE_ENV = "SCHEDULE_TRIGGERS_TABLE"
 WORKER_ARN_ENV = "WORKER_FUNCTION_ARN"
-# DynamoDB scan page size, not a cutoff: load_items walks pages to exhaustion.
-SCAN_LIMIT = 200
 RULE_PREFIX = "dapier-schedule-"
 TARGET_ID = "dapier-worker"
 SCHEDULE_EVENT = "schedule.triggered"
@@ -143,37 +141,10 @@ def _events(events_client=None):
     return boto3.client("events")
 
 
-def _decode_numbers(value):
-    """DynamoDB's resource API returns Decimals; engine params must stay JSON-safe."""
-    if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value() else float(value)
-    if isinstance(value, dict):
-        return {key: _decode_numbers(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_decode_numbers(item) for item in value]
-    return value
-
-
-def _scan_all(table):
-    """Read every scan page: a single Limit=200 scan silently dropped
-    trigger #201 and beyond — it would stop firing with no error anywhere.
-    Same walk as published_workflows._scan_all (the managed-store loader)."""
-    items, start = [], None
-    while True:
-        kwargs = {"Limit": SCAN_LIMIT}
-        if start:
-            kwargs["ExclusiveStartKey"] = start
-        page = table.scan(**kwargs)
-        items.extend(page.get("Items", []))
-        start = page.get("LastEvaluatedKey")
-        if not start:
-            return items
-
-
 def load_items(table_ref=None):
     return sorted(
-        ({key: _decode_numbers(value) for key, value in item.items()}
-         for item in _scan_all(get_table(table_ref))),
+        ({key: decode_numbers(value) for key, value in item.items()}
+         for item in scan_all(get_table(table_ref))),
         key=lambda item: item.get("schedule_id", ""),
     )
 
@@ -181,7 +152,7 @@ def load_items(table_ref=None):
 def get_item(name, table_ref=None):
     name = str(name or "").strip().lower()
     item = get_table(table_ref).get_item(Key={"schedule_id": name}).get("Item")
-    return {key: _decode_numbers(value) for key, value in item.items()} if item else None
+    return {key: decode_numbers(value) for key, value in item.items()} if item else None
 
 
 def sync_rule(item, *, events_client=None, target_arn=None):
@@ -257,7 +228,7 @@ def record_fire(event, outcome, workflows=None, error=None, *, table_ref=None):
         if not stored:
             return None
         entry = fire_entry(event, outcome, workflows, error)
-        stored["fires"] = _with_entry(_decode_numbers(stored.get("fires") or []), entry)
+        stored["fires"] = _with_entry(decode_numbers(stored.get("fires") or []), entry)
         table.put_item(Item=stored)
         return entry
     except Exception:

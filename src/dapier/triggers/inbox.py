@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from email.utils import parseaddr
 
 from ..auth import visibility
+from .dynamo import decode_numbers
 
 logger = logging.getLogger(__name__)
 
@@ -294,19 +295,6 @@ def _table():
     return boto3.resource("dynamodb").Table(name)
 
 
-def _decode_numbers(value):
-    """DynamoDB's resource API returns Decimals; API payloads stay JSON-safe."""
-    from decimal import Decimal
-
-    if isinstance(value, Decimal):
-        return int(value) if value == value.to_integral_value() else float(value)
-    if isinstance(value, dict):
-        return {key: _decode_numbers(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_decode_numbers(item) for item in value]
-    return value
-
-
 def record(event, *, table_ref=None):
     """Record an inbound event before the engine runs it.
 
@@ -470,14 +458,14 @@ def _display_body(data):
 def _view(item, *, body=False):
     keys = ("inbox_id", "connector", "event", "source", "occurred_at",
             "received_at", "processed_at", "status", "data", "matched", "error")
-    view = {key: _decode_numbers(item.get(key)) for key in keys}
+    view = {key: decode_numbers(item.get(key)) for key in keys}
     view["outcome"] = OUTCOMES.get(view.get("status"), view.get("status"))
     # One run per matched workflow, keyed like engine.worker._run_id, so a
     # client links straight to the run without searching history.
     view["runs"] = [{"workflow": str(workflow), "run_id": f"{workflow}:{view['inbox_id']}"}
                     for workflow in (view.get("matched") or [])]
     if view.get("connector") == "email":
-        stored_summary = _decode_numbers(item.get("email"))
+        stored_summary = decode_numbers(item.get("email"))
         view["email"] = stored_summary or email_summary(view.get("data")) or {}
         if body:
             content, rehydrated = _display_body(view.get("data"))
@@ -497,7 +485,7 @@ def _view(item, *, body=False):
                 view["data"] = {key: value for key, value in data.items()
                                 if key not in _LIST_BODY_KEYS}
     if item.get("request") is not None:
-        view["request"] = _decode_numbers(item["request"])
+        view["request"] = decode_numbers(item["request"])
     return view
 
 
@@ -675,7 +663,7 @@ def stored(inbox_id, *, table_ref=None):
     except InboxError:
         return None
     item = table.get_item(Key={"inbox_id": inbox_id}).get("Item")
-    return _decode_numbers(item) if item else None
+    return decode_numbers(item) if item else None
 
 
 _PREVIEW_BUCKET_RE = re.compile(r'"bucket"\s*:\s*"([^"]+)"')
@@ -773,7 +761,7 @@ def api_replay(inbox_id, *, queue=None, table_ref=None):
     item = table.get_item(Key={"inbox_id": inbox_id}).get("Item")
     if not item:
         return 404, {"error": "Inbox event not found"}
-    event, error = replay_event(_decode_numbers(item))
+    event, error = replay_event(decode_numbers(item))
     if error:
         return 409, {"error": error}
     try:
