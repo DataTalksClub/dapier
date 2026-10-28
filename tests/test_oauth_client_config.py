@@ -149,7 +149,7 @@ def test_save_oauth_client_requires_both_values(monkeypatch, config_db):
     response = admin.save_oauth_client("google", request("PUT", "/api/admin/oauth-clients/google", {"client_id": "gid"}))
     assert response["statusCode"] == 400
 
-    response = admin.save_oauth_client("mailchimp", request("PUT", "/api/admin/oauth-clients/mailchimp", {
+    response = admin.save_oauth_client("acme", request("PUT", "/api/admin/oauth-clients/acme", {
         "client_id": "a", "client_secret": "b",
     }))
     assert response["statusCode"] == 404

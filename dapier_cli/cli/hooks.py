@@ -35,7 +35,7 @@ def register(sub):
     hook_sub = hook_p.add_subparsers(dest="command", required=True)
     hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
     hook_list_p.add_argument("--kind", default=None,
-                             choices=["webhook", "telegram", "mailchimp", "youtube"])
+                             choices=["webhook", "telegram", "youtube"])
     hook_show_p = hook_sub.add_parser("show", help="Show one hook trigger, including its token")
     hook_show_p.add_argument("name")
     hook_save_p = hook_sub.add_parser("save", help="Create or update a hook trigger from a JSON file")
@@ -47,14 +47,14 @@ def register(sub):
     hook_del_p = hook_sub.add_parser("delete", help="Delete a hook trigger")
     hook_del_p.add_argument("name")
     hook_del_p.add_argument("--kind", default=None,
-                            choices=["webhook", "telegram", "mailchimp", "youtube"])
+                            choices=["webhook", "telegram", "youtube"])
     _activity_commands(hook_sub)
     webhooks_p = sub.add_parser(
-        "webhooks", help="Webhook, Telegram, Mailchimp, and YouTube callbacks that start a flow")
+        "webhooks", help="Webhook, Telegram, and YouTube callbacks that start a flow")
     webhooks_sub = webhooks_p.add_subparsers(dest="command", required=True)
     webhooks_list = webhooks_sub.add_parser("list", help="List webhooks")
     webhooks_list.add_argument("--kind", default=None,
-                               choices=["webhook", "telegram", "mailchimp", "youtube"])
+                               choices=["webhook", "telegram", "youtube"])
     webhooks_show = webhooks_sub.add_parser("show", help="Show one webhook, including its token")
     webhooks_show.add_argument("name")
     webhooks_save = webhooks_sub.add_parser("save", help="Create or update a webhook from a JSON file")
@@ -66,7 +66,7 @@ def register(sub):
     webhooks_del = webhooks_sub.add_parser("delete", help="Delete a webhook")
     webhooks_del.add_argument("name")
     webhooks_del.add_argument("--kind", default=None,
-                              choices=["webhook", "telegram", "mailchimp", "youtube"])
+                              choices=["webhook", "telegram", "youtube"])
     _activity_commands(webhooks_sub)
 
 

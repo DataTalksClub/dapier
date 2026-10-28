@@ -5,7 +5,7 @@ The Triggers view hardcodes two lists — the Source select's options
 must carry a connection_id). This gate pins both to
 triggers.poll_sources, so a newly registered source cannot land without
 its console surface (the gap this closed: google-drive.updates,
-google-drive.deletions, mailchimp.members and slack.messages were
+google-drive.deletions and slack.messages were
 registered but unreachable from the console dialog).
 """
 import re
@@ -17,11 +17,10 @@ WEB = Path(__file__).resolve().parents[1] / "src" / "web"
 
 # Sources that must stay OUT of the connection-requiring list the console
 # validates against: credential-backed ones (the three s3 sources share the
-# stored aws keys, mailchimp.members the shared mailchimp key or a named
-# credential) and rss, which polls a public feed URL and needs no auth at
+# stored aws keys) and rss, which polls a public feed URL and needs no auth at
 # all. Hub uses its scoped service identity rather than an OAuth connection.
 CREDENTIAL_SOURCES = {"s3", "s3.updates", "s3.deletions",
-                      "mailchimp.members", "rss", "hub.sessions"}
+                      "rss", "hub.sessions"}
 
 
 def _select_sources():

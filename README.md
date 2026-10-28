@@ -240,8 +240,8 @@ Decrypt with the exact store name as encryption context. Each entry keeps the
 original plain string or JSON in its `value` field. Workflow `auth_secret_id`
 references use store names, for example `dapier.dataops`.
 
-The **Credentials** view accepts the Slack bot token used by Dapier and the
-Mailchimp API key used by DataOps. The values are write-only: the browser sends
+The **Credentials** view accepts the Slack bot token, the AWS access, and the
+Typefully and OpenRouter API keys used by Dapier. The values are write-only: the browser sends
 them over HTTPS to the administration API, which stores them in the dedicated
 DynamoDB credentials table and returns only presence and update metadata. The
 **Connections** view shows one card per service: click **Connect** on Google
@@ -559,7 +559,6 @@ the CLI — the commands drive the same operator-gated API as the console:
 dapier overview                       # workflows, connections, credentials, recent executions
 dapier overview --section workflows   # only this block; returns JSON
 dapier credentials set slack --file slack-token.txt   # or --file - for stdin
-dapier credentials set mailchimp --file mailchimp-key.txt
 dapier grants list [--connection youtube-personal]
 dapier grants save grant.json         # {"connection_id", "subject", "agent", "operations"}
 dapier grants delete youtube-personal "subject-9#buildcamp-uploader"

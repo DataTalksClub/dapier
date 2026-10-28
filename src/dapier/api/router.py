@@ -744,40 +744,6 @@ def handler(event, _context):
             connections_table=table, publish=_publish,
         )
         return _response(status, payload)
-    elif path.startswith("/hooks/mailchimp/"):
-        from ..triggers.intake import mailchimp_webhooks
-
-        name = path.removeprefix("/hooks/mailchimp/").strip("/").lower()
-        if not name or "/" in name:
-            return _response(404, {"error": "not found"})
-        if len(body) > MAX_HOOK_BODY_BYTES:
-            return _response(413, {"error": "body too large"})
-        # The stored hook trigger gates the URL (enable/disable, the same
-        # `hooks` CRUD every surface already has); no bearer check — Mailchimp
-        # sends no auth headers, the unguessable name is the credential.
-        item = _hook_item(name)
-        if not item or item.get("kind") != "mailchimp":
-            return _response(404, {"error": "unknown hook"})
-        # Delivery dedupe like the webhook kind: Mailchimp retries on non-2xx,
-        # and a trigger with a dedupe_path (a real delivery's top-level
-        # ``fired_at`` is the natural one) answers a re-POST of the same
-        # delivery 202 without publishing twice.
-        event_id, fresh = _claim_delivery(item, mailchimp_webhooks.parse_form(body))
-        if not fresh:
-            return _response(202, {"accepted": True, "duplicate": True, "event_id": event_id})
-
-        def _publish_claimed(connector, event_type, data, source=None):
-            _publish(connector, event_type, data, source=source, event_id=event_id)
-
-        try:
-            status, payload = mailchimp_webhooks.handle(body, hook=name,
-                                                        publish=_publish_claimed)
-        except Exception:
-            _release_delivery(item, event_id)
-            raise
-        if status >= 300:
-            _release_delivery(item, event_id)
-        return _response(status, payload)
     elif path.startswith("/hooks/webhook/") or path.startswith("/hooks/telegram/"):
         prefix = "/hooks/webhook/" if path.startswith("/hooks/webhook/") else "/hooks/telegram/"
         name = (path.split(prefix, 1)[1] or "").strip("/").lower()

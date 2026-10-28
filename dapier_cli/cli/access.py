@@ -8,7 +8,7 @@ GROUPS = ("credentials", "grants", "tokens", "oauth-clients",)
 def register(sub):
     cred_p = sub.add_parser("credentials", help="Provider credentials used by workflows")
     cred_sub = cred_p.add_subparsers(dest="command", required=True)
-    cred_set_p = cred_sub.add_parser("set", help="Store a credential (Slack bot token, Mailchimp API key, or AWS keys as JSON)")
+    cred_set_p = cred_sub.add_parser("set", help="Store a credential (Slack bot token, Typefully or OpenRouter API key, or AWS keys as JSON)")
     cred_set_p.add_argument("provider")
     cred_set_p.add_argument("--file", required=True,
                             help="File with the secret value, or - for stdin")

@@ -2,7 +2,7 @@
 
 SES reports bounces and complaints through SNS, which POSTs a JSON envelope
 to the feedback destination (the configuration set's feedback hook,
-``/hooks/ses-notifications``). Like Mailchimp, the unguessable URL is the
+``/hooks/ses-notifications``). The unguessable URL is the
 credential, so the topic allowlist (``SES_NOTIFICATION_TOPICS``, a
 comma-separated TopicArn list) is the real gate: with it set, an envelope
 naming another topic is 403 and nothing runs; operators should always set

@@ -25,19 +25,19 @@ import { OUTCOME_FILTERS, filterSegments, whenHtml, workflowNames, outcomeCell, 
    google-sheets.updates |
    google-drive.files | google-drive.updates | google-drive.deletions |
    google-calendar.events |
-   zoom.recordings | dropbox.files | youtube.videos | mailchimp.members |
+   zoom.recordings | dropbox.files | youtube.videos |
    slack.messages) take their target through these too: bucket/prefix,
    spreadsheet_id/worksheet, folder_id, for_email, path, channel_id,
-   list_id, calendar_id. */
+   calendar_id. */
 const POLL_OPTION_KEYS = ['headers', 'body', 'list_path', 'id_path', 'cursor_mode',
   'cursor_path', 'cursor_query', 'max_items', 'dedupe_ttl_days',
   'source', 'bucket', 'prefix', 'spreadsheet_id', 'worksheet', 'folder_id', 'drive_id', 'for_email',
-  'path', 'channel_id', 'list_id', 'calendar_id'];
+  'path', 'channel_id', 'calendar_id'];
 
 /* Sources that poll a connected account and so require connection_id on
    save (the server validates too — this is the early, human-readable
-   check). s3 and mailchimp.members authenticate through stored credentials
-   instead, so they stay off this list. */
+   check). s3 authenticates through stored credentials instead, so it stays
+   off this list. */
 const CONNECTION_POLL_SOURCES = ['google-sheets.rows', 'google-sheets.updates',
   'google-drive.files', 'google-drive.updates', 'google-drive.deletions',
   'google-calendar.events', 'gmail.messages',
@@ -51,7 +51,7 @@ const SOURCE_LABELS = {
   'google-drive.files': 'Drive folder', 'google-drive.updates': 'Drive changes',
   'google-drive.deletions': 'Drive deletions', 'google-calendar.events': 'Calendar',
   'gmail.messages': 'Gmail', 'zoom.recordings': 'Zoom recordings', 'dropbox.files': 'Dropbox folder',
-  'youtube.videos': 'YouTube channel', 'mailchimp.members': 'Mailchimp audience',
+  'youtube.videos': 'YouTube channel',
   'slack.messages': 'Slack channel',
 };
 
@@ -113,7 +113,7 @@ function pollTarget(poll) {
       ? [poll.bucket, poll.prefix].filter(Boolean).join('/')
       : [poll.spreadsheet_id, poll.worksheet].filter(Boolean).join(' · ')
         || poll.folder_id || poll.for_email || poll.path
-        || poll.channel_id || poll.list_id || poll.calendar_id || poll.url || '';
+        || poll.channel_id || poll.calendar_id || poll.url || '';
     return target;
   }
   return `${poll.method && poll.method !== 'GET' ? `${poll.method} ` : ''}${poll.url || ''}`;

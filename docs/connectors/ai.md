@@ -191,8 +191,8 @@ step runs that branch's steps inline — a smart `if` statement, or a
 with probabilities and a confidence, not chat text, so there is nothing to
 parse and a reply cannot route anywhere illegal. The endpoint is OpenRouter's
 own, so the key is not env: `decision` authenticates with the stored
-**`openrouter` credential** — the same credential store behind the Slack,
-Mailchimp, and AWS secrets. Set it once from the console's Credentials tab
+**`openrouter` credential** — the same credential store behind the Slack
+and AWS secrets. Set it once from the console's Credentials tab
 or with `dapier credentials set openrouter` (the key travels only in the
 request body and is never shown again); the credential's **Test connection**
 exercises the key against OpenRouter's key-introspection endpoint. The

@@ -1,7 +1,5 @@
-"""The Mailchimp + Google Drive poll round: the audience-member poll source,
-the Drive changes-feed sources (updated/deleted file), and the action
-staples that round out both connectors (remove/tag member, share/copy
-file).
+"""The Google Drive poll round: the Drive changes-feed sources
+(updated/deleted file) and the share/copy file action staples.
 
 The poll sources follow the dropbox/zoom pattern: save validation through
 build_item, a page fetcher returning ``(items, next_cursor)``, a seeded
@@ -9,12 +7,10 @@ first fire, and the end-to-end fire against a fake transport with real
 cursor and seen machinery — no network, no moto. The Drive changes pair
 shares one changes.list fetch (``google-drive.updates`` publishes
 ``file.updated``, ``google-drive.deletions`` publishes ``file.deleted``,
-the page token parked as the cursor); the Mailchimp source lists one
-audience's members by ``last_changed`` and publishes ``member.new``. The
+the page token parked as the cursor). The
 actions drive the registered runners with canned HTTP responses, asserting
 method, URL, request body and the step-output shape.
 """
-import hashlib
 import json
 import unittest.mock as mock
 import urllib.parse
@@ -22,14 +18,9 @@ import urllib.parse
 import boto3
 import pytest
 
-from src.dapier.connections import credentials as credentials_module
 from src.dapier.connections import discovery, tokens
 from src.dapier.engine.actions import base
 from plugins.google.runners.drive import run_drive_copy_file, run_drive_share_file
-from plugins.mailchimp.runners.mailchimp import (
-    run_mailchimp_remove_member,
-    run_mailchimp_tag_member,
-)
 from src.dapier.triggers import poll_sources, poll_triggers
 from src.dapier.triggers.email_triggers import TriggerError
 
@@ -37,7 +28,6 @@ import src.dapier.connectors  # noqa: F401  (import = registration)
 from src.dapier.connectors import registry
 
 MEMBER_EMAIL = "person@example.test"
-MEMBER_DIGEST = hashlib.md5(MEMBER_EMAIL.encode()).hexdigest()
 
 EVENT = {"connector": "schedule", "event": "schedule.fired",
          "occurred_at": "2026-09-28T09:00:00+00:00",
@@ -45,7 +35,6 @@ EVENT = {"connector": "schedule", "event": "schedule.fired",
 
 GOOGLE_CONNECTION = {"connection_id": "gdrive", "provider": "google",
                      "status": "connected", "credential_id": "oauth#gdrive"}
-MAILCHIMP_CREDENTIAL = {"apiKey": "key123-us12", "server": "us12"}
 
 
 @pytest.fixture(autouse=True)
@@ -104,23 +93,6 @@ class JsonTransport:
         raise AssertionError(f"unexpected provider call: {method} {url}")
 
 
-class MembersTransport:
-    """The Marketing API's members listing: canned pages, popped per call."""
-
-    def __init__(self, pages=None):
-        self.pages = list(pages or [])
-        self.calls = []
-
-    def __call__(self, method, url, *, headers=None, body=None, timeout=15):
-        self.calls.append({"method": method, "url": url, "headers": headers or {},
-                           "body": body})
-        assert (headers.get("authorization") or "").startswith("Basic ")
-        if "/members?" in url:
-            page = self.pages.pop(0) if self.pages else {"members": []}
-            return 200, json.dumps(page).encode()
-        raise AssertionError(f"unexpected mailchimp call: {method} {url}")
-
-
 class ChangesTransport:
     """The Drive changes feed: startPageToken seeds, canned pages pop per
     call; an exhausted page list drains the feed."""
@@ -141,11 +113,6 @@ class ChangesTransport:
         return 200, json.dumps(page).encode()
 
 
-def member_entry(member_id, last_changed, email=MEMBER_EMAIL, status="subscribed"):
-    return {"id": member_id, "email_address": email, "status": status,
-            "last_changed": last_changed, "merge_fields": {"FNAME": "Person"}}
-
-
 def update_change(change_id, file_id, name, parents=None,
                   time="2026-09-28T10:00:00.000Z"):
     return {"id": change_id, "fileId": file_id, "removed": False, "time": time,
@@ -155,14 +122,6 @@ def update_change(change_id, file_id, name, parents=None,
 
 def delete_change(change_id, file_id, time="2026-09-28T11:00:00.000Z"):
     return {"id": change_id, "fileId": file_id, "removed": True, "time": time}
-
-
-def mailchimp_body(**overrides):
-    body = {"name": "roster-watch", "expression": "rate(1 hour)",
-            "source": "mailchimp.members", "list_id": "abc123",
-            "actions": [{"type": "email_send", "to": "ops@example.test"}]}
-    body.update(overrides)
-    return body
 
 
 def drive_changes_body(**overrides):
@@ -176,23 +135,6 @@ def drive_changes_body(**overrides):
 def stored(body):
     """The stored item build_item would persist for ``body``."""
     return poll_triggers.build_item(body, "op@example.test")
-
-
-def run_mailchimp_fire(item, transport, *, cursors=None):
-    """One scheduled fire against a canned members listing, with real
-    cursor/seen machinery and the engine stubbed out."""
-    fired_events = []
-    cursors = cursors or FakeCursorTable()
-
-    with mock.patch.object(poll_triggers, "get_item", return_value=item), \
-         mock.patch.object(credentials_module, "get_credential",
-                           return_value=dict(MAILCHIMP_CREDENTIAL)), \
-         mock.patch.object(base, "_default_transport", side_effect=transport), \
-         mock.patch("src.dapier.engine.execute",
-                    side_effect=lambda event, **_kwargs: fired_events.append(event)), \
-         mock.patch("src.dapier.engine.notify.notify_failure"):
-        result = poll_triggers.fire(item["poll_id"], cursor_table_ref=cursors)
-    return result, fired_events, cursors
 
 
 def run_drive_fire(item, transport, *, cursors=None):
@@ -216,7 +158,6 @@ def run_drive_fire(item, transport, *, cursors=None):
 
 def test_the_poll_sources_register_under_their_chip_events():
     for name, connector_name, event in (
-            ("mailchimp.members", "mailchimp", "member.new"),
             ("google-drive.updates", "google-drive", "file.updated"),
             ("google-drive.deletions", "google-drive", "file.deleted")):
         source = poll_sources.SOURCES[name]
@@ -225,297 +166,13 @@ def test_the_poll_sources_register_under_their_chip_events():
 
 
 def test_the_new_action_types_are_registered():
-    for action_type in ("mailchimp_remove_member", "mailchimp_tag_member",
-                        "drive_share_file", "drive_copy_file"):
+    for action_type in ("drive_share_file", "drive_copy_file"):
         assert action_type in registry.ACTIONS
 
 
 def test_the_chips_declare_the_poll_published_events():
-    assert "member.new" in registry.CONNECTORS["mailchimp"].events
     assert registry.CONNECTORS["google-drive"].events == \
         ("file.created", "file.updated", "file.deleted")
-
-
-# --- mailchimp actions: remove + tag ------------------------------------------------
-
-
-def run_remove(action, transport):
-    with mock.patch.object(credentials_module, "get_credential",
-                           return_value=dict(MAILCHIMP_CREDENTIAL)):
-        return run_mailchimp_remove_member(
-            {"list_id": "abc123", "email": MEMBER_EMAIL, **action},
-            EVENT, transport=transport)
-
-
-def test_remove_member_deletes_the_md5_path():
-    transport = JsonTransport(("/members/", 204, {}))
-
-    output = run_remove({}, transport)
-
-    assert output == {"removed": True, "email": MEMBER_EMAIL}
-    call = transport.calls[0]
-    assert call["method"] == "DELETE"
-    assert call["url"].endswith(f"/3.0/lists/abc123/members/{MEMBER_DIGEST}")
-    assert call["headers"]["authorization"].startswith("Basic ")
-
-
-def test_removing_a_missing_member_is_not_an_error():
-    transport = JsonTransport(("/members/", 404, {"title": "Resource Not Found"}))
-
-    output = run_remove({}, transport)
-
-    assert output == {"removed": False, "email": MEMBER_EMAIL}
-
-
-def test_remove_member_needs_list_and_email():
-    with pytest.raises(ValueError, match="list_id and email"):
-        run_mailchimp_remove_member({"list_id": "abc123"}, EVENT)
-
-
-def run_tag(action, transport):
-    with mock.patch.object(credentials_module, "get_credential",
-                           return_value=dict(MAILCHIMP_CREDENTIAL)):
-        return run_mailchimp_tag_member(
-            {"list_id": "abc123", "email": MEMBER_EMAIL, "tag": "digest-readers",
-             **action},
-            EVENT, transport=transport)
-
-
-def test_tag_member_posts_the_tag_active():
-    transport = JsonTransport(("/tags", 204, {}))
-
-    output = run_tag({}, transport)
-
-    assert output == {"tagged": True, "email": MEMBER_EMAIL,
-                      "tag": "digest-readers", "tag_status": "active"}
-    call = transport.calls[0]
-    assert call["method"] == "POST"
-    assert call["url"].endswith(
-        f"/3.0/lists/abc123/members/{MEMBER_DIGEST}/tags")
-    assert json.loads(call["body"]) == {
-        "tags": [{"name": "digest-readers", "status": "active"}]}
-
-
-def test_untag_sets_the_tag_inactive():
-    transport = JsonTransport(("/tags", 204, {}))
-
-    output = run_tag({"tag_action": "remove"}, transport)
-
-    assert output["tag_status"] == "inactive"
-    assert json.loads(transport.calls[0]["body"]) == {
-        "tags": [{"name": "digest-readers", "status": "inactive"}]}
-
-
-def test_tag_member_rejects_an_unknown_operation_and_a_missing_tag():
-    transport = JsonTransport(("/tags", 204, {}))
-
-    with pytest.raises(ValueError, match="tag_action must be one of"):
-        run_tag({"tag_action": "maybe"}, transport)
-    with pytest.raises(ValueError, match="list_id, email and tag"):
-        run_tag({"tag": ""}, transport)
-    assert transport.calls == []  # nothing reached the API
-
-
-def test_tag_member_dispatches_through_the_registry():
-    transport = JsonTransport(("/tags", 204, {}))
-
-    with mock.patch.object(credentials_module, "get_credential",
-                           return_value=dict(MAILCHIMP_CREDENTIAL)), \
-         mock.patch.object(base, "_default_transport", transport):
-        output = registry.ACTIONS["mailchimp_tag_member"].run(
-            {"type": "mailchimp_tag_member", "list_id": "abc123",
-             "email": MEMBER_EMAIL, "tag": "vip"}, EVENT, "wf-1")
-
-    assert output["tagged"] is True
-    assert output["tag"] == "vip"
-    assert json.loads(transport.calls[0]["body"])["tags"][0]["name"] == "vip"
-
-
-# --- mailchimp.members poll source ---------------------------------------------------
-
-
-def mailchimp_fetch(item, cursor, transport):
-    """One direct source fetch with the shared credential stubbed."""
-    with mock.patch.object(credentials_module, "get_credential",
-                           return_value=dict(MAILCHIMP_CREDENTIAL)):
-        return poll_sources.SOURCES["mailchimp.members"].fetch(
-            item, cursor, transport=transport)
-
-
-def test_a_mailchimp_poll_builds_a_next_cursor_poll():
-    item = stored(mailchimp_body())
-
-    assert item["source"] == "mailchimp.members"
-    assert item["list_id"] == "abc123"
-    assert item["cursor_mode"] == "next_cursor"
-    assert item["id_path"] == "id"
-    assert item["url"] == ""  # the source fetches; no HTTP url
-
-
-def test_a_mailchimp_poll_requires_the_audience():
-    with pytest.raises(TriggerError, match="list_id"):
-        stored(mailchimp_body(list_id="  "))
-
-
-def test_the_mailchimp_poll_view_shows_the_audience():
-    view = poll_triggers.public_view(stored(mailchimp_body()))
-
-    assert view["source"] == "mailchimp.members"
-    assert view["list_id"] == "abc123"
-
-
-def test_the_listing_sorts_by_last_changed_descending():
-    transport = MembersTransport()
-    item = stored(mailchimp_body())
-
-    mailchimp_fetch(item, "2026-09-27T00:00:00+00:00", transport)
-
-    parsed = urllib.parse.urlparse(transport.calls[0]["url"])
-    query = urllib.parse.parse_qs(parsed.query)
-    assert parsed.path.endswith("/3.0/lists/abc123/members")
-    assert query["count"] == ["1000"]
-    assert query["sort_field"] == ["last_changed"]
-    assert query["sort_dir"] == ["DESC"]
-
-
-def test_the_first_fetch_seeds_at_the_newest_member():
-    transport = MembersTransport([
-        {"members": [member_entry("mem-1", "2026-09-28T10:00:00+00:00"),
-                     member_entry("mem-2", "2026-09-28T11:00:00+00:00")]},
-    ])
-    item = stored(mailchimp_body())
-
-    items, seed = mailchimp_fetch(item, None, transport)
-
-    assert items == []  # the roster is history, not news
-    assert seed == "2026-09-28T11:00:00+00:00|mem-2"
-
-
-def test_only_members_past_the_watermark_fire_oldest_first():
-    transport = MembersTransport([
-        {"members": [member_entry("mem-3", "2026-09-28T12:00:00+00:00"),
-                     member_entry("mem-1", "2026-09-28T09:00:00+00:00"),
-                     member_entry("mem-2", "2026-09-28T10:30:00+00:00")]},
-    ])
-    item = stored(mailchimp_body())
-
-    items, next_cursor = mailchimp_fetch(
-        item, "2026-09-28T10:00:00+00:00", transport)
-
-    assert [entry["id"] for entry in items] == ["mem-2", "mem-3"]  # oldest first
-    assert items[0]["email"] == MEMBER_EMAIL
-    assert items[0]["status"] == "subscribed"
-    assert items[0]["last_changed"] == "2026-09-28T10:30:00+00:00"
-    assert next_cursor == "2026-09-28T12:00:00+00:00|mem-3"
-
-
-def test_a_member_changed_in_the_fired_members_second_still_fires():
-    # the composite last_changed|id watermark keeps same-second members
-    # distinct — a plain last_changed watermark would skip mem-2 forever
-    transport = MembersTransport([
-        {"members": [member_entry("mem-1", "2026-09-28T12:00:00+00:00"),
-                     member_entry("mem-2", "2026-09-28T12:00:00+00:00")]},
-    ])
-    item = stored(mailchimp_body())
-
-    items, next_cursor = mailchimp_fetch(
-        item, "2026-09-28T12:00:00+00:00|mem-1", transport)
-
-    assert [entry["id"] for entry in items] == ["mem-2"]
-    assert next_cursor == "2026-09-28T12:00:00+00:00|mem-2"
-
-
-def test_nothing_new_keeps_the_mailchimp_cursor():
-    transport = MembersTransport([
-        {"members": [member_entry("mem-1", "2026-09-28T09:00:00+00:00")]},
-    ])
-    item = stored(mailchimp_body())
-
-    items, next_cursor = mailchimp_fetch(
-        item, "2026-09-28T10:00:00+00:00", transport)
-
-    assert items == []
-    assert next_cursor == "2026-09-28T10:00:00+00:00"
-
-
-def test_members_without_a_usable_watermark_never_fire():
-    transport = MembersTransport([
-        {"members": [{"email_address": MEMBER_EMAIL, "status": "subscribed"},
-                     member_entry("mem-1", "2026-09-28T10:00:00+00:00")]},
-    ])
-    item = stored(mailchimp_body())
-
-    items, _next = mailchimp_fetch(item, "2026-09-28T09:00:00+00:00", transport)
-
-    assert [entry["id"] for entry in items] == ["mem-1"]
-
-
-def test_a_failed_mailchimp_listing_raises_runtimeerror():
-    transport = JsonTransport(("/members?", 500, {"detail": "boom"}))
-    item = stored(mailchimp_body())
-
-    with pytest.raises(RuntimeError, match="mailchimp poll failed"):
-        mailchimp_fetch(item, "2026-09-28T10:00:00+00:00", transport)
-
-
-def test_a_mailchimp_poll_without_its_list_never_lists():
-    item = stored(mailchimp_body())
-    del item["list_id"]
-
-    with pytest.raises(RuntimeError, match="list_id"):
-        mailchimp_fetch(item, None, MembersTransport())
-
-
-def test_fire_seeds_then_emits_changed_members_once():
-    item = stored(mailchimp_body())
-    cursors = FakeCursorTable()
-
-    result, fired, cursors = run_mailchimp_fire(
-        item, MembersTransport([
-            {"members": [member_entry("mem-1", "2026-09-28T09:00:00+00:00")]}]),
-        cursors=cursors)
-
-    assert result == {"poll": "roster-watch", "fired": 0}
-    assert fired == []
-    assert poll_triggers.get_cursor("roster-watch", table=cursors) == \
-        "2026-09-28T09:00:00+00:00|mem-1"
-
-    result, fired, cursors = run_mailchimp_fire(
-        item, MembersTransport([
-            {"members": [member_entry("mem-1", "2026-09-28T09:00:00+00:00"),
-                         member_entry("mem-2", "2026-09-28T11:00:00+00:00",
-                                      email="newest@example.test")]}]),
-        cursors=cursors)
-
-    assert result == {"poll": "roster-watch", "fired": 1}
-    event = fired[0]
-    assert event["connector"] == "mailchimp"
-    assert event["event"] == "member.new"
-    assert event["source"] == "roster-watch"
-    assert event["data"]["item_id"] == "mem-2"
-    assert event["data"]["email"] == "newest@example.test"
-    assert poll_triggers.get_cursor("roster-watch", table=cursors) == \
-        "2026-09-28T11:00:00+00:00|mem-2"
-
-    # The member edits again (same id, newer last_changed): the fetch offers
-    # it, the seen-set keeps the edit from re-firing inside the dedupe
-    # window — the event is member.new.
-    result, fired, _ = run_mailchimp_fire(
-        item, MembersTransport([
-            {"members": [member_entry("mem-2", "2026-09-28T12:00:00+00:00",
-                                      email="newest@example.test")]}]),
-        cursors=cursors)
-
-    assert result["fired"] == 0
-    assert fired == []
-
-
-def test_the_fired_mailchimp_event_matches_the_chip():
-    event = poll_triggers.event_for(stored(mailchimp_body()), {"id": "mem-1"})
-
-    assert event["connector"] == "mailchimp"
-    assert event["event"] == "member.new"
-    assert event["data"]["poll"] == "roster-watch"
 
 
 # --- drive actions: share + copy -----------------------------------------------------

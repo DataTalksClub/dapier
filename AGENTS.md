@@ -22,8 +22,8 @@ history.
 
 ## Integrations live in plugins/ (structure)
 
-Each provider integration (slack, rss, mailchimp, telegram, dropbox, aws,
-zoom, google) lives in `plugins/<name>/` — its connector registrations,
+Each provider integration (slack, rss, telegram, dropbox, aws,
+zoom, google, ...) lives in `plugins/<name>/` — its connector registrations,
 runners, manifest (`plugin.yaml`), README/CHANGELOG, and its own tests in
 `plugins/<name>/tests/` with a CI lane per plugin. The loader
 (`src/dapier/plugins/__init__.py`) imports every `plugins/*/plugin.py` at

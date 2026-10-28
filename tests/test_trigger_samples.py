@@ -37,10 +37,10 @@ def test_every_trigger_chip_has_a_sample():
     cat = trigger_discovery.trigger_discovery_catalog()
     for connector in ("email", "webhook", "telegram", "dropbox", "dataops",
                       "renderer", "schedule", "youtube", "zoom", "poll", "custom",
-                      "slack", "mailchimp"):
+                      "slack"):
         assert connector in cat["sample"], connector
     for connector in ("dropbox", "s3", "slack", "telegram", "zoom",
-                      "google-sheets", "google-drive", "mailchimp", "youtube"):
+                      "google-sheets", "google-drive", "youtube"):
         assert connector in cat["options"], connector
 
 
@@ -105,17 +105,6 @@ def test_youtube_sample_carries_the_pubsub_entry():
     assert sample["event"] == "video.published"
     assert sample["data"]["video_id"]
     assert sample["data"]["url"].startswith("https://www.youtube.com/watch?v=")
-
-
-def test_mailchimp_sample_picks_the_webhook_type_payload():
-    sample = _sample("mailchimp", event="upemail")["sample"]
-    assert sample["event"] == "upemail"
-    assert sample["data"]["type"] == "upemail"
-    assert sample["data"]["data"]["new_email"]
-    # an unknown type falls back to the default payload (subscribe)
-    fallback = _sample("mailchimp", event="bogus")["sample"]
-    assert fallback["event"] == "subscribe"
-    assert fallback["data"]["data"]["email"]
 
 
 def test_zoom_sample_is_metadata_only():
@@ -469,27 +458,6 @@ def test_s3_object_options_pass_the_bucket_through(monkeypatch):
     assert payload["options"] == [
         {"value": "reports/2026/report.pdf", "label": "reports/2026/report.pdf"}]
     assert fake.calls == [{"Bucket": "backups", "MaxKeys": 100}]
-
-
-def test_mailchimp_audience_options_fall_back_to_the_shared_credential(monkeypatch):
-    """mailchimp is a key credential with often no connection record: the
-    pseudo-account fallback still lists audiences from the stored key."""
-    import plugins.mailchimp.plugin as mailchimp_plugin
-
-    monkeypatch.setattr(
-        "src.dapier.connections.credentials.get_credential",
-        lambda credential_id: {"apiKey": "key-us21", "server": "us21"})
-    monkeypatch.setattr(
-        mailchimp_plugin, "mailchimp_request",
-        lambda method, url, api_key, transport=None: (
-            200, {"lists": [{"id": "abc123", "name": "Digest",
-                             "stats": {"member_count": 42}}]}))
-    configure_connections(monkeypatch, {})
-    status, payload = trigger_discovery.api_discover(
-        {"connector": "mailchimp", "kind": "options",
-         "resource": "mailchimp.audiences"})
-    assert status == 200, payload
-    assert payload["options"] == [{"value": "abc123", "label": "Digest (42 members)"}]
 
 
 # --- agent API: the CLI's surface ---

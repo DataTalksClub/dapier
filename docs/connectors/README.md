@@ -9,7 +9,6 @@ Provider-specific setup and verified account details live in separate guides:
 | Slack | [Slack](../../plugins/slack/README.md) (plugin) | `slack` (bot paste), `slack-user` (OAuth user token) | OAuth user scopes for the user connection; pasted bot or user token for the legacy bot connection |
 | Zoom | [Zoom](../../plugins/zoom/README.md) (plugin) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
 | Telegram | [Telegram](../../plugins/telegram/README.md) (plugin) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
-| Mailchimp | [Mailchimp](../../plugins/mailchimp/README.md) (plugin) | `mailchimp` (pseudo connection) | Stored API key; the `-usNN` suffix selects the datacenter |
 | Amazon S3 | [AWS / S3](../../plugins/aws/README.md) (plugin) | `aws`, `s3` (pseudo connections) | Stored IAM access key pair |
 | AI (LLM) | [AI](ai.md) | `connection_id` (default `llm`) | Verified connection: Anthropic OIDC or a stored API key |
 
@@ -41,8 +40,8 @@ provider app, see the [Google](../../plugins/google/README.md), [Dropbox](../../
 A legacy Slack bot connection still pastes its token instead of OAuth.
 Zoom's recording webhook uses a separate signing token in
 addition to its OAuth client for Zoom API access. Telegram also uses a
-pasted token, while Mailchimp and Amazon S3 use stored provider
-credentials rather than connections — see their guides.
+pasted token, while Amazon S3 uses stored provider
+credentials rather than connections — see its guide.
 
 Before provider-console work, run `uv run dapier oauth-clients list` in the
 already authenticated CLI session. Reuse configured clients rather than

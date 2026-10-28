@@ -509,13 +509,13 @@ def test_credentials_set_reads_stdin(monkeypatch, capsys):
 
     def fake_call(api_url, method, path, body=None, **kwargs):
         posted.update(path=path, body=body)
-        return {"provider": "mailchimp", "configured": True}
+        return {"provider": "typefully", "configured": True}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    monkeypatch.setattr(sys, "stdin", io.StringIO("a" * 20 + "-us1\n"))
-    assert commands.credentials_set("https://api.example.test", "mailchimp", "-") == 0
-    assert posted == {"path": "/api/agent/credentials/mailchimp",
-                      "body": {"api_key": "a" * 20 + "-us1"}}
+    monkeypatch.setattr(sys, "stdin", io.StringIO("a" * 24 + "\n"))
+    assert commands.credentials_set("https://api.example.test", "typefully", "-") == 0
+    assert posted == {"path": "/api/agent/credentials/typefully",
+                      "body": {"api_key": "a" * 24}}
 
 
 def test_credentials_set_rejects_unknown_provider_and_empty_value(monkeypatch, tmp_path, capsys):
@@ -613,7 +613,7 @@ def test_overview_prints_operator_summary(monkeypatch, capsys):
                          "status": "connected"}],
         "credentials": [{"provider": "slack", "configured": True,
                          "updated_at": "2026-09-24T00:00:00+00:00"},
-                        {"provider": "mailchimp", "configured": False, "updated_at": None}],
+                        {"provider": "typefully", "configured": False, "updated_at": None}],
         "executions": [{"workflow_id": "demo", "action_id": "upload", "status": "completed",
                         "started_at": "2026-09-24T01:00:00+00:00"}],
     }
@@ -643,8 +643,8 @@ def test_main_operator_command_parsing(monkeypatch):
     monkeypatch.setattr(commands, "credentials_set",
                         lambda api_url, provider, path, debug=False:
                         seen.update(provider=provider, path=path) or 0)
-    assert main.main(["credentials", "set", "mailchimp", "--file", "-"]) == 0
-    assert seen["provider"] == "mailchimp" and seen["path"] == "-"
+    assert main.main(["credentials", "set", "typefully", "--file", "-"]) == 0
+    assert seen["provider"] == "typefully" and seen["path"] == "-"
 
     monkeypatch.setattr(commands, "overview", lambda api_url, debug=False, section=None: 0)
     assert main.main(["overview"]) == 0

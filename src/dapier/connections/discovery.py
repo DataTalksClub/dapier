@@ -51,7 +51,6 @@ PROVIDER_LABELS = {
     "zoom": "Zoom",
     "slack": "Slack",
     "telegram": "Telegram",
-    "mailchimp": "Mailchimp",
     "aws": "AWS",
     "s3": "S3",
 }

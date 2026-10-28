@@ -102,7 +102,6 @@ def test_missing_required_param_is_a_404_not_a_listing(monkeypatch):
     monkeypatch.setattr(trigger_discovery, "options_from_registry", _delegate_fake([]))
     for connector, resource, param in (
             ("youtube", "youtube.playlist_items", "playlist_id"),
-            ("mailchimp", "mailchimp.members", "list_id"),
             ("slack", "slack.messages", "channel"),
             ("dropbox", "dropbox.search", "query"),
             ("google-sheets", "google-sheets.worksheets", "spreadsheet_id")):
@@ -110,17 +109,6 @@ def test_missing_required_param_is_a_404_not_a_listing(monkeypatch):
             {"connector": connector, "kind": "options", "resource": resource})
         assert status == 404, (connector, resource, payload)
         assert param in payload["error"]
-
-
-def test_member_options_delegate_like_the_audience_options(monkeypatch):
-    """mailchimp imports its delegation by name; the pseudo-account fallback
-    (``connection_id: "mailchimp"``) resolves through it the same way."""
-    import plugins.mailchimp.plugin as mailchimp
-
-    seen = []
-    monkeypatch.setattr(mailchimp, "options_from_registry", _delegate_fake(seen))
-    _options("mailchimp", "mailchimp.members", event="abc123", connection_id="mailchimp")
-    assert seen[-1] == ("mailchimp.members", None, 5, {"list_id": "abc123"})
 
 
 # --- stored-trigger pickers: poll.triggers and schedule.triggers --------------

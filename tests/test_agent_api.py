@@ -558,7 +558,7 @@ def test_oauth_clients_roundtrip_over_bearer(monkeypatch):
     missing = agent_api.route(event({"client_id": "only-id"}), "PUT", "/api/agent/oauth-clients/google")
     assert missing["statusCode"] == 400
     unknown = agent_api.route(
-        event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/mailchimp",
+        event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/acme",
     )
     assert unknown["statusCode"] == 404
 

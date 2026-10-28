@@ -11,19 +11,15 @@ __all__ = ["hooks_deliveries", "hooks_delete", "hooks_delivery", "hooks_list", "
 
 
 def print_hook(item):
-    for key in ("hook_id", "kind", "url", "connection_id", "list_id", "description",
+    for key in ("hook_id", "kind", "url", "connection_id", "description",
                 "dedupe_path", "enabled", "created_by", "created_at",
                 "updated_at"):
         if item.get(key) not in (None, ""):
             print(f"{key}: {item[key]}")
-    if item.get("events"):
-        print(f"events: {', '.join(item['events'])}")
     if item.get("response"):
         print(f"response: {json.dumps(item['response'], sort_keys=True)}")
     if item.get("kind") == "telegram":
         print("secret header: x-telegram-bot-api-secret-token (managed by Telegram)")
-    elif item.get("kind") == "mailchimp":
-        print("auth: none — Mailchimp calls the unguessable URL directly")
     elif item.get("signed"):
         print(f"verification: signed — {item.get('signature_header') or 'x-dapier-signature'}: "
               "sha256=<hex HMAC-SHA256(secret, raw body)>")
@@ -86,13 +82,6 @@ def hooks_save(api_url, path, debug=False, sync_response=False):
         print(f"  Telegram delivery URL: {data.get('url')}")
         if data.get("connection_id"):
             print(f"  Bot connection: {data.get('connection_id')}")
-    elif data.get("kind") == "mailchimp":
-        # Mailchimp sends no auth headers — the unguessable URL is the
-        # credential — and the webhook registration was just (re)drawn with
-        # the stored Mailchimp API key, so no curl hint with a bearer token.
-        print(f"  Mailchimp delivery URL: {data.get('url')}")
-        if data.get("list_id"):
-            print(f"  Audience: {data.get('list_id')} — webhook registered on the list")
     else:
         print(f"  URL: {data.get('url')}")
         if data.get("signed"):

@@ -8,8 +8,7 @@ The connectors without a module of their own (renderer, custom) register
 their trigger sample discoveries here, next to the chip that offers them;
 provider connectors sample in their own plugin modules — zoom one
 documented payload per declared event, slack and youtube a live fetch with
-the history/synthetic fallback, mailchimp one payload per Mailchimp webhook
-type — and schedule and poll in connectors.schedule / connectors.poll — a
+the history/synthetic fallback — and schedule and poll in connectors.schedule / connectors.poll — a
 schedule fire is synthesized and a poll fire has a live fetch path, so
 each owns its sample.
 """

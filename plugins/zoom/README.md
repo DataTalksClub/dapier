@@ -260,7 +260,7 @@ Creating needs write access the find actions don't. Before using the action:
 
 The Settings field takes a Zoom meeting-settings JSON object (for example
 `join_before_host`, `waiting_room`); `{tokens}` expand inside it and literal
-braces double, exactly like Mailchimp merge fields.
+braces double.
 
 `zoom_find_meeting` can reach the same write path as find-or-create (Zapier's
 "Find or Create Meeting"): with **Create if missing** enabled, a topic search

@@ -145,7 +145,7 @@ def test_real_tree_loads_every_plugin():
     import src.dapier.connectors  # noqa: F401  (imports = core + load_all)
 
     manifests = plugins.load_all()
-    expected = {"slack", "rss", "mailchimp", "telegram", "dropbox", "aws", "zoom",
+    expected = {"slack", "rss", "telegram", "dropbox", "aws", "zoom",
                 "google"}
     assert expected <= set(manifests), set(manifests)
     for name in expected:
@@ -160,7 +160,6 @@ def test_real_tree_loads_every_plugin():
 
     # provider mappings fed from the manifests
     assert registry.PROVIDER_DISCOVERY_SOURCES["slack"] == ("slack",)
-    assert registry.PROVIDER_DISCOVERY_SOURCES["mailchimp"] == ("mailchimp",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["telegram"] == ("telegram",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["dropbox"] == ("dropbox",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["s3"] == ("s3",)
@@ -172,13 +171,13 @@ def test_real_tree_loads_every_plugin():
     assert registry.CONNECTION_TEST_ALIASES["s3"] == "aws"
 
     # actions: at least one per action-carrying plugin
-    for action in ("slack", "mailchimp_find_member", "telegram_send",
+    for action in ("slack", "telegram_send",
                    "dropbox_upload", "s3_upload", "zoom_create_meeting",
                    "sheets_append_row", "gmail_send", "youtube_upload_video"):
         assert action in registry.ACTIONS, action
 
     # poll sources
-    for source in ("slack.messages", "rss", "mailchimp.members",
+    for source in ("slack.messages", "rss",
                    "dropbox.files", "s3", "zoom.recordings",
                    "google-sheets.rows", "google-drive.files",
                    "google-calendar.events", "gmail.messages", "youtube.videos"):
@@ -187,11 +186,11 @@ def test_real_tree_loads_every_plugin():
     # connection tests and discoveries carry the connectors they did before
     # (aws registers its health check under the aws connector but its
     # bucket/object discoveries under s3, as before the move)
-    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "aws",
+    for connector_name in ("slack", "telegram", "dropbox", "aws",
                            "zoom", "google", "youtube"):
         assert any(test.connector == connector_name for test in
                    registry.connection_tests().values()), connector_name
-    for connector_name in ("slack", "mailchimp", "telegram", "dropbox", "s3",
+    for connector_name in ("slack", "telegram", "dropbox", "s3",
                            "zoom", "google-sheets", "youtube"):
         assert any(entry.connector == connector_name for entry in
                    registry.discoveries()), connector_name

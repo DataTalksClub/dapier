@@ -25,7 +25,7 @@ WEBHOOK_CONNECTOR = "webhook"
 # Hook kinds whose intake stamps ``data.hook`` on the events it publishes,
 # by the connector those events carry. YouTube rides a shared WebSub
 # callback keyed by channel, so its deliveries are not per-hook.
-HOOK_CONNECTORS = {"webhook": "webhook", "telegram": "telegram", "mailchimp": "mailchimp"}
+HOOK_CONNECTORS = {"webhook": "webhook", "telegram": "telegram"}
 # Run lookups are one GSI query per (delivery, matched workflow); a page
 # never pays for more than this many.
 MAX_RUN_LOOKUPS = 60
@@ -187,7 +187,7 @@ def delivery_view(event, *, with_runs=True, budget=None, detail=False):
     }
     if detail:
         view["headers"] = request.get("headers") or {}
-        # A webhook's payload is the caller's body; Telegram and Mailchimp
+        # A webhook's payload is the caller's body; Telegram
         # deliveries keep the parsed update as their event data.
         view["body"] = data.get("body") if event.get("connector") == WEBHOOK_CONNECTOR else data
         view["query"] = data.get("query") or {}
@@ -196,7 +196,7 @@ def delivery_view(event, *, with_runs=True, budget=None, detail=False):
 
 
 def api_deliveries(hook=None, limit=25, next_token=None, visible=None):
-    """Recent hook deliveries (webhook, Telegram, Mailchimp), newest
+    """Recent hook deliveries (webhook, Telegram), newest
     first, optionally for one hook."""
     hook = str(hook or "").strip() or None
     try:

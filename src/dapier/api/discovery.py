@@ -75,9 +75,9 @@ def _load(connection_id, connections_table):
 # record but resolves the same bucket discovery and STS health check
 # (registry.PROVIDER_DISCOVERY_SOURCES). The synthetic record carries no
 # credential_id, so s3's key resolution falls back to the default "aws"
-# credential. "mailchimp" resolves the stored Mailchimp API key the same
-# way, and "openrouter" the stored OpenRouter key behind the decision step.
-PSEUDO_CONNECTION_PROVIDERS = {"typefully": "typefully", "aws": "s3", "s3": "s3", "mailchimp": "mailchimp",
+# credential, and "openrouter" resolves the stored OpenRouter key behind the
+# decision step the same way.
+PSEUDO_CONNECTION_PROVIDERS = {"typefully": "typefully", "aws": "s3", "s3": "s3",
                                "openrouter": "openrouter"}
 
 

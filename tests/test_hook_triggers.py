@@ -1,4 +1,4 @@
-"""Tests for webhook, Telegram, and Mailchimp hook triggers."""
+"""Tests for webhook, Telegram, and YouTube hook triggers."""
 
 import json
 import os
@@ -60,37 +60,6 @@ class WebhookSaveTests(unittest.TestCase):
         self.assertGreaterEqual(len(payload["token"]), 32)
         self.assertEqual(payload["header"], "authorization")
         self.assertEqual(payload["auth_scheme"], "Bearer")
-
-    def test_mailchimp_kind_reserves_the_mailchimp_url(self):
-        body = dict(WEBHOOK_BODY, kind="mailchimp", list_id="abc123")
-        credential = patch("src.dapier.connections.credentials.get_credential",
-                           return_value={"apiKey": "abc123-us12"})
-        transport = lambda method, url, body=None, **kwargs: (200, b'{"id": "wh1"}')
-        credential.start()
-        self.addCleanup(credential.stop)
-        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks", "HOOKS_BASE_URL": "https://dapier.example.test"}):
-            status, payload = hook_triggers.api_save(body, "op", "mailchimp", table_ref=StubTable(),
-                                                     transport=transport)
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["url"], "https://dapier.example.test/hooks/mailchimp/orders")
-        self.assertEqual(payload["kind"], "mailchimp")
-        self.assertEqual(payload["list_id"], "abc123")
-        self.assertNotIn("warnings", payload)
-
-    def test_mailchimp_kind_accepts_webhook_response_semantics(self):
-        body = dict(WEBHOOK_BODY, kind="mailchimp", list_id="abc123",
-                    response={"mode": "ack"}, dedupe_path="data.email")
-        credential = patch("src.dapier.connections.credentials.get_credential",
-                           return_value={"apiKey": "abc123-us12"})
-        transport = lambda method, url, body=None, **kwargs: (200, b'{"id": "wh1"}')
-        credential.start()
-        self.addCleanup(credential.stop)
-        with patch.dict(os.environ, {"HOOK_TRIGGERS_TABLE": "hooks", "HOOKS_BASE_URL": "https://dapier.example.test"}):
-            status, payload = hook_triggers.api_save(body, "op", "mailchimp", table_ref=StubTable(),
-                                                     transport=transport)
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["dedupe_path"], "data.email")
-        self.assertNotIn("warnings", payload)
 
     def test_update_keeps_token_unless_rotated(self):
         stub = StubTable()
@@ -268,119 +237,6 @@ class TelegramSaveTests(unittest.TestCase):
         self.assertEqual(data["update"]["message"]["message_thread_id"], 547)
 
 
-class MailchimpTransport:
-    """Records every Marketing API call behind a mailchimp trigger's
-    lifecycle; answers GET listings with ``webhooks`` and mutations with a
-    created webhook id."""
-
-    def __init__(self, webhooks=None, status=200):
-        self.calls = []
-        self.webhooks = list(webhooks or [])
-        self.status = status
-
-    def __call__(self, method, url, headers=None, body=None, timeout=None):
-        self.calls.append((method, url, json.loads(body) if body else None))
-        payload = {"webhooks": self.webhooks} if method == "GET" else {"id": "wh1"}
-        return self.status, json.dumps(payload).encode()
-
-
-class MailchimpTriggerTests(unittest.TestCase):
-    BODY = {"name": "audience", "list_id": "abc123"}
-
-    def setUp(self):
-        self.env = patch.dict(os.environ, {
-            "HOOK_TRIGGERS_TABLE": "hooks",
-            "HOOKS_BASE_URL": "https://dapier.example.test",
-        })
-        self.env.start()
-        self.addCleanup(self.env.stop)
-        credential_patch = patch("src.dapier.connections.credentials.get_credential",
-                                 return_value={"apiKey": "abc123-us12"})
-        credential_patch.start()
-        self.addCleanup(credential_patch.stop)
-        self.transport = MailchimpTransport()
-
-    def methods(self):
-        return [(method, url) for method, url, _body in self.transport.calls]
-
-    def api_save(self, body, table=None, transport=None):
-        return hook_triggers.api_save(
-            body, "op", "mailchimp", table_ref=table or StubTable(),
-            transport=transport or self.transport)
-
-    def test_save_registers_the_audience_webhook_with_subscribed_types(self):
-        status, payload = self.api_save(dict(self.BODY, events=["subscribe"]))
-        self.assertEqual(status, 200)
-        self.assertNotIn("warnings", payload)
-        # the audience is listed (nothing stale to remove on a fresh save),
-        # then the callback URL is registered for exactly the subscribed types
-        self.assertEqual(self.methods(), [
-            ("GET", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks"),
-            ("POST", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks"),
-        ])
-        _method, _url, registered = self.transport.calls[-1]
-        self.assertEqual(registered["url"],
-                         "https://dapier.example.test/hooks/mailchimp/audience")
-        self.assertEqual(registered["events"], {
-            name: name == "subscribe" for name in hook_triggers.MAILCHIMP_EVENT_TYPES})
-        # no bearer hint: Mailchimp sends no auth headers
-        self.assertNotIn("header", payload)
-        self.assertNotIn("auth_scheme", payload)
-        self.assertEqual(payload["list_id"], "abc123")
-
-    def test_omitted_events_default_to_every_type(self):
-        _status, payload = self.api_save(dict(self.BODY))
-        self.assertEqual(payload["events"], list(hook_triggers.MAILCHIMP_EVENT_TYPES))
-        _method, _url, registered = self.transport.calls[-1]
-        self.assertTrue(all(registered["events"].values()))
-
-    def test_reregistration_replaces_a_stale_webhook_on_the_same_url(self):
-        self.transport.webhooks = [
-            {"id": "wh-old", "url": "https://dapier.example.test/hooks/mailchimp/audience"},
-            {"id": "wh-keep", "url": "https://example.test/someone-else"},
-        ]
-        status, payload = self.api_save(dict(self.BODY, events=["cleaned"]))
-        self.assertEqual(status, 200)
-        self.assertNotIn("warnings", payload)
-        self.assertEqual(self.methods(), [
-            ("GET", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks"),
-            ("DELETE", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks/wh-old"),
-            ("POST", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks"),
-        ])
-
-    def test_disable_and_delete_unsubscribe_from_mailchimp(self):
-        stub = StubTable()
-        self.api_save(dict(self.BODY), table=stub)
-        self.transport.webhooks = [
-            {"id": "wh1", "url": "https://dapier.example.test/hooks/mailchimp/audience"}]
-        self.transport.calls.clear()
-        status, payload = self.api_save(dict(self.BODY, enabled=False), table=stub)
-        self.assertEqual(status, 200)
-        self.assertNotIn("warnings", payload)
-        self.assertEqual(self.methods(), [
-            ("GET", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks"),
-            ("DELETE", "https://us12.api.mailchimp.com/3.0/lists/abc123/webhooks/wh1"),
-        ])
-
-        self.transport.calls.clear()
-        status, payload = hook_triggers.api_delete("audience", "op", table_ref=stub,
-                                                   transport=self.transport)
-        self.assertEqual(status, 200)
-        self.assertTrue(payload["ok"])
-        self.assertNotIn("warnings", payload)
-        self.assertEqual([method for method, _url in self.methods()], ["GET", "DELETE"])
-        self.assertEqual(stub.items, {})
-
-    def test_a_mailchimp_outage_warns_but_the_save_lands(self):
-        stub = StubTable()
-        status, payload = self.api_save(dict(self.BODY), table=stub,
-                                        transport=MailchimpTransport(status=500))
-        self.assertEqual(status, 200)
-        self.assertEqual(len(payload.get("warnings") or []), 1)
-        self.assertIn("registration failed", payload["warnings"][0])
-        self.assertIn("audience", stub.items)
-
-
 class HubTransport:
     """Records every WebSub hub call behind a youtube trigger's save."""
 
@@ -396,8 +252,7 @@ class HubTransport:
 
 class YouTubeSaveTests(unittest.TestCase):
     """Subscribe-on-save for youtube hook triggers: saving subscribes the
-    watched channel on the WebSub hub (best-effort, mirroring Mailchimp's
-    lifecycle), disabling/deleting never unsubscribes (the hub callback is
+    watched channel on the WebSub hub (best-effort), disabling/deleting never unsubscribes (the hub callback is
     shared by every watcher of the channel), and the stored trigger's
     workflow matches the hub's channel-scoped deliveries."""
 

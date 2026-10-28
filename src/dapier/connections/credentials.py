@@ -8,7 +8,6 @@ CREDENTIAL_SPECS = {
     "typefully": {"credential_id": "typefully", "fields": ("api_key",)},
     "taskdeck": {"credential_id": "taskdeck", "fields": ("token",)},
     "slack": {"credential_id": "slack", "fields": ("token",)},
-    "mailchimp": {"credential_id": "mailchimp", "fields": ("api_key",)},
     "aws": {"credential_id": "aws", "fields": ("access_key_id", "secret_access_key")},
     "openrouter": {"credential_id": "openrouter", "fields": ("api_key",)},
 }
@@ -169,15 +168,10 @@ def api_save_credential(provider, body):
         if not isinstance(api_key, str) or not re.fullmatch(r"[!-~]{20,2048}", api_key.strip()):
             return 400, {"error": "Enter a valid Typefully API key"}
         secret_value = {"api_key": api_key.strip()}
-    elif provider == "openrouter":
+    else:
         api_key = str(body.get("api_key", "")).strip()
         if not re.fullmatch(r"sk-or-[A-Za-z0-9_-]{20,}", api_key):
             return 400, {"error": "Enter a valid OpenRouter API key (sk-or-...)"}
         secret_value = {"api_key": api_key}
-    else:
-        api_key = str(body.get("api_key", "")).strip()
-        if not re.fullmatch(r"[A-Za-z0-9_-]{20,}-us\d{1,3}", api_key):
-            return 400, {"error": "Enter a valid Mailchimp API key"}
-        secret_value = {"apiKey": api_key, "server": api_key.rsplit("-", 1)[1]}
     put_credential(spec["credential_id"], secret_value, provider=provider)
     return 200, {"provider": provider, "configured": True}

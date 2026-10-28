@@ -16,7 +16,6 @@ registry (`registry.ACTIONS / DISCOVERIES / CONNECTION_TESTS`,
 | dropbox | ✅ (`dropbox.py`) | dropbox | |
 | slack | ✅ (`slack.py`) | slack | token provider |
 | telegram | ✅ (`telegram.py`) | telegram | token provider |
-| mailchimp | ✅ (`mailchimp.py`) | mailchimp | credential, not a connection record — pseudo-connection |
 | aws | ✅ (`s3.py`, key `aws`, alias `s3`→`aws`) | s3 | credential, not a connection record — pseudo-connection |
 
 `PROVIDER_DISCOVERY_SOURCES` covers every provider; every discovery
@@ -45,7 +44,6 @@ console Credentials "test" (`views/connections.js`). Discovery endpoints
 | gmail.labels | **browse-only** |
 | google-calendar.events | **browse-only** (a calendar's events) |
 | s3.buckets / s3.objects | `s3_upload`, `s3_find`, `s3_list_objects`, `s3_read_object`, `s3_delete_object`, `s3_presign_url` (bucket → key cascade; objects takes an optional `prefix` param), `render_html_to_pdf.output_bucket` |
-| mailchimp.audiences / mailchimp.members | all five member actions (`upsert`, `find`, `tag`, `unsubscribe`, `remove`): `list_id` from audiences, `email` from members (scoped by the picked `list_id`) |
 | youtube.videos | `youtube_add_to_playlist.video_id`, `youtube_update_video.video_id` |
 | youtube.playlists | `youtube_add_to_playlist.playlist_id`, `youtube_find_playlist_items.playlist_id` |
 | youtube.playlist_items | **browse-only** (the `youtube_find_playlist_items` data source) |
@@ -89,14 +87,14 @@ registry — `tests/test_designer_pickers.py` green; bundle
 
 ## Triggers: 17/18 palette connectors have sample discovery
 
-18 palette connectors (ai, custom, dropbox, email, gmail, google-calendar,
-google-drive, google-sheets, mailchimp, poll, renderer, rss, s3, schedule,
-slack, telegram, youtube, zoom) declare 43 events. 17 register
+17 palette connectors (ai, custom, dropbox, email, gmail, google-calendar,
+google-drive, google-sheets, poll, renderer, rss, s3, schedule,
+slack, telegram, youtube, zoom) declare 36 events. 17 register
 `TriggerDiscovery(kind="sample")`, live where the provider allows (slack:
 the newest channel message, delivery-shaped via
 `triggers.intake.slack_events.event_data`), else history-first with
 synthetic fallback — and multi-event connectors (dropbox, zoom, email,
-google-drive, s3, telegram, slack, mailchimp) serve one documented payload
+google-drive, s3, telegram, slack) serve one documented payload
 per declared event. `ai` is action-side only (`ai_complete`): it declares
 no events and needs no sample. Field options (`kind="options"`): all 28
 registry discovery resources plus `poll.triggers` / `schedule.triggers`
@@ -221,8 +219,8 @@ The factual sections above were regenerated from a fresh
 `.tmp/coverage-audit/registry_dump.json` (105 actions, 18 trigger
 connectors, 28 discovery resources, 8 connection tests, 49 trigger
 discoveries). Since round 8 the connectors grew the google-calendar and
-gmail resources (browse-only `google-calendar.events`, `gmail.labels`),
-mailchimp member actions, and the slack message-timestamp pickers — the
+gmail resources (browse-only `google-calendar.events`, `gmail.labels`)
+and the slack message-timestamp pickers — the
 resource table and the no-hint action list now say exactly that. The
 75/105 hint split and the four browse-only resources are the only
 remaining follow-ups worth naming, and both are deliberate.

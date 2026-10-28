@@ -117,13 +117,13 @@ def test_a_delivery_carries_its_request_record_beside_unchanged_data(env):
 
 def test_inbox_list_filters_by_hook_across_connectors(env):
     for hook_id, connector in (("orders", "webhook"), ("refunds", "webhook"), ("bot", "telegram"),
-                               ("audience", "mailchimp"), ("x", "email")):
+                               ("audience", "webhook"), ("x", "email")):
         inbox.record({"id": f"e-{hook_id}", "connector": connector, "event": "e",
                       "source": "list-1", "data": {"hook": hook_id}}, table_ref=env["inbox"])
     _, payload = inbox.api_list("webhook", hook="refunds", table_ref=env["inbox"])
     assert [event["inbox_id"] for event in payload["events"]] == ["e-refunds"]
     assert payload["paging"]["filtered"] is True
-    _, payload = inbox.api_list(("webhook", "telegram", "mailchimp"), table_ref=env["inbox"])
+    _, payload = inbox.api_list(("webhook", "telegram"), table_ref=env["inbox"])
     assert len(payload["events"]) == 4
     _, payload = inbox.api_list(None, hook="audience", table_ref=env["inbox"])
     assert [event["inbox_id"] for event in payload["events"]] == ["e-audience"]

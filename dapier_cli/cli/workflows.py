@@ -114,7 +114,7 @@ def register(sub):
     wf_sample_p = wf_sub.add_parser(
         "sample", help="Pull a sample of what a flow receives when it starts")
     wf_sample_p.add_argument("connector", nargs="?", default=None,
-                             help="e.g. custom, dataops, dropbox, email, mailchimp, poll, "
+                             help="e.g. custom, dataops, dropbox, email, poll, "
                                   "renderer, schedule, telegram, webhook, youtube, zoom")
     wf_sample_p.add_argument("--workflow", default=None,
                              help="Workflow id: print its newest run's recorded "

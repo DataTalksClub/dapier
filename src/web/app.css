@@ -1851,7 +1851,7 @@ section[data-pending="true"]:not(.view) > :not(.section-head):not(.section-loadi
 /* --- mobile: service credential names keep whole words (<=560) --------------------
    Service credential rows carry a third control (the row menu): the name
    wraps on whole words and the row buttons shrink a step, so a single-word
-   name like Mailchimp never breaks mid-word at 375. Scoped to phones - the
+   name like OpenRouter never breaks mid-word at 375. Scoped to phones - the
    same two rules sat below every media query (83ce6d4) and shrank the setup
    tables' buttons on desktop too. */
 @media (max-width: 560px) {

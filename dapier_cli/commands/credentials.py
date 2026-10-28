@@ -7,7 +7,7 @@ from .. import api
 __all__ = ["credentials_set"]
 
 
-CREDENTIAL_FIELDS = {"typefully": ["api_key"], "taskdeck": ["token"], "slack": ["token"], "mailchimp": ["api_key"],
+CREDENTIAL_FIELDS = {"typefully": ["api_key"], "taskdeck": ["token"], "slack": ["token"],
                      "aws": ["access_key_id", "secret_access_key"],
                      "openrouter": ["api_key"]}
 

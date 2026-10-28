@@ -854,82 +854,6 @@ export const actionCatalog: ActionEntry[] = [
     ]
   },
   {
-    type: "mailchimp_find_member",
-    label: "Mailchimp: find member",
-    icon: MailLogo,
-    description: "Find one audience member by email. Output: {found, member}; a miss is {found: false, member: null} — or, with Create if missing on, the member is created and the output reports created: true.",
-    fields: [
-      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
-      { key: "list_id", label: "Audience", required: true,
-        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
-      { key: "email", label: "Email", placeholder: "{sender}", required: true,
-        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } },
-      { key: "create_if_missing", label: "Create if missing", type: "boolean", default: "false" },
-      { key: "status", label: "Status if new", type: "select",
-        options: ["subscribed", "pending", "unsubscribed", "cleaned"], default: "subscribed",
-        placeholder: "only used when Create if missing is on" },
-      { key: "merge_fields", label: "Merge fields (JSON)",
-        placeholder: '{"FNAME": "{name}"} — only used when Create if missing is on' }
-    ]
-  },
-  {
-    type: "mailchimp_upsert_member",
-    label: "Mailchimp",
-    icon: MailLogo,
-    description: "Add or update one audience member: Status applies to new members; merge fields are a JSON object.",
-    fields: [
-      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
-      { key: "list_id", label: "Audience", required: true,
-        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
-      { key: "email", label: "Email", placeholder: "{sender}", required: true,
-        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } },
-      { key: "status", label: "Status if new", type: "select",
-        options: ["subscribed", "pending", "unsubscribed", "cleaned"], default: "subscribed" },
-      { key: "merge_fields", label: "Merge fields (JSON)", placeholder: '{"FNAME": "{name}"}' }
-    ]
-  },
-  {
-    type: "mailchimp_remove_member",
-    label: "Mailchimp: remove member",
-    icon: MailLogo,
-    description: "Permanently remove one audience member by email. A missing email is not an error: the output is {removed: false} — guard with find member when the difference matters.",
-    fields: [
-      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
-      { key: "list_id", label: "Audience", required: true,
-        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
-      { key: "email", label: "Email", placeholder: "{sender}", required: true,
-        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } }
-    ]
-  },
-  {
-    type: "mailchimp_unsubscribe_member",
-    label: "Mailchimp: unsubscribe member",
-    icon: MailLogo,
-    description: "Unsubscribe one audience member by email — reversible: the member stays on the audience with status unsubscribed, unlike the permanent remove. A missing email is not an error: the output is {unsubscribed: false}.",
-    fields: [
-      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
-      { key: "list_id", label: "Audience", required: true,
-        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
-      { key: "email", label: "Email", placeholder: "{sender}", required: true,
-        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } }
-    ]
-  },
-  {
-    type: "mailchimp_tag_member",
-    label: "Mailchimp: tag member",
-    icon: MailLogo,
-    description: "Add or remove one tag on an audience member: Add applies the tag, Remove sets it inactive. The member must exist — upsert it first when unsure.",
-    fields: [
-      { key: "credential_id", label: "Credential ID", placeholder: "mailchimp (default)" },
-      { key: "list_id", label: "Audience", required: true,
-        discover: { resource: "audiences", account: "mailchimp", value: "{id}" } },
-      { key: "email", label: "Email", placeholder: "{sender}", required: true,
-        discover: { resource: "members", params: { list_id: "list_id" }, account: "mailchimp", value: "{email}" } },
-      { key: "tag", label: "Tag", placeholder: "digest-readers", required: true },
-      { key: "tag_action", label: "Operation", type: "select", options: ["add", "remove"], default: "add" }
-    ]
-  },
-  {
     type: "drive_find_file",
     label: "Drive: find file",
     icon: FileText,
@@ -1857,7 +1781,6 @@ export const connectorCatalog: ConnectorEntry[] = [
   { name: "zoom", label: "Zoom", logo: Video, events: ["recording.completed", "recording.transcript_completed", "meeting.started", "meeting.ended", "meeting.registration_created", "webinar.started", "webinar.ended", "webinar.registration_created"] },
   { name: "slack", label: "Slack", logo: SlackLogo, events: ["message.received", "app.mention", "reaction.added", "member.joined"] },
   { name: "telegram", label: "Telegram", logo: TelegramLogo, events: ["message.received", "channel_post.received", "callback_query.received"] },
-  { name: "mailchimp", label: "Mailchimp", logo: MailLogo, events: ["subscribe", "unsubscribe", "profile", "upemail", "cleaned", "campaign", "member.new"] },
   { name: "google-sheets", label: "Google Sheets", logo: SheetsLogo, events: ["row.new", "row.updated"] },
   { name: "google-drive", label: "Google Drive", logo: Folder, events: ["file.created", "file.updated", "file.deleted"] },
   { name: "google-calendar", label: "Google Calendar", logo: Calendar, events: ["event.new"] },
@@ -1889,13 +1812,6 @@ export const connectorEventInfo: Record<string, [label: string, description: str
   "google-drive/file.deleted": ["File deleted", "A file is removed from the watched Drive folder"],
   "google-sheets/row.new": ["Row added", "A new row appears in the watched worksheet"],
   "google-sheets/row.updated": ["Row changed", "An existing row in the watched worksheet is edited"],
-  "mailchimp/subscribe": ["Subscribed", "Someone joins the audience"],
-  "mailchimp/unsubscribe": ["Unsubscribed", "Someone leaves the audience"],
-  "mailchimp/profile": ["Profile updated", "A subscriber changes their profile fields"],
-  "mailchimp/upemail": ["Email changed", "A subscriber changes their email address"],
-  "mailchimp/cleaned": ["Address cleaned", "Mailchimp removes an address that keeps bouncing"],
-  "mailchimp/campaign": ["Campaign sent", "A campaign is sent to the audience"],
-  "mailchimp/member.new": ["New member (poll)", "A polled audience lists a member not seen before"],
   "poll/item.new": ["New item", "A polled API returns an item not seen before"],
   "renderer/job.completed": ["Render finished", "A renderer job finished and its output is ready"],
   "rss/item.new": ["New feed item", "The feed publishes an entry not seen before"],
@@ -2038,7 +1954,6 @@ const appPrefixes: Array<[RegExp, string]> = [
   [/^email(_|$)/, "email"],
   [/^dropbox(_|$)/, "dropbox"],
   [/^s3(_|$)/, "s3"],
-  [/^mailchimp(_|$)/, "mailchimp"],
   [/^drive(_|$)/, "google-drive"],
   [/^youtube(_|$)/, "youtube"],
   [/^calendar(_|$)/, "google-calendar"],

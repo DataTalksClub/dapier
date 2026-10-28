@@ -64,11 +64,10 @@ function outcomeLine(row) {
   return outcomeCell(key, { error: deliveryError(row), note: key === 'filtered' ? 'Did not pass the workflow filters' : '' });
 }
 
-const KIND_LABEL = { webhook: 'Webhook', telegram: 'Telegram', mailchimp: 'Mailchimp', youtube: 'YouTube' };
+const KIND_LABEL = { webhook: 'Webhook', telegram: 'Telegram', youtube: 'YouTube' };
 
 function verification(hook) {
   if (hook.kind === 'telegram') return 'Telegram secret token, managed for you';
-  if (hook.kind === 'mailchimp') return 'Unguessable URL (Mailchimp sends no credentials)';
   if (hook.kind === 'youtube') return 'Hub signature on the shared YouTube callback';
   if (hook.signed) return `Signed: HMAC-SHA256 of the body in ${hook.signature_header || 'x-dapier-signature'}`;
   return 'Bearer token in the authorization header';
@@ -81,7 +80,7 @@ function formatSize(bytes) {
 
 function responseLabel(row) {
   if (row.response_status) return `<span class="mono">${escapeHtml(row.response_status)}</span>`;
-  // Telegram and Mailchimp answers are fixed by the intake; only webhook
+  // Telegram answers are fixed by the intake; only webhook
   // requests record theirs.
   return '<span class="muted-cell">—</span>';
 }
@@ -241,7 +240,7 @@ export function renderHooks() {
 
 function headersBlock(headers) {
   const entries = Object.entries(headers || {}).sort(([a], [b]) => a.localeCompare(b));
-  if (!entries.length) return '<p class="detail-muted">Not recorded for this delivery (Telegram and Mailchimp requests, and deliveries from before the log kept headers).</p>';
+  if (!entries.length) return '<p class="detail-muted">Not recorded for this delivery (Telegram requests, and deliveries from before the log kept headers).</p>';
   return `<dl class="hook-headers">${entries.map(([key, value]) =>
     `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>`;
 }
@@ -428,7 +427,6 @@ function openHookDialog(hook) {
   form.kind.value = hook ? (hook.kind || 'webhook') : 'webhook';
   form.kind.disabled = Boolean(hook); // a kind change would orphan the URL
   form.connection_id.value = hook ? (hook.connection_id || '') : '';
-  form.list_id.value = hook ? (hook.list_id || '') : '';
   form.description.value = hook ? (hook.description || '') : '';
   form.dedupe_path.value = hook ? (hook.dedupe_path || '') : '';
   const response = hook ? (hook.response || {}) : {};
@@ -451,7 +449,6 @@ function openHookDialog(hook) {
   $('#hook-secret-field').hidden = form.kind.value !== 'webhook';
   form.enabled.checked = hook ? Boolean(hook.enabled) : true;
   $('#hook-connection-field').hidden = form.kind.value !== 'telegram';
-  $('#hook-list-field').hidden = form.kind.value !== 'mailchimp';
   $('#hook-dialog').showModal();
   if (!hook) form.name.focus();
 }
@@ -464,7 +461,6 @@ $('#hook-send-test').addEventListener('click', () => openTest(null));
 
 $('#hook-form').elements.kind.addEventListener('change', (event) => {
   $('#hook-connection-field').hidden = event.currentTarget.value !== 'telegram';
-  $('#hook-list-field').hidden = event.currentTarget.value !== 'mailchimp';
   $('#hook-response-field').hidden = event.currentTarget.value === 'telegram';
   $('#hook-secret-field').hidden = event.currentTarget.value !== 'webhook';
 });
@@ -501,7 +497,6 @@ $('#hook-form').addEventListener('submit', async (event) => {
           body.signature_header = form.signature_header.value.trim().toLowerCase();
         }
       }
-      if (body.kind === 'mailchimp') body.list_id = form.list_id.value.trim();
       const response = { mode: form.response_mode.value };
       if (response.mode === 'sync' && form.response_template.value.trim()) {
         try { response.template = JSON.parse(form.response_template.value); } catch (_) { throw new Error('Response template must be valid JSON'); }
@@ -512,7 +507,7 @@ $('#hook-form').addEventListener('submit', async (event) => {
     $('#hook-dialog').close();
     const warnings = saved.warnings || [];
     notice(`Saved hook ${body.name}. It is live immediately.`
-      + (warnings.length ? ` Mailchimp warning: ${warnings.join(' ')}` : ''));
+      + (warnings.length ? ` Warning: ${warnings.join(' ')}` : ''));
     await refreshHooks();
   } catch (error) {
     $('#hook-error').textContent = error.message;
@@ -535,9 +530,7 @@ async function deleteHook(button) {
   if (!hook) return;
   const message = hook.kind === 'telegram'
     ? 'The bot stops forwarding updates and the trigger is removed.'
-    : hook.kind === 'mailchimp'
-      ? 'Its webhook subscription is removed from the Mailchimp audience and the trigger is deleted.'
-      : 'Callers using the hook URL are rejected and the token stops working.';
+    : 'Callers using the hook URL are rejected and the token stops working.';
   if (!await confirmDelete(`Delete ${hook.kind || 'webhook'} hook ${hook.hook_id}?`, message)) return;
   button.disabled = true;
   try {

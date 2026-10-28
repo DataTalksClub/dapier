@@ -399,7 +399,7 @@ DECISIONS_PATH = "/api/alpha/decisions"
 # Unlike ai_complete's env-configured endpoint, the decisions endpoint is
 # OpenRouter's own — so its key is not env but a dapier credential: the
 # stored ``openrouter`` credential (console Credentials tab / `dapier
-# credentials set openrouter`), the same store behind the slack/mailchimp/aws
+# credentials set openrouter`), the same store behind the slack/aws
 # secrets.
 OPENROUTER_CREDENTIAL_ID = "openrouter"
 

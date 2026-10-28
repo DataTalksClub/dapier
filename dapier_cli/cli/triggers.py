@@ -15,7 +15,7 @@ def register(sub):
     trig_sample_p = trig_sub.add_parser(
         "sample", help="Pull a sample event for a trigger connector, or a workflow's last trigger input")
     trig_sample_p.add_argument("connector", nargs="?", default=None,
-                               help="e.g. custom, dataops, dropbox, email, mailchimp, poll, "
+                               help="e.g. custom, dataops, dropbox, email, poll, "
                                     "renderer, schedule, telegram, webhook, youtube, zoom")
     trig_sample_p.add_argument("--workflow", default=None,
                                help="Workflow id: print its newest run's recorded "

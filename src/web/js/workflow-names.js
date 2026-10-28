@@ -52,7 +52,7 @@ export function workflowLabelHtml(id, fallback = 'Run') {
 const APP_PREFIXES = [
   [/^slack(_|$)/, 'slack'], [/^telegram(_|$)/, 'telegram'], [/^gmail(_|$)/, 'gmail'],
   [/^email(_|$)/, 'email'], [/^dropbox(_|$)/, 'dropbox'], [/^s3(_|$)/, 's3'],
-  [/^mailchimp(_|$)/, 'mailchimp'], [/^drive(_|$)/, 'google-drive'], [/^youtube(_|$)/, 'youtube'],
+  [/^drive(_|$)/, 'google-drive'], [/^youtube(_|$)/, 'youtube'],
   [/^calendar(_|$)/, 'google-calendar'], [/^sheets(_|$)/, 'google-sheets'], [/^zoom(_|$)/, 'zoom'],
 ];
 /* Steps that shape data rather than reach an app: no tile of their own
@@ -65,7 +65,7 @@ const GOOGLE = new Set(['gmail', 'google-drive', 'google-sheets', 'google-calend
 /* Family stroke icons for app-less steps and triggers (icons.js names);
    anything else gets the neutral plug. */
 const GLYPHS = {
-  webhook: 'webhook', custom: 'webhook', email: 'mail', mailchimp: 'mail', schedule: 'clock',
+  webhook: 'webhook', custom: 'webhook', email: 'mail', schedule: 'clock',
   poll: 'refresh-cw', agent: 'bot', code: 'code-2', js: 'code-2', dataops: 'database',
   s3: 'database', renderer: 'file-text', render_html_to_pdf: 'file-text', run_workflow: 'workflow',
 };

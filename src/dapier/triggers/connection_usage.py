@@ -8,7 +8,7 @@ connection that live definitions still point at. Two sources count:
 
 - published workflow definitions — any ``connection_id`` anywhere in the
   stored workflow (trigger config, actions, designer flow nodes);
-- hook triggers (Telegram bots, Mailchimp) that bind a connection id.
+- hook triggers (Telegram bots) that bind a connection id.
 
 Drafts and version records never count: only live definitions do, the same
 set the engine merges.

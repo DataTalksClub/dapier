@@ -570,7 +570,7 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     events = [_view(item) for item in items]
     if connector:
         # One connector, or a family of them (the hook delivery log reads
-        # webhook, telegram and mailchimp rows together).
+        # webhook and telegram rows together).
         wanted = (connector,) if isinstance(connector, str) else tuple(connector)
         events = [event for event in events if event.get("connector") in wanted]
     if hook:

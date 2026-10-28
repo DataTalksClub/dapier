@@ -9,7 +9,6 @@ const PROVIDERS = {
   typefully: { name: 'Typefully', fields: [{ key: 'api_key', label: 'API key' }] },
   taskdeck: { name: 'Taskdeck status', fields: [{ key: 'token', label: 'Bearer token' }] },
   slack: { name: 'Slack bot', fields: [{ key: 'token', label: 'Bot token' }] },
-  mailchimp: { name: 'Mailchimp', fields: [{ key: 'api_key', label: 'API key' }] },
   aws: { name: 'AWS', fields: [
     { key: 'access_key_id', label: 'Access key ID' },
     { key: 'secret_access_key', label: 'Secret access key' },
@@ -18,7 +17,7 @@ const PROVIDERS = {
 };
 
 /* Credential-backed providers with a health check (pseudo connections). */
-const TESTABLE = new Set(['mailchimp', 'aws', 'openrouter', 'typefully']);
+const TESTABLE = new Set(['aws', 'openrouter', 'typefully']);
 
 function providerName(provider) {
   if (PROVIDERS[provider]) return PROVIDERS[provider].name;

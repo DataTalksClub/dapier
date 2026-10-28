@@ -1,4 +1,4 @@
-"""Zapier-style webhook, Telegram, Mailchimp and YouTube triggers: reserve a
+"""Zapier-style webhook, Telegram and YouTube triggers: reserve a
 delivery URL and bind the provider.
 
 Creating a webhook trigger reserves ``/hooks/webhook/{name}`` and generates
@@ -24,20 +24,9 @@ Creating a Telegram trigger binds one Telegram bot connection to
 ``X-Telegram-Bot-Api-Secret-Token`` on every update. Telegram keeps a single
 webhook per bot, so one connection can drive at most one trigger.
 
-Creating a Mailchimp trigger binds an audience (``list_id``) to
-``/hooks/mailchimp/{name}``: Dapier subscribes the delivery URL on the
-audience with Mailchimp's ``POST /lists/{id}/webhooks`` (authenticated with
-the stored Mailchimp API key, the connection's or the shared ``mailchimp``
-credential) for the trigger's subscribed event types. Mailchimp answers the
-registration with a ``ping`` POST, which the intake answers 200 without
-publishing. Unlike Telegram, Mailchimp has no delete-by-URL: unregistering
-lists the audience's webhooks, finds ours by URL, and deletes it by id. Both
-directions are best-effort: a Mailchimp failure never fails the local save or
-delete — it comes back as a ``warnings`` list in the response instead.
-
 Creating a YouTube trigger binds a channel (``channel_id``): Dapier
-subscribes the channel on the WebSub hub right away (best-effort, like
-Mailchimp a failure warns instead of blocking the save) and the renewal
+subscribes the channel on the WebSub hub right away (best-effort: a
+failure warns instead of blocking the save) and the renewal
 schedule keeps the subscription alive. YouTube delivers new uploads to the
 deployment's shared ``/hooks/youtube`` callback — verified against the hub
 secret — so the trigger's own ``/hooks/youtube/{name}`` URL is its stored
@@ -65,7 +54,6 @@ import secrets
 from datetime import datetime, timezone
 
 from ..connections.providers import telegram_api
-from .intake.mailchimp_webhooks import EVENT_TYPES as MAILCHIMP_EVENT_TYPES
 
 logger = logging.getLogger(__name__)
 from .email_triggers import NAME_PATTERN, TriggerError
@@ -74,7 +62,7 @@ from .dynamo import decode_numbers, scan_all
 TABLE_ENV = "HOOK_TRIGGERS_TABLE"
 BASE_URL_ENV = "HOOKS_BASE_URL"
 
-KINDS = ("webhook", "telegram", "mailchimp", "youtube")
+KINDS = ("webhook", "telegram", "youtube")
 WEBHOOK_EVENT = "request.received"
 TELEGRAM_EVENT = "message.received"
 # Channel announcements (the Bot API's channel_post / edited_channel_post
@@ -393,34 +381,6 @@ def response_budget(item):
     return max(RESPONSE_BUDGET_BOUNDS[0], min(value, RESPONSE_BUDGET_BOUNDS[1]))
 
 
-def validate_mailchimp_events(value, previous=None):
-    """The validated subscribed-event list for a mailchimp trigger.
-
-    Any of the intake's event types (the set Mailchimp POSTs); the default —
-    and an omitted or empty list on a create — is all of them. On an edit the
-    stored list survives an omitted ``events``, mirroring how the Telegram
-    binding keeps its ``connection_id``.
-    """
-    if value is None:
-        value = (previous or {}).get("events")
-    if value is None:
-        return list(MAILCHIMP_EVENT_TYPES)
-    if not isinstance(value, list) or not value:
-        raise TriggerError(
-            "events must be a list of mailchimp webhook types: "
-            f"{', '.join(MAILCHIMP_EVENT_TYPES)}")
-    events = []
-    for entry in value:
-        name = str(entry or "").strip().lower()
-        if name not in MAILCHIMP_EVENT_TYPES:
-            raise TriggerError(
-                f"unknown mailchimp event '{entry}'; subscribed types: "
-                f"{', '.join(MAILCHIMP_EVENT_TYPES)}")
-        if name not in events:
-            events.append(name)
-    return events or list(MAILCHIMP_EVENT_TYPES)
-
-
 def build_item(body, operator, kind, previous=None):
     """Build the stored item for a create or edit.
 
@@ -465,14 +425,6 @@ def build_item(body, operator, kind, previous=None):
         if not connection_id:
             raise TriggerError("a telegram trigger requires the connection_id of a Telegram bot connection")
         item["connection_id"] = connection_id
-    elif kind == "mailchimp":
-        list_id = str(body.get("list_id") or previous.get("list_id") or "").strip()
-        if not list_id:
-            raise TriggerError("a mailchimp trigger requires the list_id of the audience to watch")
-        item["list_id"] = list_id
-        item["events"] = validate_mailchimp_events(body.get("events"), previous)
-        item["connection_id"] = str(
-            body.get("connection_id") or previous.get("connection_id") or "").strip()
     elif kind == "youtube":
         channel_id = str(body.get("channel_id") or previous.get("channel_id") or "").strip()
         if not channel_id:
@@ -613,11 +565,6 @@ def _telegram_connection(connection_id, connections_table):
     return _connected_connection(connection_id, connections_table, "telegram")
 
 
-def _mailchimp_connection(connection_id, connections_table):
-    """Load the connection a mailchimp trigger binds to, verifying it fits."""
-    return _connected_connection(connection_id, connections_table, "mailchimp")
-
-
 def _telegram_connection_token(connection, connections_table):
     """The stored bot token for a connection, from the credentials store."""
     from ..connections.credentials import get_credential
@@ -664,70 +611,6 @@ def _unregister_telegram(item, *, connections_table=None, transport=None):
         pass
 
 
-def _mailchimp_api_settings(item, connections_table):
-    """The (api_key, server) pair behind a mailchimp trigger: the bound
-    connection's stored credential, else the shared ``mailchimp`` credential
-    (the same resolution the connector's audience fetchers use)."""
-    from ..connections.providers.mailchimp_api import stored_settings
-
-    connection = {}
-    if item.get("connection_id"):
-        connection = _mailchimp_connection(item["connection_id"], connections_table)
-    try:
-        return stored_settings(connection)
-    except RuntimeError as exc:
-        raise TriggerError(str(exc)) from None
-
-
-def _register_mailchimp(item, *, connections_table=None, transport=None):
-    """Subscribe the trigger's callback URL on its audience. Best-effort:
-    returns a warning for the save response instead of raising, so a
-    Mailchimp outage or a missing stored key never fails the local save —
-    the trigger stays live for local merging and the operator sees what did
-    not land remotely. Mailchimp webhooks are per-audience and additive, so
-    registration first removes any webhook already registered under this
-    trigger's URL (it may carry stale subscribed types), then posts the
-    current one."""
-    from ..connections.providers import mailchimp_api as mailchimp_connector
-
-    try:
-        api_key, server = _mailchimp_api_settings(item, connections_table)
-        for entry in mailchimp_connector.list_webhooks(
-                item["list_id"], api_key, server, transport=transport):
-            if entry.get("url") == item["url"]:
-                mailchimp_connector.delete_webhook(
-                    item["list_id"], entry.get("id"), api_key, server, transport=transport)
-        mailchimp_connector.register_webhook(
-            item["list_id"], item["url"],
-            {name: name in item["events"] for name in MAILCHIMP_EVENT_TYPES},
-            api_key, server, transport=transport)
-    except Exception as exc:
-        return f"the trigger saved, but Mailchimp webhook registration failed: {exc}"
-    return None
-
-
-def _unregister_mailchimp(item, *, connections_table=None, transport=None):
-    """Best-effort unsubscribe of the trigger's callback URL: Mailchimp has
-    no delete-by-URL, so the audience's webhooks are listed, ours is found by
-    URL, and deleted by id. Returns a warning for the response, or None when
-    the registration is gone — every failure logs and continues, since the
-    trigger is gone either way and Mailchimp must never block its deletion."""
-    from ..connections.providers import mailchimp_api as mailchimp_connector
-
-    try:
-        api_key, server = _mailchimp_api_settings(item, connections_table)
-        for entry in mailchimp_connector.list_webhooks(
-                item["list_id"], api_key, server, transport=transport):
-            if entry.get("url") == item["url"]:
-                mailchimp_connector.delete_webhook(
-                    item["list_id"], entry.get("id"), api_key, server, transport=transport)
-    except Exception as exc:
-        logger.warning("mailchimp trigger '%s': leaving its webhook registered (%s)",
-                       item.get("hook_id"), exc)
-        return f"Mailchimp webhook removal failed: {exc}"
-    return None
-
-
 def _register_youtube(item, *, transport=None):
     """Best-effort WebSub subscribe for the trigger's channel at save time.
 
@@ -735,7 +618,7 @@ def _register_youtube(item, *, transport=None):
     the channel up within its cycle anyway; subscribing on the enabled save
     means a fresh trigger can fire immediately instead of waiting days.
     Subscribing is idempotent — a re-save refreshes the hub lease — and a
-    hub failure warns instead of blocking the local save, like Mailchimp's.
+    hub failure warns instead of blocking the local save.
 
     Disabling and deleting never unsubscribe: the hub callback is shared by
     every watcher of the channel (stored hooks and designer workflows
@@ -765,14 +648,6 @@ def public_view(item):
     if item.get("kind") == "telegram":
         view["connection_id"] = item.get("connection_id")
         view["header"] = "x-telegram-bot-api-secret-token"
-    elif item.get("kind") == "mailchimp":
-        # The binding an edit must round-trip (like Telegram's bot). No
-        # header/auth_scheme: Mailchimp sends no auth headers — the
-        # unguessable URL is the credential.
-        view["list_id"] = item.get("list_id")
-        view["events"] = item.get("events") or list(MAILCHIMP_EVENT_TYPES)
-        if item.get("connection_id"):
-            view["connection_id"] = item.get("connection_id")
     elif item.get("kind") == "youtube":
         # The watched channel is the binding an edit must round-trip. No
         # header/auth_scheme: YouTube delivers to the deployment's shared
@@ -815,21 +690,6 @@ def api_save(body, operator, kind="webhook", *, table_ref=None,
             # Disabling an existing trigger releases the bot's single webhook
             # so another trigger (or nothing) can claim it.
             _unregister_telegram(item, connections_table=connections_table, transport=transport)
-    elif item["kind"] == "mailchimp":
-        # Best-effort lifecycle with Mailchimp: every enabled save (re-)draws
-        # the webhook registration, a Mailchimp failure warns instead of
-        # blocking the local save, and disabling releases the subscription
-        # like Telegram's.
-        if item["enabled"]:
-            warning = _register_mailchimp(item, connections_table=connections_table,
-                                          transport=transport)
-        elif not created:
-            warning = _unregister_mailchimp(item, connections_table=connections_table,
-                                            transport=transport)
-        else:
-            warning = None
-        if warning:
-            warnings.append(warning)
     elif item["kind"] == "youtube" and item["enabled"]:
         # Best-effort subscribe-on-save: a hub failure warns but the trigger
         # lands, and a disable/delete never unsubscribes (see
@@ -851,23 +711,12 @@ def api_delete(name, operator, kind=None, *, table_ref=None,
         raise TriggerError(f"no {kind or 'hook'} trigger named '{validate_name(name)}'")
     if kind and item.get("kind") != kind:
         raise TriggerError(f"trigger '{item['hook_id']}' is a {item['kind']} trigger")
-    warnings = []
     if item.get("kind") == "telegram" and item.get("connection_id"):
         # Best-effort: remove the delivery URL so Telegram stops POSTing to
         # a hook nobody listens on; the trigger is gone either way.
         _unregister_telegram(item, connections_table=connections_table, transport=transport)
-    elif item.get("kind") == "mailchimp":
-        # Best-effort: unsubscribe so Mailchimp stops POSTing into a 404;
-        # a Mailchimp failure warns but never blocks the deletion.
-        warning = _unregister_mailchimp(item, connections_table=connections_table,
-                                        transport=transport)
-        if warning:
-            warnings.append(warning)
     get_table(table_ref).delete_item(Key={"hook_id": item["hook_id"]})
     from . import seen
 
     seen.drop(f"hook#{item['hook_id']}")
-    payload = {"ok": True, "hook_id": item["hook_id"], "kind": item["kind"]}
-    if warnings:
-        payload["warnings"] = warnings
-    return 200, payload
+    return 200, {"ok": True, "hook_id": item["hook_id"], "kind": item["kind"]}

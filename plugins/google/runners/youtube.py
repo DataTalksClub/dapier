@@ -426,7 +426,7 @@ def run_youtube_remove_from_playlist(action, event, *, transport=None, steps=Non
             f"youtube playlist unreachable: {type(exc).__name__}") from None
     if status == 404:
         # Already removed (or never there): a benign miss, like
-        # mailchimp_remove_member's missing member.
+        # a missing item.
         return {"removed": False, "playlist_item_id": playlist_item_id}
     if status >= 300:
         raise RuntimeError("youtube remove-from-playlist returned HTTP "
