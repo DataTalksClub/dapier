@@ -59,18 +59,22 @@ def _scrub(value):
 
 
 def resolve_owner(item):
-    """The owner a reader sees: the stamped ``owner``, else the item's
-    informational ``published_by`` (every item predating G17 has one), else
-    "" — the Phase 1 backfill, applied on read so no migration is needed."""
+    """The owner a version record answers with: the stamped ``owner``, else
+    the record's informational ``published_by`` (records predating the G17
+    stamp have one), else "" — version history is immutable, so the
+    backfill stays until those records age out of MAX_VERSIONS pruning.
+    Live items all carry the stamp (the Oct-2026 store-check found none
+    without) and read it directly."""
     return str(item.get("owner") or item.get("published_by") or "")
 
 
 def _decode_item(item):
     """Decode one stored item for readers: Decimals to JSON-safe numbers and
-    ``owner`` resolved (see resolve_owner) — every live-item read answers
-    with an owner, backfilled from published_by when the stamp predates it."""
+    the ``owner`` stamp passed through — every live item carries one, so no
+    published_by backfill on live reads (version records keep theirs, see
+    resolve_owner)."""
     decoded = {key: decode_numbers(value) for key, value in item.items()}
-    decoded["owner"] = resolve_owner(decoded)
+    decoded["owner"] = str(decoded.get("owner") or "")
     return decoded
 
 

@@ -51,13 +51,13 @@ def owner_of_item(item):
     """The owner of one stored workflow item.
 
     A draft-only row (``draft_of`` set) is owned by its ``drafted_by`` —
-    drafts are never published, so they carry no owner stamp (Phase 1). A
-    live item resolves like every Phase 1 read: the stamped ``owner``,
-    backfilled from ``published_by`` (see published_workflows.resolve_owner).
+    drafts are never published, so they carry no owner stamp. A live item
+    answers with its stamp: every live row carries one (the Oct-2026
+    store-check found none without), so no published_by backfill.
     """
     if item.get("draft_of"):
         return str(item.get("drafted_by") or "")
-    return published_workflows.resolve_owner(item)
+    return str(item.get("owner") or "")
 
 
 def workflow_owners(table_ref=None):

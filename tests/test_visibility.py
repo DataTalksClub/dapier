@@ -240,7 +240,8 @@ def test_owner_of_item_drafts_belong_to_the_drafter(published):
     assert visibility.owner_of_item(draft_item("w2", MINE)) == MINE
     unstamped = workflow_item("w3", "")
     unstamped.pop("owner")
-    assert visibility.owner_of_item(unstamped) == ""  # published_by "" backfills to ""
+    unstamped["published_by"] = THEIRS  # a stale byline no longer backfills
+    assert visibility.owner_of_item(unstamped) == ""  # the stamp is the only source
 
 
 def test_workflow_owners_maps_live_and_draft_only(published):

@@ -352,18 +352,20 @@ def test_publish_stamps_owner_and_preserves_it_without_an_operator(published):
     assert published_workflows.get_version("test-flow", 1)["owner"] == "op-1"
 
 
-def test_owner_backfills_from_published_by(published):
+def test_owner_write_carries_over_but_reads_require_the_stamp(published):
     published_workflows.publish(seeded_workflow(), operator="legacy-op")
     legacy = dict(published.items["test-flow"])
     del legacy["owner"]  # an item stored before G17
-    # A publish without an operator copies the owner from published_by...
+    # A publish without an operator still copies the owner forward from the
+    # previous revision's published_by...
     published_workflows.publish(seeded_workflow(), previous=legacy)
     assert published_workflows.get_item("test-flow")["owner"] == "legacy-op"
-    # ...and every read of a still-unstamped item resolves it the same way,
-    # while the engine's view of the definition is untouched.
+    # ...but live reads answer with the stamp alone: every stored live item
+    # carries one (the Oct-2026 store-check found none without), so a row
+    # missing it reads as unowned instead of backfilling the byline.
     published.items["test-flow"].pop("owner")
-    assert published_workflows.get_item("test-flow")["owner"] == "legacy-op"
-    assert published_workflows.load_items()[0]["owner"] == "legacy-op"
+    assert published_workflows.get_item("test-flow")["owner"] == ""
+    assert published_workflows.load_items()[0]["owner"] == ""
     assert published_workflows.load_workflows() == [seeded_workflow()]
 
 
