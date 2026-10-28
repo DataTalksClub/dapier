@@ -410,6 +410,7 @@ def test_operator_endpoints_reject_non_operators(monkeypatch):
          "PUT", "/api/agent/connections"),
         (event(), "GET", "/api/agent/oauth-clients"),
         (event({"client_id": "i", "client_secret": "s"}), "PUT", "/api/agent/oauth-clients/google"),
+        (event(), "GET", "/api/agent/store-check"),
     )
     for request, method, path in requests:
         assert agent_api.route(request, method, path)["statusCode"] == 403
@@ -433,6 +434,37 @@ def test_operator_can_list_credential_shapes(monkeypatch):
         "version": 3, "updated_at": "2026-10-28T00:00:00+00:00",
     }]
     assert "private" not in body
+
+
+def test_operator_can_run_store_check(monkeypatch):
+    tables = configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
+    monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
+    monkeypatch.setenv("PUBLISHED_WORKFLOWS_TABLE", "published")
+    monkeypatch.setenv("POLL_TRIGGERS_TABLE", "polls")
+    tables["executions"] = Table({
+        "wf:a:e": {"execution_id": "wf:a:e", "run_id": "wf:e", "status": "completed",
+                   "lease_until": 10},
+        "wf:b:e": {"execution_id": "wf:b:e", "status": "processing"},
+    })
+    tables["published"] = Table({
+        "one": {"workflow_id": "one", "owner": "subject-1"},
+        "two": {"workflow_id": "two"},
+    })
+    tables["connections"] = Table({"a": {"connection_id": "a", "display_name": "Legacy"}})
+    tables["polls"] = Table({"news": {"poll_id": "news"}})
+
+    response = agent_api.route(event(), "GET", "/api/agent/store-check")
+
+    assert response["statusCode"] == 200, response["body"]
+    assert json.loads(response["body"]) == {
+        "executions_without_run_id": 1,
+        "executions_processing_without_lease": 1,
+        "published_live_without_owner": 1,
+        "published_versions_without_owner": 0,
+        "published_drafts_without_owner": 0,
+        "connections_with_display_name": 1,
+        "polls_with_flow": 0,
+    }
 
 
 def test_grants_roundtrip_over_bearer(monkeypatch):

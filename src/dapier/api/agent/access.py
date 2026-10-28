@@ -22,7 +22,7 @@ verify_id_token = _LateBinding("verify_id_token")
 
 
 __all__ = ["credentials_api", "credentials_view", "grants_api", "oauth_clients_api",
-           "oauth_clients_view", "tokens_api"]
+           "oauth_clients_view", "store_check_view", "tokens_api"]
 
 
 
@@ -144,6 +144,18 @@ def credentials_view(event):
     if error:
         return error
     return _json_response(200, {"credentials": credentials.credential_shapes()})
+
+
+def store_check_view(event):
+    """Operator-only store-integrity counts: the legacy-shaped stored rows
+    the stored-row compat fallbacks serve (see store_checks). Read-only
+    Scans over the run/publish/connection/poll stores."""
+    _, error = require_operator(event, audit.CONFIG)
+    if error:
+        return error
+    from ... import store_checks
+
+    return _json_response(200, store_checks.legacy_row_counts())
 
 
 def credentials_api(event, provider):

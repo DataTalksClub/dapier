@@ -998,6 +998,27 @@ def test_credentials_list_prints_key_names_never_values(isolated_home, monkeypat
     assert "xoxb" not in out and "arn:aws" not in out
 
 
+def test_store_check_prints_the_counts(isolated_home, monkeypatch, capsys):
+    def fake_call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("GET", "/api/agent/store-check")
+        return {"executions_without_run_id": 0,
+                "executions_processing_without_lease": 0,
+                "published_live_without_owner": 0,
+                "published_versions_without_owner": 0,
+                "published_drafts_without_owner": 0,
+                "connections_with_display_name": 2,
+                "polls_with_flow": 0}
+
+    monkeypatch.setattr(commands.api, "call", fake_call)
+
+    rc = main.main(["store-check"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "connections carrying display_name  2" in out
+    assert "execution rows without run_id      0" in out
+
+
 def test_credentials_list_empty(isolated_home, monkeypatch, capsys):
     monkeypatch.setattr(commands.api, "call",
                         lambda *args, **kwargs: {"credentials": []})

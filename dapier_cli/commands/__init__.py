@@ -13,6 +13,7 @@ from .hooks import *
 from .schedules import *
 from .polls import *
 from .catalog import *
+from .store_check import *
 from .credentials import *
 from .grants import *
 from .tokens import *

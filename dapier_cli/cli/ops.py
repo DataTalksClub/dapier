@@ -4,7 +4,8 @@ import sys
 
 from .. import commands
 
-GROUPS = ("costs", "overview", "usage", "quota", "errors", "agent-tasks", "workers", "worker", "catalog",)
+GROUPS = ("costs", "overview", "usage", "quota", "errors", "agent-tasks", "workers", "worker", "catalog",
+          "store-check",)
 
 
 def register(sub):
@@ -64,6 +65,9 @@ def register(sub):
     worker_p.add_argument("--once", action="store_true", help="Poll once and exit")
     catalog_p = sub.add_parser("catalog", help="Show the action and trigger catalog (GET /api/catalog)")
     catalog_p.add_argument("--json", action="store_true", help="Print the raw catalog JSON")
+    store_check_p = sub.add_parser(
+        "store-check",
+        help="Count the legacy-shaped stored rows the compat fallbacks serve (operator)")
 
 
 def run(args, api_url, debug, child=None):
@@ -103,4 +107,6 @@ def run(args, api_url, debug, child=None):
                                    capabilities=args.capability, engine=args.engine)
     if args.group == "catalog":
         return commands.catalog_show(api_url, debug, as_json=args.json)
+    if args.group == "store-check":
+        return commands.store_check(api_url, debug)
     return 2

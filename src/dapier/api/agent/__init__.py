@@ -220,6 +220,8 @@ def _route(event, method, path):
         return oauth_clients_api(event, oauth_client_match.group(1))
     if path == "/api/agent/credentials" and method == "GET":
         return credentials_view(event)
+    if path == "/api/agent/store-check" and method == "GET":
+        return store_check_view(event)
     credential_match = re.fullmatch(r"/api/agent/credentials/([a-z]+)", path)
     if credential_match and method == "PUT":
         return credentials_api(event, credential_match.group(1))
