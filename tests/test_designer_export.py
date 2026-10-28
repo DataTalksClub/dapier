@@ -3,8 +3,9 @@ workflow's canonical YAML plus a manifest.json, served by both operator
 routes — /api/admin/designer/export (the console's Export-all button) and
 /api/agent/designer/export (`workflows export --all`).
 
-Follows the established export test conventions (test_designer.py): a WORKFLOWS_DIR with a couple of files for the domain
-bundle, the signed session/bearer events for the two dispatchers. The
+Follows the established export test conventions (test_designer.py): a
+couple of published workflows for the bundle, the signed session/bearer
+events for the two dispatchers. The
 assertions that matter: each zip entry's bytes equal what api_get serves for
 that file, the manifest rows carry file/enabled/tags/folder/version, and the
 tag/folder filters narrow the bundle exactly like the designer list.
