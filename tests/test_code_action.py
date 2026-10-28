@@ -31,8 +31,8 @@ class CodeStepTests(unittest.TestCase):
         output = run("output = {'sum': sum(input['values'])}", {"values": [1, 2, 3]})
         self.assertEqual(output["result"], {"sum": 6})
 
-    def test_result_variable_alias(self):
-        self.assertEqual(run("result = 'ok'")["result"], "ok")
+    def test_result_variable_is_not_the_output(self):
+        self.assertIsNone(run("result = 'ok'")["result"])
 
     def test_no_result_is_null(self):
         self.assertIsNone(run("print('side effect only')")["result"])

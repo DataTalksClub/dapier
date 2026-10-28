@@ -8,9 +8,9 @@ The snippet transforms the triggering event and returns JSON for later steps
   ``input`` (a dict) and the prior steps' outputs bound to ``steps``
   (``{step_id: {"output": ...}}``, ``{}`` standalone);
 - the step output is what the snippet produces — Python: its last top-level
-  *expression*, falling back to a variable named ``output`` (``result`` is
-  accepted as an alias); JavaScript: the value it ``return``s from the
-  snippet body — and with neither, the result is ``null``;
+  *expression*, falling back to a variable named ``output``; JavaScript: the
+  value it ``return``s from the snippet body — and with neither, the result
+  is ``null``;
 - anything the snippet prints is captured and reported alongside the result.
 
 Sandbox (best-effort — see "Threat model"): the snippet executes with a
@@ -147,13 +147,13 @@ def _error_message(exc):
 
 def _run(sandbox, exec_code, tail_code, outcome):
     """The thread body: exec the snippet, then eval the trailing expression
-    (or fall back to an ``output``/``result`` variable) into ``outcome``."""
+    (or fall back to an ``output`` variable) into ``outcome``."""
     try:
         exec(exec_code, sandbox)  # noqa: S102 - the sandbox is the point
         if tail_code is not None:
             outcome["result"] = eval(tail_code, sandbox)  # noqa: S307
         else:
-            outcome["result"] = sandbox.get("output", sandbox.get("result"))
+            outcome["result"] = sandbox.get("output")
     except BaseException as exc:  # noqa: BLE001 - every failure is a step failure
         outcome["error"] = exc
 
