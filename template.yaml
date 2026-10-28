@@ -47,20 +47,6 @@ Parameters:
   DatamailerInboundBucketName:
     Type: String
     Default: relay-sandbox-817685572750-eu-west-1-inbound-mail
-  LegacyInboundMailBucketName:
-    Type: String
-    Default: datamailer-sandbox-817685572750-inbound-mail
-    Description: >
-      Legacy datamailer raw bucket that still receives dtcdev.click inbound
-      mail from the us-east-1 SES receipt rule; its objects publish through
-      EmailIngressFunction until the relay cutover retires the bucket.
-  LegacyInboundEmailTopicArn:
-    Type: String
-    Default: arn:aws:sns:us-east-1:817685572750:datamailer-sandbox-inbound-email-events
-    Description: >
-      Datamailer SNS topic the us-east-1 SES receipt rule still publishes
-      inbound events to; allowed alongside the pinned topic so mail keeps
-      flowing until the relay cutover retires the legacy chain.
   InboundEmailTopicArn:
     Type: String
     Default: arn:aws:sns:eu-west-1:817685572750:relay-sandbox-inbound-email-events
@@ -465,8 +451,6 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${DatamailerInboundBucketName}
                   - !Sub arn:aws:s3:::${DatamailerInboundBucketName}/*
-                  - !Sub arn:aws:s3:::${LegacyInboundMailBucketName}
-                  - !Sub arn:aws:s3:::${LegacyInboundMailBucketName}/*
                   - !Sub arn:aws:s3:::${MailBucket}
                   - !Sub arn:aws:s3:::${MailBucket}/*
         # Designer/CLI execution tests run file-read steps in the API process.
@@ -680,20 +664,11 @@ Resources:
       Handler: dapier.triggers.intake.email_ingress.handler
       Runtime: python3.12
       Architectures: [arm64]
-      Environment:
-        Variables:
-          # Raw objects in the legacy datamailer bucket publish the relay
-          # inbound-email contract (the worker rehydrates body and stages
-          # attachments from the raw_mime pointer); MailBucket objects keep
-          # the original rich envelope.
-          LEGACY_INBOUND_BUCKET: !Ref LegacyInboundMailBucketName
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
         - S3ReadPolicy:
             BucketName: !Sub ${AWS::StackName}-mail-${AWS::AccountId}
-        - S3ReadPolicy:
-            BucketName: !Ref LegacyInboundMailBucketName
       Events:
         MailStored:
           Type: S3
@@ -761,7 +736,7 @@ Resources:
             - - !GetAtt EmailIngressFunctionRole.RoleId
               - !GetAtt ApiExecutionRole.RoleId
               - !GetAtt WorkerFunctionRole.RoleId
-          INBOUND_EMAIL_TOPICS: !Join [',', [!Ref InboundEmailTopicArn, !Ref LegacyInboundEmailTopicArn]]
+          INBOUND_EMAIL_TOPICS: !Ref InboundEmailTopicArn
           YOUTUBE_WEBHOOK_SECRET_NAME: !Ref YouTubeWebhookSecretName
           DEVELOPER_WEBHOOK_SECRET_NAME: !Ref DeveloperWebhookSecret
           HUB_INTAKE_TOKEN_SECRET_NAME: !Ref HubIntakeTokenSecret
@@ -904,8 +879,6 @@ Resources:
             BucketName: !Ref DataOpsEmailDocumentsBucket
         - S3ReadPolicy:
             BucketName: !Ref DatamailerInboundBucketName
-        - S3ReadPolicy:
-            BucketName: !Ref LegacyInboundMailBucketName
         - S3CrudPolicy:
             BucketName: !Ref MailBucket
       Events:
@@ -1015,9 +988,7 @@ Resources:
             Resource: !GetAtt EventQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn:
-                  - !Ref InboundEmailTopicArn
-                  - !Ref LegacyInboundEmailTopicArn
+                aws:SourceArn: !Ref InboundEmailTopicArn
 
   DeadLetterQueue:
     Type: AWS::SQS::Queue

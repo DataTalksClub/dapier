@@ -155,28 +155,6 @@ def _addresses(header):
     return [address for _name, address in getaddresses([str(header or "")]) if address]
 
 
-def _legacy_contract(bucket, key, message):
-    """The relay inbound-email v1 contract for a raw object in the legacy
-    datamailer raw bucket. The worker's ingress normalizer rehydrates the
-    body and stages the attachments from the raw_mime pointer exactly as it
-    does for Relay's own events, so both ingestion paths share one contract
-    and flows key on the same route label either way."""
-    to = message.get("To", "")
-    sender = message.get("From", "")
-    return {
-        "contract": "inbound-email",
-        "version": 1,
-        "event_id": f"email:{message.get('Message-ID') or key}",
-        "occurred_at": message.get("Date"),
-        "route": str(to or ""),
-        "message_id": message.get("Message-ID"),
-        "sender": {"header": str(sender or ""), "addresses": _addresses(sender)},
-        "recipients": {"addresses": _addresses(to)},
-        "subject": message.get("Subject"),
-        "raw_mime": {"bucket": bucket, "key": key},
-    }
-
-
 def handler(event, _context):
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
@@ -185,11 +163,6 @@ def handler(event, _context):
             continue
         raw = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
         message = parse_message(raw)
-        if os.environ.get("LEGACY_INBOUND_BUCKET") == bucket:
-            envelope = _legacy_contract(bucket, key, message)
-            queue.send_message(QueueUrl=os.environ["EVENT_QUEUE_URL"],
-                               MessageBody=json.dumps(envelope))
-            continue
         pointer = {"bucket": bucket, "key": key}
         to = message.get("To", "")
         envelope = {

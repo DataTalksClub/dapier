@@ -227,8 +227,7 @@ def test_template_wires_trusted_publishers_and_zero_schedule():
         {"Fn::GetAtt": ["EmailIngressFunctionRole", "RoleId"]},
         {"Fn::GetAtt": ["ApiExecutionRole", "RoleId"]},
         {"Fn::GetAtt": ["WorkerFunctionRole", "RoleId"]}]]}
-    assert variables["INBOUND_EMAIL_TOPICS"] == {"Join": [",", [
-        {"Ref": "InboundEmailTopicArn"}, {"Ref": "LegacyInboundEmailTopicArn"}]]}
+    assert variables["INBOUND_EMAIL_TOPICS"] == {"Ref": "InboundEmailTopicArn"}
 
 
 def test_raw_sns_contract_requires_protected_queue_metadata(monkeypatch):
@@ -259,8 +258,7 @@ def test_queue_policy_denies_arbitrary_direct_publishers():
             "WorkerFunctionRole", "DropboxResolverFunctionRole", "HtmlRendererFunctionRole"]]}}
     sns = next(s for s in statements if s["Sid"] == "AllowInboundEmailEvents")
     assert sns["Principal"] == {"Service": "sns.amazonaws.com"}
-    assert sns["Condition"]["ArnEquals"]["aws:SourceArn"] == [
-        {"Ref": "InboundEmailTopicArn"}, {"Ref": "LegacyInboundEmailTopicArn"}]
+    assert sns["Condition"]["ArnEquals"]["aws:SourceArn"] == {"Ref": "InboundEmailTopicArn"}
     variables = resources["WorkerFunction"]["Properties"]["Environment"]["Variables"]
     assert variables["INBOUND_EMAIL_QUEUE_ARN"] == {"Fn::GetAtt": ["EventQueue", "Arn"]}
     assert resources["WorkerFunction"]["DependsOn"] == "EventQueuePolicy"
