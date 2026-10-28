@@ -64,6 +64,7 @@ def _configure(monkeypatch, items):
 
 def _run(workflow_id, event_id, *, status="completed", started="2026-09-25T10:00:00+00:00"):
     return {
+        "lease_until": int(time.time()) + 300 if status == "processing" else None,
         "execution_id": f"{workflow_id}:post:{event_id}",
         "run_id": f"{workflow_id}:{event_id}",
         "workflow_id": workflow_id,

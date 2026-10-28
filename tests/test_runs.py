@@ -35,7 +35,7 @@ def _configure(monkeypatch, items):
 
 def _step(workflow_id, action_id, event_id, *, status="completed", started="2026-09-25T10:00:00+00:00",
           finished=None, action_type="slack", connector="email", error=None,
-          duration=None, input_data=None, output=None, run_id=None):
+          duration=None, input_data=None, output=None, run_id=None, lease_until=None):
     item = {
         "execution_id": f"{workflow_id}:{action_id}:{event_id}",
         "workflow_id": workflow_id,
@@ -46,6 +46,7 @@ def _step(workflow_id, action_id, event_id, *, status="completed", started="2026
         "event_type": "message.received",
         "correlation_id": event_id,
         "expires_at": 1789000000,
+        "lease_until": lease_until,
         "duration_ms": duration,
         "input": input_data,
         "output": output,
@@ -73,7 +74,8 @@ def test_recent_groups_steps_by_run_and_orders_newest_first(monkeypatch):
               finished="2026-09-25T10:00:01+00:00"),
         _step("wf-1", "upload", "evt-1", started="2026-09-25T10:00:01+00:00",
               finished="2026-09-25T10:00:03+00:00", action_type="dropbox_upload"),
-        _step("wf-1", "post", "evt-2", started="2026-09-25T11:00:00+00:00", status="processing"),
+        _step("wf-1", "post", "evt-2", started="2026-09-25T11:00:00+00:00",
+              status="processing", lease_until=int(time.time()) + 300),
     ])
 
     status, payload = runs.api_list()
@@ -94,7 +96,7 @@ def test_run_summary_failed_wins_over_processing(monkeypatch):
         _step("wf-1", "post", "evt-1", status="failed", error="boom",
               run_id="wf-1:evt-1", started="2026-09-25T10:00:00+00:00"),
         _step("wf-1", "post2", "evt-1", status="processing", run_id="wf-1:evt-1",
-              started="2026-09-25T10:00:02+00:00"),
+              started="2026-09-25T10:00:02+00:00", lease_until=int(time.time()) + 300),
     ])
 
     status, payload = runs.api_list()
@@ -105,12 +107,12 @@ def test_run_summary_failed_wins_over_processing(monkeypatch):
 
 
 def test_run_summary_stalled_when_leases_expired(monkeypatch):
-    # A processing step whose lease is long past (or that predates leases)
-    # has no worker behind it: the run shows processing but must say stalled.
-    _configure(monkeypatch, [
-        _step("wf-1", "decide", "evt-1", status="processing", action_type="decision",
-              run_id="wf-1:evt-1", started="2026-09-25T10:00:02+00:00"),
-    ])
+    # A processing step whose lease is long past has no worker behind it:
+    # the run shows processing but must say stalled.
+    stale = _step("wf-1", "decide", "evt-1", status="processing", action_type="decision",
+                  run_id="wf-1:evt-1", started="2026-09-25T10:00:02+00:00")
+    stale["lease_until"] = int(time.time()) - 10
+    _configure(monkeypatch, [stale])
 
     status, payload = runs.api_list()
     run = payload["runs"][0]
@@ -118,6 +120,18 @@ def test_run_summary_stalled_when_leases_expired(monkeypatch):
     assert run["stalled"] is True
     assert run["stalled_step"] == "decide"
     assert run["stalled_since"] == "2026-09-25T10:00:02+00:00"
+
+
+def test_run_summary_processing_step_without_lease_fails_loudly(monkeypatch):
+    # Every processing step carries a lease (the writer stamps one; the
+    # Oct-2026 store-check found none without), so a row missing it is a
+    # writer bug and must not quietly read as stalled-or-running.
+    _configure(monkeypatch, [
+        _step("wf-1", "post", "evt-1", status="processing", run_id="wf-1:evt-1"),
+    ])
+
+    with pytest.raises(TypeError):
+        runs.api_list()
 
 
 def test_run_summary_processing_with_live_lease_is_not_stalled(monkeypatch):

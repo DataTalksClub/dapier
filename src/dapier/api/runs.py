@@ -202,10 +202,9 @@ def run_summary(run_id, items):
     A ``processing`` run whose every processing step lease has expired is
     not running: the worker died mid-step (a deploy, a crash, a timeout)
     and nothing will close the step out. The engine agrees - a redelivery
-    takes an expired-lease step over, and a step written before leases
-    (no ``lease_until``) can never be re-taken - so such a run is flagged
-    ``stalled`` (additive, no new run status) with the step and the moment
-    work last advanced.
+    takes an expired-lease step over - so such a run is flagged ``stalled``
+    (additive, no new run status) with the step and the moment work last
+    advanced.
     """
     items = [redact(item) for item in items]
     statuses = [item.get("status", "") for item in items]
@@ -263,16 +262,15 @@ def run_summary(run_id, items):
         "duration_ms": _sum_duration(items),
         "error": errors[0] if errors else None,
     }
-    # Stalled = the run open steps are ones no worker holds anymore. The lease is the
-    # engine liveness marker (engine.worker._is_pending re-takes a step only once its
-    # lease is past; a step recorded before leases carries none and can never be
-    # re-taken), so an expired-or-absent lease on every processing step means a
-    # replay or fresh delivery is the only way forward. Readers: the console pills
+    # Stalled = the run's open steps are ones no worker holds anymore. The lease is
+    # the engine liveness marker (engine.worker._is_pending re-takes a step only once
+    # its lease is past), so an expired lease on every processing step means a replay
+    # or fresh delivery is the only way forward. Readers: the console pills
     # (format.js runStatusLine) and the CLI list; stalled_since is the step start,
     # i.e. the moment progress stopped.
     if status == "processing":
         pending = [item for item in items if item.get("status") == "processing"]
-        if pending and not any((_int(item.get("lease_until")) or 0) > int(time.time())
+        if pending and not any(_int(item.get("lease_until")) > int(time.time())
                                for item in pending):
             stalled_step = pending[0]
             summary["stalled"] = True
