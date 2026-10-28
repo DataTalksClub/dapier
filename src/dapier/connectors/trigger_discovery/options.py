@@ -44,13 +44,15 @@ def connected_connection(provider, connection_id=None):
     With no id, the first connected connection of ``provider`` wins, so
     discovery works before an operator memorizes connection ids. No usable
     account at all is 404 (nothing to discover from); a named connection
-    that is not connected is 502 (the fetch cannot proceed).
+    that is not connected is 502 (the fetch cannot proceed). A ``provider``
+    of None only happens from _options_connection, where the listing does
+    not know its provider and the explicit id is taken as-is.
     """
     from ...connections import records as connections
 
     if connection_id:
         connection = connection_by_id(connection_id)
-        if connection.get("provider") != provider:
+        if provider and connection.get("provider") != provider:
             raise DiscoveryUpstream(
                 f"connection '{connection_id}' is a {connection.get('provider')} "
                 f"connection, not {provider}")
@@ -60,9 +62,10 @@ def connected_connection(provider, connection_id=None):
         return connection
     import boto3
 
-    # No connections store configured (bare test/edge deploys) means nothing
+    # No provider (an options listing that does not know its provider) and
+    # no connections store configured (bare test/edge deploys) mean nothing
     # live to discover, like api.discovery._load — fall through, never fail.
-    if not os.environ.get("CONNECTIONS_TABLE"):
+    if not provider or not os.environ.get("CONNECTIONS_TABLE"):
         raise DiscoveryNotFound(
             f"no connected {provider} connection to discover from; connect one first")
     table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
@@ -100,30 +103,15 @@ def _credential_connection(provider, credential_fallback):
 def _options_connection(provider, connection_id, *, credential_fallback=None):
     """The connection record an options listing runs against.
 
-    Explicit id first, then the first connected connection of the provider;
-    ``credential_fallback`` names a shared credential (e.g. the stored Slack
-    bot token) that stands in for a connection when none exists.
+    Explicit id first, then the first connected connection of the provider
+    (:func:`connected_connection`); ``credential_fallback`` names a shared
+    credential (e.g. the stored Slack bot token) that stands in for a
+    connection when none exists.
     """
-    from ...connections import records as connections
-
-    if connection_id:
-        connection = connection_by_id(connection_id)
-        if provider and connection.get("provider") != provider:
-            raise DiscoveryUpstream(
-                f"connection '{connection_id}' is a {connection.get('provider')} "
-                f"connection, not {provider}")
-        if connection.get("status") != connections.STATUS_CONNECTED:
-            raise DiscoveryUpstream(
-                f"connection '{connection_id}' is not connected; connect it first")
-        return connection
-    if provider:
-        import boto3
-
-        table = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"])
-        for connection in connections.list_connections(table):
-            if (connection.get("provider") == provider
-                    and connection.get("status") == connections.STATUS_CONNECTED):
-                return connection
+    try:
+        return connected_connection(provider, connection_id)
+    except DiscoveryNotFound:
+        pass
     if credential_fallback:
         return _credential_connection(provider, credential_fallback)
     raise DiscoveryNotFound(
