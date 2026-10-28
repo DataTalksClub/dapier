@@ -48,7 +48,8 @@ def legacy_row_counts(*, executions=None, published=None, connections=None,
 
     steps = _scan(executions, "execution_id, run_id, #st, lease_until",
                   names={"#st": "status"})
-    published_rows = _scan(published, "workflow_id, version_of, draft_of, owner")
+    published_rows = _scan(published, "workflow_id, version_of, draft_of, #own",
+                           names={"#own": "owner"})
     live = [item for item in published_rows
             if not item.get("version_of") and not item.get("draft_of")]
     versions = [item for item in published_rows if item.get("version_of")]
