@@ -1,6 +1,6 @@
 """GET /api/admin|agent/triggers/sample?workflow=<id>: the workflow's own
 last trigger input, for the designer's {trigger.*} autofill and
-`dapier triggers sample --workflow`.
+`dapier workflows sample --workflow`.
 
 The domain dispatch (runs.api_trigger_sample) prefers the newest run's
 recorded input — what the workflow really received last — and falls back to
@@ -375,7 +375,7 @@ def test_admin_sample_discovery_fallback_needs_no_runs(monkeypatch, tmp_path):
     assert body["source"] in ("synthetic", "history")
 
 
-# --- CLI: dapier triggers sample --workflow <id> (thin client) ---
+# --- CLI: dapier workflows sample --workflow <id> (thin client) ---
 
 
 def test_cli_workflow_sample(monkeypatch, tmp_path, capsys):
@@ -393,7 +393,7 @@ def test_cli_workflow_sample(monkeypatch, tmp_path, capsys):
                 "data": {"subject": "Invoice", "route": "todo"}}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    assert main.main(["triggers", "sample", "--workflow", "sample-flow"]) == 0
+    assert main.main(["workflows", "sample", "--workflow", "sample-flow"]) == 0
     assert calls == [("GET", "/api/agent/triggers/sample?workflow=sample-flow")]
     out = capsys.readouterr().out
     assert "message.received" in out and "history" in out
@@ -406,5 +406,5 @@ def test_cli_workflow_sample_requires_connector_or_workflow(monkeypatch, tmp_pat
 
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.delenv("DAPIER_API_URL", raising=False)
-    assert main.main(["triggers", "sample"]) == 2
+    assert main.main(["workflows", "sample"]) == 2
     assert "--workflow" in capsys.readouterr().out

@@ -92,7 +92,7 @@ Button taps need the bot to be subscribed to them: new trigger
 registrations include `callback_query` in `set_webhook`'s
 `allowed_updates`; an existing Telegram trigger must be re-saved once to
 re-register. A sample pull,
-`dapier triggers sample --connector telegram --event callback_query.received`,
+`dapier workflows sample telegram --event callback_query.received`,
 returns the documented tap. Creating the buttons themselves still means
 sending a `reply_markup` inline keyboard through the API — the send actions
 have no `reply_markup` field yet.

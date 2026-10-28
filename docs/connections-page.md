@@ -97,7 +97,7 @@ email is "Not signed in", never a fake Drive account.
   Telegram paste a new token in Manage. Provider access tokens are
   fetched in-script (the `google-data-pull` skill's `dtoken.py`); the
   console does not reveal them.
-  Trigger samples are CLI-only (`dapier triggers sample`); this page has
+  Trigger samples are CLI-only (`dapier workflows sample`); this page has
   no Pull sample toolbar button. Expiry reminder email is the daily
   ConnectionDigestFunction schedule, not a send-now button on this page.
 - **Connect another service** lists, below the groups, every service with

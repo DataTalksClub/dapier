@@ -4,7 +4,7 @@ The catalog declares recording.completed / recording.transcript_completed /
 meeting.started / meeting.ended / meeting.registration_created and the
 webhook intake publishes all five (see triggers.intake.zoom_webhooks), so
 the sample pull — the shared api_discover dispatch behind
-`dapier triggers sample` and the designer's test panel — must serve each
+`dapier workflows sample` and the designer's test panel — must serve each
 event its own realistic, metadata-only payload, and recorded history must
 never answer one event's ask with another event's run.
 """

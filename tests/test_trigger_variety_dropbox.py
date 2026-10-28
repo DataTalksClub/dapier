@@ -3,7 +3,7 @@
 The catalog declares file.created / file.updated / file.deleted and the
 resolver publishes all three (see triggers.intake.dropbox_resolver.
 process_entry), so the sample pull — the shared api_discover dispatch behind
-`dapier triggers sample` and the designer's test panel — must serve each
+`dapier workflows sample` and the designer's test panel — must serve each
 event its own realistic payload, and recorded history must never answer one
 event's ask with another event's run.
 """

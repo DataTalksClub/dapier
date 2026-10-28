@@ -112,7 +112,7 @@ webhook — used by trigger setup flows.
 | Workflow test (dry-run) | ✅ agent `designer/workflows/test` (+ per-file) | ✅ `dapier workflows test` | ✅ designer Test |
 | Workflow step test (per-step, live) | ✅ agent `designer/workflows/test-step` (+ per-file) | ✅ `dapier workflows test-step` | ✅ designer inspector "Test step" |
 | Connection test | ✅ agent + admin | ✅ | ✅ Credentials view |
-| Trigger sample (`/discover` POST) | ✅ agent + admin | ✅ `dapier triggers` | ✅ designer |
+| Trigger sample (`/discover` POST) | ✅ agent + admin | ✅ `dapier workflows sample` | ✅ designer |
 
 ## Gaps found
 

@@ -8,9 +8,9 @@ commands.<handler>.
 import argparse
 
 from . import access, audit, auth, connections, emails, hooks, ops, \
-    polls, runs, schedules, storage, triggers, typefully, slack, workflows
+    polls, runs, schedules, storage, typefully, slack, workflows
 
-MODULES = (auth, connections, access, ops, runs, audit, storage, triggers,
+MODULES = (auth, connections, access, ops, runs, audit, storage,
            workflows, hooks, schedules, polls, emails, typefully, slack)
 
 

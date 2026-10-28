@@ -45,8 +45,6 @@ Scripts needing a provider token fetch it in-script via the `dtoken.py`
 helper in the `google-data-pull` skill — there is no `token exec`
 anymore.
 
-(`triggers` and `hooks` are aliases that point at `emails`/`webhooks`.)
-
 ## Recipes
 
 ```bash

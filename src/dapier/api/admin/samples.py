@@ -12,7 +12,7 @@ def discover_samples(event, operator):
     Zapier's 'pull in sample data': a realistic event envelope for one
     trigger connector — live where the connector can fetch, else the newest
     recorded run, else a documented example. The designer's test panel
-    and `dapier triggers sample` land here via their own surfaces.
+    and `dapier workflows sample` land here via their own surfaces.
     """
     try:
         body = http._request_json(event)

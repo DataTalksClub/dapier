@@ -1,4 +1,4 @@
-"""Implementations of the `dapier triggers` commands (email triggers and samples)."""
+"""Implementations of `dapier emails list|show` and `dapier workflows sample`."""
 
 import json
 from urllib.parse import quote

@@ -34,7 +34,7 @@ def test_triggers_sample_pulls_and_prints(isolated_home, monkeypatch, capsys):
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    assert main.main(["triggers", "sample", "schedule"]) == 0
+    assert main.main(["workflows", "sample", "schedule"]) == 0
 
     assert calls == [("POST", "/api/agent/discover",
                       {"connector": "schedule", "kind": "sample"})]
@@ -56,7 +56,7 @@ def test_triggers_sample_forwards_event_and_connection(isolated_home, monkeypatc
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    assert main.main(["triggers", "sample", "poll", "--event", "blog",
+    assert main.main(["workflows", "sample", "poll", "--event", "blog",
                       "--connection-id", "conn-1"]) == 0
 
     assert captured["body"] == {"connector": "poll", "kind": "sample",
@@ -75,7 +75,7 @@ def test_triggers_sample_resource_lists_options(isolated_home, monkeypatch, caps
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    assert main.main(["triggers", "sample", "slack",
+    assert main.main(["workflows", "sample", "slack",
                       "--resource", "slack.channels", "--limit", "3"]) == 0
 
     out = capsys.readouterr().out
@@ -90,5 +90,5 @@ def test_triggers_sample_reports_unknown_connector(isolated_home, monkeypatch, c
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    assert main.main(["triggers", "sample", "bogus"]) == 4
+    assert main.main(["workflows", "sample", "bogus"]) == 4
     assert "unknown discovery connector" in capsys.readouterr().out

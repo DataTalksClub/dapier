@@ -5,7 +5,7 @@ The catalog declares file.created / file.updated / file.deleted and the
 poll sources publish all three (``s3`` on the last_modified watermark,
 ``s3.updates``/``s3.deletions`` on a listing snapshot parked as the
 cursor), so the sample pull — the shared api_discover dispatch behind
-`dapier triggers sample` and the designer's test panel — must serve each
+`dapier workflows sample` and the designer's test panel — must serve each
 event its own realistic payload, recorded history must never answer one
 event's ask with another event's run, and the diff sources must never fire
 on an ambiguous listing (first poll, re-scoped prefix, capped listing).

@@ -145,14 +145,14 @@ timestamp. See [Zoom's webhook setup and validation guide](https://developers.zo
 
 For OAuth accounts, Dapier also lists upcoming meetings for field pickers
 (`dapier connections discover <connection> meetings`, and
-`dapier triggers sample zoom --resource zoom.meetings`); the
+`dapier workflows sample zoom --resource zoom.meetings`); the
 `zoom_find_meeting` action's Meeting ID field browses the same listing.
 
 ### Browse meetings, past meetings, webinars and recordings
 
 Dapier lists upcoming meetings for field pickers
 (`dapier connections discover zoom-api meetings`, or
-`dapier triggers sample zoom --resource zoom.meetings`), the last 30
+`dapier workflows sample zoom --resource zoom.meetings`), the last 30
 days of cloud recordings (`recordings`), meetings already held
 (`past_meetings` — the `zoom_list_past_participants` and
 `zoom_delete_meeting` fields browse it), and upcoming webinars
@@ -216,7 +216,7 @@ user may see). Behavior, mirroring the webhook trigger:
 
 List what a stored poll watches with `dapier polls list` (the Watches column
 shows `zoom.recordings <for_email>`), and pull a sample payload with
-`dapier triggers sample zoom --event zoom-recordings`.
+`dapier workflows sample zoom --event zoom-recordings`.
 
 ## Archive recordings to S3
 
@@ -325,7 +325,7 @@ The webinar actions mirror the meeting set one level up on Zoom's REST API:
 
 The Webinar ID fields browse the `webinars` discovery listing
 (`dapier connections discover zoom-api webinars`, or
-`dapier triggers sample zoom --resource zoom.webinars`).
+`dapier workflows sample zoom --resource zoom.webinars`).
 
 Webinars need the webinar scopes alongside `user:read:user`: the read side
 (`zoom_find_webinar`, the past-participants listing, the pickers) works with

@@ -2,7 +2,7 @@
 
 Zapier's 'pull in sample data' for every trigger connector: live where the
 connector can fetch, else the newest recorded run, else a documented
-example. The CLI (`dapier triggers sample`) reaches it over
+example. The CLI (`dapier workflows sample`) reaches it over
 /api/agent/discover and the designer's test panel over /api/admin/discover;
 both share connectors.trigger_discovery.api_discover, so a pulled sample is
 exactly what a real delivery publishes. Ownership: samples for connectors

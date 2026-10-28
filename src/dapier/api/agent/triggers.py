@@ -51,7 +51,7 @@ def trigger_sample_api(event):
     recorded trigger input, else the connector's discovery sample.
 
     The CLI twin of the console's GET /api/admin/triggers/sample — both
-    dispatch through runs.api_trigger_sample, so `dapier triggers sample
+    dispatch through runs.api_trigger_sample, so `dapier workflows sample
     --workflow` autofills from exactly what the designer's inspector offers.
     """
     subject, error = require_operator(event, "triggers.sample")

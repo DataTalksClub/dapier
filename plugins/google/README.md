@@ -294,7 +294,7 @@ identity and can run again. Existing WebSub execution records remain compatible.
 The hub verifies the callback with a GET `hub.challenge` request before
 confirming a subscription; Dapier answers it. Subscriptions lapse when not
 renewed, which is what the five-day schedule does. Pull a sample payload with
-`dapier triggers sample youtube` (the connected channel's newest upload, or a
+`dapier workflows sample youtube` (the connected channel's newest upload, or a
 documented notification when none exists).
 
 ## YouTube upload video
@@ -527,7 +527,7 @@ one event per occurrence.
 Save a poll trigger from a JSON file:
 
 ```sh
-uv run dapier triggers polls save calendar-news.json
+uv run dapier polls save calendar-news.json
 ```
 
 ```json
