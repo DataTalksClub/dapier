@@ -32,7 +32,7 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/usage", "/workflows", "/connections", "/emails", "/agents", "/workers", "/credentials", "/tokens", "/runs", "/inbox", "/schedules", "/triggers", "/storage", "/audit", "/costs", "/designer")
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/agents", "/workers", "/credentials", "/tokens", "/runs", "/schedules", "/audit", "/costs", "/designer")
 # The designer app shell, framed by the console's /designer view.
 DESIGNER_APP_VIEW = "/designer/app"
 

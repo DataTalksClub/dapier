@@ -94,7 +94,6 @@ any step — connector action or logic step (`filter`, `condition`, `paths`,
 The console’s Runs page combines workflow executions with incoming events, including
 events no workflow handled. Inspect or replay these with `dapier runs events list`,
 `dapier runs events show <event-id>`, and `dapier runs events replay <event-id>`.
-The older `/inbox` console links remain compatible.
 
 Every run is recorded in run history (console → Runs, or `dapier runs list`),
 and any run — failed or successful — can be re-executed with its original
@@ -228,8 +227,7 @@ tasks in Agents, and connected accounts in Connections (OAuth clients and
 provider keys sit under App setup). Access and Audit live under Settings.
 A workflow with storage steps (`storage_get`/`set`/`find`/`delete`) shows a
 **Stored data** panel in its designer (the topbar's "Stored data" action, under
-More on a phone) to list, filter, set and delete its keys; the old `/storage`
-page link redirects to Workflows. The CLI reaches the same actions with
+More on a phone) to list, filter, set and delete its keys. The CLI reaches the same actions with
 `dapier workflows`, `dapier runs`, `dapier connections`, `dapier storage`,
 `dapier quota`, `dapier errors send-digest`, and `dapier audit`.
 

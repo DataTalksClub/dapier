@@ -564,21 +564,9 @@ Resources:
         ConsoleTokens:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /tokens, Method: GET}
-        ConsoleUsers:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /users, Method: GET}
         ConsoleRuns:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /runs, Method: GET}
-        ConsoleInbox:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /inbox, Method: GET}
-        ConsoleStorage:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /storage, Method: GET}
-        ConsoleUsage:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /usage, Method: GET}
         ConsoleCosts:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /costs, Method: GET}
@@ -588,9 +576,6 @@ Resources:
         ConsoleSchedules:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: /schedules, Method: GET}
-        ConsoleTriggers:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /triggers, Method: GET}
         # One greedy route for every static asset; the console Lambda's
         # allowlist (router._static) decides what is actually served.
         ConsoleAssets:

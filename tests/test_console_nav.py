@@ -173,25 +173,14 @@ def test_workflows_toolbar_keeps_search_without_status_tag_folder_filters():
     assert "$('#workflow-filter')" not in js
 
 
-def test_old_triggers_path_opens_hooks_tab():
-    assert "if (name === 'triggers') return 'workflows'" in ROUTER
-    assert "'/triggers'" in ROUTER
-    assert "/workflows?tab=hooks" in ROUTER
-    assert "/triggers" in ingress.CONSOLE_VIEWS
-
-
-def test_old_data_page_redirects_to_workflows():
-    """The Data page left the console: a workflow's stored keys live in its
-    designer's Stored data panel. Saved /storage links still land."""
-    assert 'href="/storage"' not in INDEX
-    assert 'data-page="storage"' not in INDEX
+def test_retired_console_paths_are_not_served():
+    """/inbox, /usage, /triggers and /storage were renamed; the console no
+    longer redirects them (no current link points there)."""
+    for path in ("/inbox", "/usage", "/triggers", "/storage", "/users"):
+        assert path not in ingress.CONSOLE_VIEWS
+        assert f"Path: {path}," not in TEMPLATE
+        assert f"'{path}'" not in ROUTER
     assert not pathlib.Path("src/web/js/views/storage.js").exists()
-    assert "'storage'" not in ROUTER.split("const VIEWS = ", 1)[1].split("\n", 1)[0]
-    assert "if (name === 'storage') return 'workflows'" in ROUTER
-    assert "window.location.pathname === '/storage') history.replaceState(null, '', '/workflows')" in ROUTER
-    assert "/storage" in ingress.CONSOLE_VIEWS
-    assert "Path: /storage" in TEMPLATE
-    assert "/assets/js/views/storage.js" not in pathlib.Path("src/dapier/api/router.py").read_text()
 
 
 def test_sidebar_and_page_tab_hrefs_have_gateway_routes():

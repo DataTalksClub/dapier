@@ -25,9 +25,6 @@ export function rememberViewUrl(url) { rememberedUrl = url; }
 
 export function viewFromPath(path) {
   const name = path.replace(/^\/+|\/+$/g, '');
-  if (name === 'inbox' || name === 'usage') return 'runs'; // compatibility with saved inbox links
-  if (name === 'triggers') return 'workflows'; // old Triggers page → workflow start methods
-  if (name === 'storage') return 'workflows'; // old Data page → a workflow's Stored data panel
   if (name.startsWith('workflows/')) return 'designer'; // /workflows/<id> opens the canvas
   return VIEWS.includes(name) ? name : 'overview';
 }
@@ -37,7 +34,6 @@ function workflowTabFor(view, push, options) {
   const requested = options.tab;
   if (requested && WORKFLOW_TABS.has(requested)) return requested;
   if (!push) {
-    if (window.location.pathname === '/triggers') return 'hooks';
     const tab = new URLSearchParams(window.location.search).get('tab');
     return WORKFLOW_TABS.has(tab) ? tab : 'list';
   }
@@ -163,9 +159,6 @@ export async function setView(view, push = true, options = {}) {
     || [view[0].toUpperCase() + view.slice(1), ''];
   $('#view-title').textContent = title;
   $('#view-description').textContent = description;
-  if (!push && ['/inbox', '/usage'].includes(window.location.pathname)) history.replaceState(null, '', `/runs${window.location.search}`);
-  if (!push && window.location.pathname === '/triggers') history.replaceState(null, '', '/workflows?tab=hooks');
-  if (!push && window.location.pathname === '/storage') history.replaceState(null, '', '/workflows');
   if (push) history.pushState(null, '', pathFor(view, workflowTab, emailTab));
   rememberedUrl = `${window.location.pathname}${window.location.search}`;
   /* .dk-main is the shell's only scroller (the page itself never scrolls). */

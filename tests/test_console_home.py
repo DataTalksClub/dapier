@@ -80,8 +80,7 @@ def test_home_only_surfaces_connections_used_by_enabled_workflows():
     assert model({'quota': {'enabled': False, 'remaining': None}})['quotaBlocked'] is False
 
 
-def test_usage_and_home_model_deep_links_are_served():
-    assert _static('/usage')['statusCode'] == 200
+def test_home_model_asset_is_served():
     assert _static('/assets/js/home-model.js')['statusCode'] == 200
 
 
