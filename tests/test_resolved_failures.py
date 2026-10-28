@@ -178,7 +178,7 @@ def test_a_filtered_rerun_does_not_recover_the_failure(monkeypatch):
 def test_an_unfinished_rerun_does_not_recover_the_failure(monkeypatch):
     _configure(monkeypatch, [
         _step("wf-a", "post", "evt-2", status="processing",
-              started="2026-09-26T10:00:00+00:00"),
+              started="2026-09-26T10:00:00+00:00", lease_until=2**31),
         *_failed_run(),
     ])
 
