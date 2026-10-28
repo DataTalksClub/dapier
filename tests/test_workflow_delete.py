@@ -91,7 +91,6 @@ def github_ready(monkeypatch):
 @pytest.fixture
 def bundle(monkeypatch, tmp_path):
     """A deployed bundle carrying exactly the source workflow."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "test-flow.yaml").write_text(WORKFLOW_YAML)
     return tmp_path
 
@@ -452,7 +451,6 @@ def git_state(monkeypatch):
 def empty_bundle(monkeypatch, tmp_path):
     """A deploy-time bundle carrying nothing: a designer-created workflow
     lives only in the published store, so 'no longer matches' is observable."""
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     return tmp_path
 
 

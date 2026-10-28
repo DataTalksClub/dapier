@@ -337,7 +337,6 @@ def overview_env(monkeypatch, published, tmp_path):
     from src.dapier.connections import credentials as credentials_module
 
     monkeypatch.setattr(credentials_module.boto3, "resource", boto3.resource)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     monkeypatch.setenv("AWS_REGION", "eu-west-1")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     monkeypatch.setenv("CONNECTIONS_TABLE", "connections")

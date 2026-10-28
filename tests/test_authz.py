@@ -107,7 +107,6 @@ def test_overview_rejects_ordinary_user(monkeypatch):
 def test_overview_allows_operator(monkeypatch, tmp_path):
     operator_env(monkeypatch)
     token = session_token(monkeypatch)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     monkeypatch.setenv("AWS_REGION", "eu-west-1")
     dynamo(monkeypatch, {
         "executions": DictTable(("execution_id",)),

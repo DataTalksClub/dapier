@@ -103,7 +103,6 @@ def test_manifest_describes_the_bundle(bundle_dir):
 
 
 def test_empty_bundle_is_valid(tmp_path, monkeypatch):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
 
     status, payload = designer_store.api_export_all()

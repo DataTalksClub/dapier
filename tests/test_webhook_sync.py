@@ -150,7 +150,6 @@ def sync_engine(monkeypatch, tmp_path):
     monkeypatch.setenv("EVENT_QUEUE_URL", "https://sqs.example.test/events")
     monkeypatch.setenv("HOOK_TRIGGERS_TABLE", "hooks")
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))  # empty: only the hook's workflow
     for unused in ("TASK_USAGE_TABLE", "PUBLISHED_WORKFLOWS_TABLE",
                    "SCHEDULE_TRIGGERS_TABLE",
                    "POLL_TRIGGERS_TABLE", "TRIGGER_INBOX_TABLE"):

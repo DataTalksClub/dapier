@@ -226,14 +226,12 @@ def test_toggle_unconfigured_is_503(github_ready, monkeypatch):
 
 
 def test_toggle_unknown_workflow_is_404(published, monkeypatch, tmp_path):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))  # empty bundle, nothing published
     monkeypatch.delenv(designer_store.TOKEN_SECRET_ENV, raising=False)  # nowhere to fall back
     status, payload = designer_store.api_toggle("test-flow.yaml", {"enabled": False})
     assert status == 404
 
 
 def test_api_list_uses_published_state(github_ready, published, monkeypatch, tmp_path):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "bundled-flow.yaml").write_text(
         "id: bundled-flow\nenabled: true\n"
         "trigger:\n  connector: email\n  event: message.received\n"
@@ -251,7 +249,6 @@ def test_api_list_uses_published_state(github_ready, published, monkeypatch, tmp
 
 
 def test_api_get_prefers_the_published_state(published, monkeypatch, tmp_path):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "test-flow.yaml").write_text(
         WORKFLOW_YAML.replace("enabled: true", "enabled: false"))
     published_workflows.publish(seeded_workflow())
@@ -262,7 +259,6 @@ def test_api_get_prefers_the_published_state(published, monkeypatch, tmp_path):
 
 
 def test_engine_reads_published_workflows(published, monkeypatch, tmp_path):
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "test-flow.yaml").write_text(WORKFLOW_YAML)
     published_workflows.publish(seeded_workflow(enabled=False))
 
@@ -274,7 +270,6 @@ def test_engine_reads_published_workflows(published, monkeypatch, tmp_path):
 
 def test_engine_has_no_workflows_when_publish_table_absent(monkeypatch, tmp_path):
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     (tmp_path / "test-flow.yaml").write_text(WORKFLOW_YAML)
     merged = {workflow["id"]: workflow for workflow in matching.all_workflows()}
     assert merged == {}

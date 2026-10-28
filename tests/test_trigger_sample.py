@@ -186,7 +186,6 @@ def test_sample_ignores_a_bound_poll_serving_another_connector(monkeypatch, tmp_
 
 def test_sample_is_404_when_no_runs_and_no_workflow(monkeypatch, tmp_path):
     _tables_env(monkeypatch, [])
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
     status, payload = runs.api_trigger_sample("never-heard-of-it")
     assert status == 404
@@ -300,7 +299,6 @@ def test_agent_sample_returns_history_for_operators(monkeypatch):
 
 def test_agent_sample_404s_when_neither_source_applies(monkeypatch, tmp_path):
     configure_agent(monkeypatch, claims={"sub": "subject-1", "email": "op@datatalks.club"})
-    monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
     monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
     response = agent_api.route(
         agent_event(query={"workflow": "ghost"}), "GET", "/api/agent/triggers/sample")
