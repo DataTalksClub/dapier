@@ -405,7 +405,7 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Scan]
                 Resource: !GetAtt CredentialsTable.Arn
         # SendMessage belongs in this same statement: a separate policy for
         # one action once pushed the previous role over the cap and wedged
