@@ -748,8 +748,7 @@ def _slack_poll_token(item):
 
     connection = base._connected_connection(item["connection_id"])
     secret = credentials.get_credential(connection.get("credential_id"))
-    token = (secret.get("token") or secret.get("bot_token")
-             or secret.get("user_token") or secret.get("SLACK_BOT_TOKEN"))
+    token = secret.get("token")
     if not token:
         raise RuntimeError(
             f"connection {item['connection_id']} has no stored bot token")

@@ -431,7 +431,7 @@ def _fetch_sample(event=None, connection_id=None, limit=DEFAULT_LIMIT, transport
         try:
             secret = trigger_discovery.stored_secret(
                 connection["credential_id"], f"telegram connection '{connection['connection_id']}'")
-            token = secret.get("token") or secret.get("bot_token")
+            token = secret.get("token")
             if not token:
                 raise DiscoveryUpstream(
                     f"connection '{connection['connection_id']}' has no stored bot token")
