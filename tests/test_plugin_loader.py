@@ -13,7 +13,6 @@ from src.dapier.triggers import poll_sources
 MANIFEST = """\
 name: {name}
 version: 0.1.0
-core_compat: ">=1.0"
 provides:
 {provides}
 """
@@ -125,18 +124,6 @@ def test_provides_feed_registry_provider_mappings(plugin_root):
         registry.CONNECTION_TEST_ALIASES.pop("probe2", None)
 
 
-def test_core_compat_mismatch_warns_but_loads(plugin_root):
-    write_plugin(plugin_root, "probe")
-    manifest_path = plugin_root / "probe" / "plugin.yaml"
-    manifest_path.write_text(
-        manifest_path.read_text().replace('core_compat: ">=1.0"',
-                                          'core_compat: ">=99.0"'))
-    plugins.load_all()
-    assert plugins.compat_warnings() == [
-        "plugin probe 0.1.0 declares core_compat >=99.0 but core is "
-        f"{plugins.CORE_VERSION}"]
-
-
 def test_real_tree_loads_every_plugin():
     """The deployment smoke: the repo's plugins/ imports cleanly through the
     loader and each plugin's surface is registered exactly as before the
@@ -148,8 +135,6 @@ def test_real_tree_loads_every_plugin():
     expected = {"slack", "telegram", "dropbox", "aws", "zoom",
                 "google"}
     assert expected <= set(manifests), set(manifests)
-    for name in expected:
-        assert plugins.core_compat_ok(manifests[name]), name
 
     # chips: every migrated connector is in the trigger catalog (aws's chip
     # is named s3; the google plugin serves five chips off one connection)

@@ -1,6 +1,5 @@
 name: aws
 version: 1.0.0
-core_compat: ">=1.0"
 provides:
   providers: [aws, s3]
   discovery_sources:

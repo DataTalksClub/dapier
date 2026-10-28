@@ -1,6 +1,5 @@
 name: slack
 version: 1.0.0
-core_compat: ">=1.0"
 provides:
   providers: [slack]
   discovery_sources:

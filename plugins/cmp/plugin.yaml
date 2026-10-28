@@ -1,5 +1,4 @@
 name: cmp
 version: 1.0.0
-core_compat: ">=1.0"
 provides:
   providers: [cmp]

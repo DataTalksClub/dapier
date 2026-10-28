@@ -1,6 +1,5 @@
 name: hub
 version: 0.1.0
-core_compat: ">=1.0"
 provides:
   poll_sources: [hub.sessions]
   trigger_chips: [hub]

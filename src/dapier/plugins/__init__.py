@@ -22,16 +22,12 @@ from pathlib import Path
 
 import yaml
 
-#: The core's version, checked against each manifest's ``core_compat``.
-CORE_VERSION = "1.0.0"
-
 #: What a manifest may declare under ``provides``. Discovery sources and
 #: test aliases are applied into the registry's provider mappings; the rest
 #: document the plugin's surface (and are validated for shape only — the
 #: registrations themselves happen from ``plugin.py``).
-PROVIDES_KEYS = ("providers", "provider_aliases", "discovery_sources",
-                 "test_aliases", "trigger_chips", "poll_sources",
-                 "ingress", "intake_handlers")
+PROVIDES_KEYS = ("providers", "discovery_sources", "test_aliases",
+                 "trigger_chips", "poll_sources")
 
 
 class PluginError(Exception):
@@ -42,7 +38,6 @@ class PluginError(Exception):
 class Manifest:
     name: str
     version: str
-    core_compat: str
     provides: dict
 
 
@@ -76,46 +71,19 @@ def load_manifest(path):
     version = str(data.get("version") or "").strip()
     if not version:
         raise PluginError(f"{path}: manifest is missing 'version'")
-    compat = str(data.get("core_compat") or "").strip()
-    if not compat:
-        raise PluginError(f"{path}: manifest is missing 'core_compat'")
     provides = data.get("provides") or {}
     if not isinstance(provides, dict):
         raise PluginError(f"{path}: 'provides' must be a mapping")
     unknown = sorted(str(key) for key in provides if key not in PROVIDES_KEYS)
     if unknown:
         raise PluginError(f"{path}: unknown provides keys: {', '.join(unknown)}")
-    for key in ("discovery_sources", "test_aliases", "provider_aliases"):
+    for key in ("discovery_sources", "test_aliases"):
         if not isinstance(provides.get(key) or {}, dict):
             raise PluginError(f"{path}: provides.{key} must be a mapping")
-    return Manifest(name=name, version=version, core_compat=compat,
-                    provides=provides)
+    return Manifest(name=name, version=version, provides=provides)
 
 
-def _version_tuple(value):
-    parts = []
-    for piece in str(value).strip().lstrip(">").lstrip("=").strip().split("."):
-        try:
-            parts.append(int(piece))
-        except ValueError:
-            break
-    return tuple(parts)
-
-
-def core_compat_ok(manifest):
-    """Whether this core satisfies the manifest's ``core_compat`` range.
-
-    Only ``>=X.Y[.Z]`` (a bare ``X.Y[.Z]`` reads the same) — the range we
-    need while plugins and core ride the same mono-repo deploy.
-    """
-    want, have = _version_tuple(manifest.core_compat), _version_tuple(CORE_VERSION)
-    width = max(len(want), len(have))
-    want += (0,) * (width - len(want))
-    have += (0,) * (width - len(have))
-    return have >= want
-
-
-_state = {"loaded": False, "loading": False, "manifests": {}, "warnings": []}
+_state = {"loaded": False, "loading": False, "manifests": {}}
 
 
 def load_all(root=None):
@@ -146,10 +114,6 @@ def load_all(root=None):
         for name, manifest in manifests.items():
             _import_plugin(base, name)
             _apply_provides(manifest)
-            if not core_compat_ok(manifest):
-                _state["warnings"].append(
-                    f"plugin {name} {manifest.version} declares core_compat "
-                    f"{manifest.core_compat} but core is {CORE_VERSION}")
         _state["manifests"] = manifests
     except Exception:
         _state["loading"] = False
@@ -159,21 +123,11 @@ def load_all(root=None):
     return _state["manifests"]
 
 
-def loaded_manifests():
-    """``{name: Manifest}`` for the plugins this process has loaded."""
-    return dict(_state["manifests"])
-
-
-def compat_warnings():
-    """core_compat mismatches seen at load time (load_all still succeeded)."""
-    return list(_state["warnings"])
-
-
 def reset():
     """Test seam: forget the load. Registered registry entries are the
     caller's teardown responsibility (the registry's dicts are the plugins'
     output, not the loader's state)."""
-    _state.update(loaded=False, loading=False, manifests={}, warnings=[])
+    _state.update(loaded=False, loading=False, manifests={})
 
 
 def _root_on_path(base):
