@@ -1197,7 +1197,7 @@ def test_runs_export_defaults_to_the_suggested_filename(isolated_home, monkeypat
     assert (tmp_path / "dapier-runs-20260925-100000.csv").exists()
 
 
-@pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])
+@pytest.mark.parametrize("prefix", [["runs", "events"]])
 def test_inbox_list_hits_agent_endpoint(prefix, isolated_home, monkeypatch, capsys):
     calls = []
 
@@ -1216,7 +1216,7 @@ def test_inbox_list_hits_agent_endpoint(prefix, isolated_home, monkeypatch, caps
     assert "evt-1" in out and "no workflow" in out
 
 
-@pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])
+@pytest.mark.parametrize("prefix", [["runs", "events"]])
 def test_inbox_show_prints_the_stored_envelope(prefix, isolated_home, monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         assert (method, path) == ("GET", "/api/agent/triggers/inbox/evt-1")
@@ -1234,7 +1234,7 @@ def test_inbox_show_prints_the_stored_envelope(prefix, isolated_home, monkeypatc
     assert '{"action": "opened"}' in out
 
 
-@pytest.mark.parametrize("prefix", [["inbox"], ["runs", "events"]])
+@pytest.mark.parametrize("prefix", [["runs", "events"]])
 def test_inbox_replay_posts_to_the_agent_endpoint(prefix, isolated_home, monkeypatch, capsys):
     def fake_call(api_url, method, path, body=None, **kwargs):
         assert (method, path) == ("POST", "/api/agent/triggers/inbox/evt-1/replay")

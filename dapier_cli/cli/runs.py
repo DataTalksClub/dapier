@@ -1,8 +1,8 @@
-"""The `dapier runs` and `dapier inbox` nouns (and `runs events`)."""
+"""The `dapier runs` noun (including `runs events`)."""
 
 from .. import commands
 
-GROUPS = ("runs", "inbox")
+GROUPS = ("runs",)
 
 OUTCOME_HELP = ("Only events with this outcome: handled, failed, refused, unmatched, "
                 "pending (comma-separate several)")
@@ -90,19 +90,6 @@ def register(sub):
     runs_export_p.add_argument("--out",
                                help="Write the CSV here (default: the suggested filename)")
     _owner_filter(runs_export_p)
-    inbox_p = sub.add_parser("inbox", help="Trigger inbox: every inbound trigger event, matched or not")
-    inbox_sub = inbox_p.add_subparsers(dest="command", required=True)
-    inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
-    inbox_list_p.add_argument("--connector", help="Only events from this connector (e.g. webhook, telegram)")
-    inbox_list_p.add_argument("--limit", type=int, default=25)
-    inbox_list_p.add_argument("--outcome", help=OUTCOME_HELP)
-    inbox_list_p.add_argument("--next", dest="next_token",
-                              help="Page token from the previous call's `next page:` footer")
-    inbox_show_p = inbox_sub.add_parser("show", help="Show one inbox event's stored envelope")
-    inbox_show_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
-    inbox_replay_p = inbox_sub.add_parser("replay", help="Send an inbox event through the engine again (fresh event id)")
-    inbox_replay_p.add_argument("inbox_id", help="Inbox event ID from `dapier inbox list`")
-
     events_p = runs_sub.add_parser("events", help="Incoming events, including those no workflow handled")
     inbox_sub = events_p.add_subparsers(dest="event_command", required=True)
     inbox_list_p = inbox_sub.add_parser("list", help="Recent inbox events, newest first")
@@ -118,8 +105,6 @@ def register(sub):
 
 
 def run(args, api_url, debug, child=None):
-    if args.group == "inbox":
-        return _inbox(args, api_url, debug)
     if args.command == "events":
         args.command = args.event_command
         return _inbox(args, api_url, debug)

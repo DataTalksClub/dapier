@@ -2,7 +2,7 @@
 
 When the inbox detail API rehydrates a stored raw email, it includes its bounded
 `authentication_results`, `received_spf` and `dkim_signatures` header lists under `event.email`.
-`dapier inbox show INBOX_ID` prints these alongside From, recipient and Message-ID.
+`dapier runs events show INBOX_ID` prints these alongside From, recipient and Message-ID.
 This lets operators inspect received authentication evidence through Dapier's
 existing authenticated API without fetching mailbox objects with AWS credentials.
 

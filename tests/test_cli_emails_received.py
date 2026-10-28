@@ -2,7 +2,7 @@
 
 `dapier emails received` lists what the Emails page lists (the inbox
 filtered to email, optionally by outcome), with the same columns: when,
-from, to, subject, and what happened. `dapier inbox list` prints the same
+from, to, subject, and what happened. `dapier runs events list` prints the same
 outcome words and envelope line for email rows.
 """
 import pytest
@@ -61,7 +61,7 @@ def test_inbox_list_passes_the_outcome_filter(isolated_home, monkeypatch, capsys
 
     monkeypatch.setattr(commands.api, "call", fake_call)
 
-    assert main.main(["inbox", "list", "--connector", "email", "--outcome", "refused"]) == 0
+    assert main.main(["runs", "events", "list", "--connector", "email", "--outcome", "refused"]) == 0
     assert calls == ["/api/agent/triggers/inbox?limit=25&connector=email&outcome=refused"]
     assert "refused: sender not allowed" in capsys.readouterr().out
 
@@ -73,7 +73,7 @@ def test_inbox_show_prints_envelope_runs_and_attachments(isolated_home, monkeypa
                         "status": "completed"}])
     monkeypatch.setattr(commands.api, "call", lambda *a, **k: {"event": event})
 
-    assert main.main(["inbox", "show", "mail-1"]) == 0
+    assert main.main(["runs", "events", "show", "mail-1"]) == 0
     out = capsys.readouterr().out
     assert "outcome: handled by invoice-intake" in out
     assert "run: invoice-intake:mail-1 (completed)" in out
@@ -86,7 +86,7 @@ def test_inbox_show_prints_the_email_body(isolated_home, monkeypatch, capsys):
     event = dict(ROWS[0], email={**ROWS[0]["email"], "text": "Please pay the March invoice."})
     monkeypatch.setattr(commands.api, "call", lambda *a, **k: {"event": event})
 
-    assert main.main(["inbox", "show", "mail-1"]) == 0
+    assert main.main(["runs", "events", "show", "mail-1"]) == 0
     out = capsys.readouterr().out
     assert "body:" in out
     assert "Please pay the March invoice." in out

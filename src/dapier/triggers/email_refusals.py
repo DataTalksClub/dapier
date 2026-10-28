@@ -161,8 +161,8 @@ def alarm_details(changed_at=None, *, table_ref=None):
     details.sort(key=lambda row: row[0], reverse=True)
     shown = [row[1] for row in details[:20]]
     if len(details) > 20:
-        shown.append(f"{len(details) - 20} additional refusals; inspect dapier inbox list --outcome refused.")
-    return "\n\n".join(shown) or "No retained refusal context; inspect worker ERROR logs and dapier inbox list --outcome refused."
+        shown.append(f"{len(details) - 20} additional refusals; inspect dapier runs events list --outcome refused.")
+    return "\n\n".join(shown) or "No retained refusal context; inspect worker ERROR logs and dapier runs events list --outcome refused."
 
 
 def heartbeat(event, context):

@@ -38,7 +38,7 @@ directly.
 
 `auth`, `connections`, `credentials`, `grants`, `tokens`,
 `oauth-clients`, `overview`, `usage`, `quota`, `errors`, `agent-tasks`,
-`workers`, `worker`, `catalog`, `runs`, `inbox`, `audit`, `storage`,
+`workers`, `worker`, `catalog`, `runs`, `audit`, `storage`,
 `workflows`, `webhooks`, `schedules`, `polls`, `emails`.
 
 Scripts needing a provider token fetch it in-script via the `dtoken.py`
@@ -70,7 +70,7 @@ uv run dapier emails list
 uv run dapier emails show invoice
 
 # Incoming events, matched or not
-uv run dapier inbox list --limit 10
+uv run dapier runs events list --limit 10
 ```
 
 ## Gotchas

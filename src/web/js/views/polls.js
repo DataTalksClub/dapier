@@ -11,7 +11,7 @@
    POST …/reset {to: now|date}              move position   (dapier polls reset)
    PUT/DELETE /api/admin/poll-triggers      create/edit/delete (dapier polls save|delete)
    Item detail + Replay reuse /api/admin/triggers/inbox/<id>[/replay]
-   (dapier inbox show|replay). */
+   (dapier runs events show|replay). */
 import { state } from '../state.js';
 import { $, $$, icons, notice, openWhenReady, collectionCreate } from '../ui.js';
 import { api } from '../api.js';

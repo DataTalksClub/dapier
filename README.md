@@ -94,7 +94,7 @@ any step — connector action or logic step (`filter`, `condition`, `paths`,
 The console’s Runs page combines workflow executions with incoming events, including
 events no workflow handled. Inspect or replay these with `dapier runs events list`,
 `dapier runs events show <event-id>`, and `dapier runs events replay <event-id>`.
-The older `dapier inbox` commands and `/inbox` console links remain compatible.
+The older `/inbox` console links remain compatible.
 
 Every run is recorded in run history (console → Runs, or `dapier runs list`),
 and any run — failed or successful — can be re-executed with its original
@@ -352,7 +352,7 @@ headers, attachment names, runs, **Replay**, and — for a refused sender —
 bounce/complaint watchers in the same list). Select an address to see who
 can write to it — an allow-list of senders, or anyone.
 `dapier emails received [--outcome handled,failed|refused|unmatched]` prints
-the same list from the same inbox API; `dapier inbox show <id>` the detail.
+the same list from the same inbox API; `dapier runs events show <id>` the detail.
 
 ```bash
 dapier emails received --outcome refused
@@ -532,7 +532,7 @@ dapier polls check blog-feed           # Poll now (queued on the worker)
 dapier polls pause blog-feed           # or resume; the position is kept
 dapier polls reset blog-feed --now     # skip everything waiting
 dapier polls reset blog-feed --from 2026-10-01   # timestamp-positioned polls: re-read from a date
-dapier inbox show <inbox-id>           # a picked-up item; `dapier inbox replay <id>` re-runs it
+dapier runs events show <inbox-id>    # a picked-up item; `dapier runs events replay <id>` re-runs it
 ```
 
 Each check records its outcome (`pollstat#<name>` in the cursors table), so

@@ -86,7 +86,7 @@ def polls_show(api_url, name, debug=False):
     return 0
 
 
-# The plain-words outcomes `dapier inbox list` and the console use.
+# The plain-words outcomes `dapier runs events list` and the console use.
 OUTCOME_TEXT = {
     "matched": "handled",
     "unmatched": "unmatched",
@@ -115,7 +115,7 @@ def polls_activity(api_url, name=None, limit=25, debug=False):
             print(f"    run: {run}")
         if item.get("error"):
             print(f"    error: {item['error']}")
-        print(f"    inbox: {item.get('inbox_id')}  (`dapier inbox show|replay <id>`)")
+        print(f"    inbox: {item.get('inbox_id')}  (`dapier runs events show|replay <id>`)")
     return 0
 
 

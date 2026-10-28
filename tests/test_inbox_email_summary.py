@@ -1,7 +1,7 @@
 """Inbox rows for email: envelope summary, outcome words, run links.
 
 The console's Emails page is a mailbox of what Dapier received and what
-happened to each message; `dapier emails received` / `dapier inbox list`
+happened to each message; `dapier emails received` / `dapier runs events list`
 print the same columns. Both read these fields from the inbox API.
 """
 import json
@@ -123,7 +123,7 @@ def test_api_list_filters_by_outcome(table):  # noqa: F811
 
 
 def test_api_get_includes_the_decoded_body(table):  # noqa: F811
-    """The reading pane (and `dapier inbox show`) load text/html on the
+    """The reading pane (and `dapier runs events show`) load text/html on the
     single-event read; list rows stay envelope-only."""
     inbox.record(EMAIL, table_ref=table)
     _, payload = inbox.api_get("mail-1", table_ref=table)
