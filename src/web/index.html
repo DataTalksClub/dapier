@@ -245,6 +245,9 @@
             <label><span class="visually-hidden">Connection status</span><select id="connection-status-filter" aria-label="Connection status"><option value="all">All statuses</option><option value="connected">Connected</option><option value="attention">Needs attention</option></select></label>
             <span id="connection-summary" class="field-hint connection-summary" role="status">Loading accounts…</span>
           </div>
+          <div class="dk-toolbar__end">
+            <button id="import-connection" class="dk-button dk-button--secondary" type="button">Import</button>
+          </div>
         </div>
         <div id="connection-filter-empty" class="empty-state" hidden><h3>No matching accounts</h3><p>No accounts match these filters.</p></div>
         <div id="connection-register" class="connection-register"></div>
@@ -596,6 +599,44 @@
       <div class="dialog-actions dk-dialog__foot">
         <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
         <button class="dk-button dk-button--primary" type="submit">Create connection</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-connection-dialog" aria-labelledby="import-connection-title" class="dk-dialog">
+    <form id="import-connection-form" method="dialog" autocomplete="off">
+      <div class="dialog-head dk-dialog__head">
+        <h2 id="import-connection-title">Import a connection</h2>
+        <button class="icon-button dialog-close" type="button" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body dk-dialog__body">
+        <p class="sub">Bring an existing provider credential over. It is verified against the provider before anything is stored, and it only travels in this request.</p>
+        <label>Provider<select name="provider">
+          <option value="google">Google</option>
+          <option value="youtube">YouTube</option>
+          <option value="dropbox">Dropbox</option>
+          <option value="slack">Slack</option>
+          <option value="telegram">Telegram</option>
+          <option value="dataops">DataOps</option>
+          <option value="cmp">CMP</option>
+          <option value="llm">LLM</option>
+          <option value="zoom">Zoom Webhooks</option>
+        </select></label>
+        <label>Connection ID<input name="connection_id" class="mono-input" placeholder="google-work" pattern="[a-z0-9][a-z0-9_-]{1,62}" required><small class="field-hint">Lowercase letters, numbers, dashes.</small></label>
+        <label id="import-credential-label">Credential<input name="credential" class="mono-input secret-input" type="password" autocomplete="new-password" required><small id="import-credential-hint" class="field-hint"></small></label>
+        <label id="import-signing-field" hidden>Slack signing secret<input name="signing_secret" class="mono-input secret-input" type="password" autocomplete="new-password" placeholder="From the app's credentials page"></label>
+        <label id="import-scopes-field" hidden>Scopes<input name="scopes" class="mono-input" placeholder="space-separated scopes"><small class="field-hint">Blank imports the provider's standard set.</small></label>
+        <label id="import-root-field" hidden>Dropbox root path<input name="root_path" class="mono-input" placeholder="/scans"></label>
+        <details id="import-advanced"><summary>Advanced</summary>
+          <label>Client ID<input name="client_id" class="mono-input" placeholder="For tokens issued by another OAuth client"></label>
+          <label>Client secret<input name="client_secret" class="mono-input secret-input" type="password" autocomplete="new-password"></label>
+          <label>Expected account<input name="expected_account_id" placeholder="Refuse the import unless the verified account matches"></label>
+        </details>
+        <p id="import-connection-error" class="form-error" role="alert"></p>
+      </div>
+      <div class="dialog-actions dk-dialog__foot">
+        <button class="dk-button dk-button--secondary dialog-close" type="button">Cancel</button>
+        <button class="dk-button dk-button--primary" type="submit">Import connection</button>
       </div>
     </form>
   </dialog>

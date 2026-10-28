@@ -1482,6 +1482,109 @@ $('#connection-form').addEventListener('submit', async (event) => {
   finally { submit.disabled = false; submit.textContent = 'Create connection'; }
 });
 
+/* Import: bring an existing provider credential over through the same
+   operator endpoint the CLI's `connections import` drives server-side
+   (import_core — the admin route wraps it, no console-side rules). Token
+   providers paste their credential, the LLM imports its connection config,
+   OAuth providers paste the authorized-user JSON whose refresh_token is
+   transferred (and verified) server-side. */
+const IMPORT_PROVIDERS = {
+  google: { kind: 'oauth', label: 'Authorized-user JSON' },
+  youtube: { kind: 'oauth', label: 'Authorized-user JSON' },
+  dropbox: { kind: 'oauth', label: 'Authorized-user JSON', rootPath: true },
+  slack: { kind: 'token', label: 'Slack token', signingSecret: true },
+  telegram: { kind: 'token', label: 'Bot token' },
+  dataops: { kind: 'token', label: 'DataOps token' },
+  cmp: { kind: 'token', label: 'CMP API token' },
+  llm: { kind: 'llm', label: 'Connection config JSON' },
+  zoom: { kind: 'token', label: 'Webhook Secret Token' },
+};
+
+const IMPORT_CREDENTIAL_PLACEHOLDERS = {
+  google: '{"refresh_token": "1//…"}',
+  youtube: '{"refresh_token": "1//…"}',
+  dropbox: '{"refresh_token": "…"}',
+  slack: 'xoxb-… or xoxp-…',
+  telegram: '123456:ABC-DEF…',
+  dataops: 'DataOps API token',
+  cmp: 'CMP API token',
+  llm: '{"auth_type": "api_key", "base_url": "…", "model": "…"}',
+  zoom: 'Secret Token from Zoom Marketplace',
+};
+
+function syncImportFields() {
+  const form = $('#import-connection-form');
+  const meta = IMPORT_PROVIDERS[form.provider.value] || IMPORT_PROVIDERS.google;
+  $('#import-credential-label').firstChild.textContent = meta.label;
+  form.credential.placeholder = IMPORT_CREDENTIAL_PLACEHOLDERS[form.provider.value] || '';
+  $('#import-credential-hint').textContent = meta.kind === 'oauth'
+    ? 'The authorized-user JSON with the refresh_token to transfer.'
+    : meta.kind === 'llm'
+      ? 'The connection config JSON; verified (a live model call) before saving.'
+      : 'Pasted once, verified server-side, never logged.';
+  $('#import-signing-field').hidden = !meta.signingSecret;
+  $('#import-scopes-field').hidden = meta.kind !== 'oauth';
+  $('#import-root-field').hidden = !meta.rootPath;
+  $('#import-advanced').hidden = meta.kind !== 'oauth';
+}
+
+function openImportDialog() {
+  const form = $('#import-connection-form');
+  form.reset();
+  form.provider.value = 'google';
+  $('#import-connection-error').textContent = '';
+  syncImportFields();
+  $('#import-connection-dialog').showModal();
+  form.connection_id.focus();
+}
+
+$('#import-connection').addEventListener('click', openImportDialog);
+$('#import-connection-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit.disabled) return;
+  submit.disabled = true;
+  submit.textContent = 'Importing…';
+  $('#import-connection-error').textContent = '';
+  try {
+    const provider = form.provider.value;
+    const meta = IMPORT_PROVIDERS[provider] || IMPORT_PROVIDERS.google;
+    const body = {
+      connection_id: form.connection_id.value.trim(),
+      provider,
+    };
+    if (meta.kind === 'token') {
+      body.token = form.credential.value.trim();
+      if (meta.signingSecret && form.signing_secret.value.trim()) body.signing_secret = form.signing_secret.value.trim();
+    } else if (meta.kind === 'llm') {
+      let config;
+      try { config = JSON.parse(form.credential.value); } catch { throw new Error('The credential must be the connection config JSON.'); }
+      if (!config || typeof config !== 'object' || Array.isArray(config)) throw new Error('The connection config must be a JSON object.');
+      body.llm_config = config;
+    } else {
+      let authorized;
+      try { authorized = JSON.parse(form.credential.value); } catch { throw new Error('The credential must be the authorized-user JSON with a refresh_token.'); }
+      if (!authorized || typeof authorized !== 'object' || !authorized.refresh_token) throw new Error('The authorized-user JSON has no refresh_token.');
+      body.authorized_user = { refresh_token: String(authorized.refresh_token) };
+      if (form.client_id.value.trim()) body.client_id = form.client_id.value.trim();
+      if (form.client_secret.value.trim()) body.client_secret = form.client_secret.value.trim();
+      if (form.expected_account_id.value.trim()) body.expected_account_id = form.expected_account_id.value.trim();
+      const scopes = form.scopes.value.trim().split(/[\s,]+/).filter(Boolean);
+      if (scopes.length) body.scopes = scopes;
+      if (meta.rootPath && form.root_path.value.trim()) body.root_path = form.root_path.value.trim();
+    }
+    const saved = await api('/api/admin/connections/import', { method: 'POST', body: JSON.stringify(body) });
+    form.credential.value = '';
+    form.signing_secret.value = '';
+    form.client_secret.value = '';
+    $('#import-connection-dialog').close();
+    notice(`Imported ${accountLabel(saved || { provider })}`);
+    await refreshConnections();
+  } catch (error) { $('#import-connection-error').textContent = error.message; }
+  finally { submit.disabled = false; submit.textContent = 'Import connection'; }
+});
+
 $('#edit-connection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
