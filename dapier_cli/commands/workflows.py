@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from .. import api
 
-__all__ = ["WorkflowRefError", "resolve_workflow_ref", "workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_export_all_bundle", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_code", "workflows_test_step", "workflows_versions"]
+__all__ = ["WorkflowRefError", "resolve_workflow_ref", "workflows_bulk_enabled", "workflows_delete", "workflows_diff", "workflows_discard", "workflows_draft_diff", "workflows_duplicate", "workflows_export", "workflows_export_all", "workflows_folder", "workflows_list", "workflows_publish", "workflows_rollback", "workflows_save", "workflows_set_enabled", "workflows_show", "workflows_tags", "workflows_test", "workflows_test_code", "workflows_test_step", "workflows_versions"]
 
 
 def workflows_list(api_url, debug=False, search=None, tag=None, folder=None):
@@ -167,35 +167,6 @@ def workflows_export_all(api_url, output=None, debug=False):
     note = f" (skipped: {', '.join(skipped)})" if skipped else ""
     print(f"Exported {count} workflow(s) to {target}{note}.")
     print("Each workflow is workflows/<file>.yaml; manifest.json describes the bundle.")
-    return 0
-
-
-def workflows_export_all_bundle(api_url, out=None, debug=False):
-    """`workflows export-all`: the server-built zip of every workflow's YAML.
-
-    Thin client over the operator-gated export-all endpoint — the same domain
-    function the console's Export-all button drives. The zip arrives base64
-    in the JSON body and is decoded here; unlike `workflows export --all`
-    nothing is fetched per workflow or assembled client-side.
-    """
-    data = api.call(api_url, "GET", "/api/agent/designer/workflows/export-all", debug=debug)
-    try:
-        raw = base64.b64decode(data.get("b64") or "")
-    except (ValueError, TypeError):
-        print("The API returned an unreadable bundle.")
-        return 5
-    # The server suggests the filename; basename keeps a hostile suggestion
-    # from writing outside the caller's directory.
-    target = out or os.path.basename(data.get("filename") or "") or "dapier-workflows.zip"
-    try:
-        with open(target, "wb") as handle:
-            handle.write(raw)
-    except OSError as exc:
-        print(f"Cannot write {target}: {exc}")
-        return 2
-    skipped = data.get("skipped") or []
-    note = f" (skipped: {', '.join(skipped)})" if skipped else ""
-    print(f"Exported {data.get('count', 0)} workflow(s) to {target}{note}")
     return 0
 
 

@@ -20,7 +20,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["designer_api", "designer_bulk_api", "designer_delete_api", "designer_discard_api", "designer_draft_api", "designer_draft_diff_api", "designer_duplicate_api", "designer_export_all_api", "designer_export_api", "designer_folder_api", "designer_publish_api", "designer_rollback_api", "designer_tags_api", "designer_test_api", "designer_test_code_api", "designer_test_step_api", "designer_toggle_api", "designer_versions_api", "designer_versions_diff_api"]
+__all__ = ["designer_api", "designer_bulk_api", "designer_delete_api", "designer_discard_api", "designer_draft_api", "designer_draft_diff_api", "designer_duplicate_api", "designer_export_api", "designer_folder_api", "designer_publish_api", "designer_rollback_api", "designer_tags_api", "designer_test_api", "designer_test_code_api", "designer_test_step_api", "designer_toggle_api", "designer_versions_api", "designer_versions_diff_api"]
 
 
 
@@ -51,25 +51,6 @@ def designer_api(event, method, source=None):
     audit.emit(str(payload.get("file", "unknown")), "workflow.save", subject,
                outcome="ok" if status == 200 else "error")
     return _json_response(status, payload)
-
-
-def designer_export_all_api(event):
-    """Operator-only export-all: every workflow's canonical YAML as one zip.
-
-    Same domain function as /api/admin/designer/workflows/export-all — the
-    zip is built once server-side and ships base64 in the JSON body, so the
-    CLI never assembles or renders YAML itself. The export itself is audited,
-    mirroring the audit CSV export: bulk reads leave a mark in the trail;
-    denials are recorded by require_operator.
-    """
-    subject, error = require_operator(event, "workflow.export-all")
-    if error:
-        return error
-    status, payload = designer_store.api_export_all(
-        visible=_visibility(event, subject))
-    if status == 200:
-        audit.emit("workflows", "workflow.export-all", subject, outcome="ok")
-    return _no_store(_json_response(status, payload))
 
 
 def designer_export_api(event):

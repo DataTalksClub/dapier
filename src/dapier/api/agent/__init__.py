@@ -236,8 +236,6 @@ def _route(event, method, path):
         return designer_test_code_api(event, None)
     if path == "/api/agent/designer/workflows/bulk" and method == "POST":
         return designer_bulk_api(event)
-    if path == "/api/agent/designer/workflows/export-all" and method == "GET":
-        return designer_export_all_api(event)
     if path == "/api/agent/designer/export" and method == "GET":
         return designer_export_api(event)
     if path == "/api/agent/discover" and method == "POST":

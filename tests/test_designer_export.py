@@ -3,8 +3,7 @@ workflow's canonical YAML plus a manifest.json, served by both operator
 routes — /api/admin/designer/export (the console's Export-all button) and
 /api/agent/designer/export (`workflows export --all`).
 
-Follows the established export test conventions (test_export_all.py,
-test_designer.py): a WORKFLOWS_DIR with a couple of files for the domain
+Follows the established export test conventions (test_designer.py): a WORKFLOWS_DIR with a couple of files for the domain
 bundle, the signed session/bearer events for the two dispatchers. The
 assertions that matter: each zip entry's bytes equal what api_get serves for
 that file, the manifest rows carry file/enabled/tags/folder/version, and the
@@ -191,6 +190,35 @@ def test_export_refuses_more_than_the_cap(monkeypatch):
 
     assert status == 400
     assert "cap" in payload["error"]
+
+
+def test_export_entries_reimport_byte_identical(bundle_dir):
+    """Parsing an entry and re-rendering it (what a save commits) reproduces
+    the same bytes, so every entry re-saves through `workflows save`."""
+    _, payload = designer_store.api_export()
+
+    with zipfile.ZipFile(io.BytesIO(base64.b64decode(payload["b64"]))) as bundle:
+        for name in bundle.namelist():
+            if not name.endswith(".yaml"):
+                continue
+            entry = bundle.read(name).decode()
+            assert designer_store.workflow_yaml_text(
+                designer_store.parse_workflow(entry)) == entry
+
+
+def test_empty_export_is_a_valid_bundle(monkeypatch):
+    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
+
+    status, payload = designer_store.api_export()
+
+    assert status == 200
+    assert payload["count"] == 0
+    assert payload["skipped"] == []
+    with zipfile.ZipFile(io.BytesIO(base64.b64decode(payload["b64"]))) as bundle:
+        assert bundle.namelist() == ["manifest.json"]
+        manifest = json.loads(bundle.read("manifest.json"))
+    assert manifest["count"] == 0
+    assert manifest["workflows"] == []
 
 
 # --- routes -----------------------------------------------------------------------

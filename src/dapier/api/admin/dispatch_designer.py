@@ -46,9 +46,6 @@ bulk, and export."""
     if method == "POST" and path == "/api/admin/designer/workflows/bulk":
         return routes.bulk_designer_workflow(event, operator_subject,
                                              visible=_read_scope(operator_payload))
-    if method == "GET" and path == "/api/admin/designer/workflows/export-all":
-        return routes.export_all_designer_workflows(event, operator_subject,
-                                                    visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/export":
         return routes.export_designer_workflows(event, operator_subject,
                                                 visible=_read_scope(operator_payload))

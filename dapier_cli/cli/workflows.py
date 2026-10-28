@@ -27,11 +27,6 @@ def register(sub):
     wf_export_p.add_argument("-o", "--output", default=None,
                              help="Write the YAML (or with --all the zip) to this "
                                   "file instead of stdout / workflows-export.zip")
-    wf_export_all_p = wf_sub.add_parser(
-        "export-all", help="Every workflow's canonical YAML as one server-built zip")
-    wf_export_all_p.add_argument("-o", "--out", dest="out", default=None,
-                                 help="Write the zip here (default: the server-suggested "
-                                      "dapier-workflows-YYYYMMDD.zip)")
     wf_save_p = wf_sub.add_parser("save", help="Save a workflow YAML as a draft "
                                   "(nothing goes live; publish it with workflows publish)")
     wf_save_p.add_argument("file", help="Path to the workflow YAML, or - for stdin")
@@ -189,8 +184,6 @@ def run(args, api_url, debug, child=None):
             print("Error: name a workflow file (e.g. my-flow.yaml) or pass --all.")
             return 2
         return commands.workflows_export(api_url, args.file, output=args.output, debug=debug)
-    if args.command == "export-all":
-        return commands.workflows_export_all_bundle(api_url, out=args.out, debug=debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
     if args.command in ("on", "off"):
