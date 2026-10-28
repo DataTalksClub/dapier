@@ -155,10 +155,10 @@ def test_grants_list_rejects_invalid_token():
     assert "token" in payload["error"].lower()
 
 
-def test_list_grants_backward_compatible_full_sorted_walk():
+def test_list_grants_full_sorted_walk():
     table = PagedGrantTable()
     seed_grants(table, 150)
-    items = authz.list_grants(table)  # legacy call: no limit, plain list back
+    items = authz.list_grants(table)
     assert len(items) == 150
     keys = [(item["connection_id"], item["grantee"]) for item in items]
     assert keys == sorted(keys)

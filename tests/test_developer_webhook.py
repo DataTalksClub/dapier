@@ -34,9 +34,10 @@ def test_build_intake_payload_defaults(monkeypatch):
 
 def test_handle_creates_intake_and_optional_assign(monkeypatch):
     secret = "hook-secret"
-    monkeypatch.setenv("DEVELOPER_WEBHOOK_SECRET", secret)
+    monkeypatch.setenv("DEVELOPER_WEBHOOK_SECRET_NAME", "dapier/developer-webhook")
     monkeypatch.setenv("HUB_INTAKE_TOKEN_SECRET_NAME", "dapier/hub-intake")
-    monkeypatch.setattr(dw.base, "secrets_value", lambda _sid: "hub-token")
+    monkeypatch.setattr(dw.base, "secrets_value",
+                        lambda sid: secret if sid == "dapier/developer-webhook" else "hub-token")
     calls = []
 
     def transport(method, url, headers=None, body=None):
@@ -56,14 +57,14 @@ def test_handle_creates_intake_and_optional_assign(monkeypatch):
 
 
 def test_handle_rejects_bad_signature(monkeypatch):
-    monkeypatch.setenv("DEVELOPER_WEBHOOK_SECRET", "hook-secret")
+    monkeypatch.setenv("DEVELOPER_WEBHOOK_SECRET_NAME", "dapier/developer-webhook")
+    monkeypatch.setattr(dw.base, "secrets_value", lambda _sid: "hook-secret")
     status, answer = dw.handle({}, b'{"title":"x"}')
     assert status == 401
     assert answer["error"] == "invalid signature"
 
 
 def test_handle_unconfigured(monkeypatch):
-    monkeypatch.delenv("DEVELOPER_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("DEVELOPER_WEBHOOK_SECRET_NAME", raising=False)
     status, answer = dw.handle({}, b"{}")
     assert status == 503

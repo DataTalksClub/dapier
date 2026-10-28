@@ -135,15 +135,14 @@ def delete_grant(table, *, connection_id, grantee_id):
     table.delete_item(Key={"connection_id": connection_id, "grantee": grantee_id})
 
 
-def list_grants(table, connection_id=None, limit=None):
+def list_grants(table, connection_id=None):
     """The grant items, sorted by ``(connection_id, grantee)``.
 
     A full walk: a single-page scan silently clipped at DynamoDB's page
-    limit, so grant #101 was unreachable. ``limit`` (legacy callers) slices
-    the sorted result; page tokens go through api_list_grants.
+    limit, so grant #101 was unreachable. Page tokens go through
+    api_list_grants.
     """
-    items = sorted(_scan_all_grants(table, connection_id), key=_grant_sort_key)
-    return items[:limit] if limit else items
+    return sorted(_scan_all_grants(table, connection_id), key=_grant_sort_key)
 
 
 # The paged list (api_list_grants): the same opaque-token contract as the

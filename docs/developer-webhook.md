@@ -13,8 +13,8 @@ Auth (either):
 
 Secret source (env / Secrets Manager, never git):
 
-- `DEVELOPER_WEBHOOK_SECRET` (literal) or `DEVELOPER_WEBHOOK_SECRET_ID`
-- Hub call uses `HUB_INTAKE_TOKEN_SECRET_ID` (bearer token or JSON `{"token":"..."}`)
+- `DEVELOPER_WEBHOOK_SECRET_NAME` (Secrets Manager id; raw value or JSON)
+- Hub call uses `HUB_INTAKE_TOKEN_SECRET_NAME` (bearer token or JSON `{"token":"..."}`)
 - Optional `HUB_INTAKE_URL` (default `https://hub.dtcdev.click/api/intake/tasks`)
 
 ### Body

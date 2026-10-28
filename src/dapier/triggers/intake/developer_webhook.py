@@ -37,9 +37,6 @@ def _headers_lower(headers):
 
 def webhook_secret():
     """Shared secret for inbound Developer deliveries, or empty if unset."""
-    raw = (os.environ.get("DEVELOPER_WEBHOOK_SECRET") or "").strip()
-    if raw:
-        return raw
     secret_id = (os.environ.get("DEVELOPER_WEBHOOK_SECRET_NAME") or "").strip()
     if not secret_id:
         return ""
