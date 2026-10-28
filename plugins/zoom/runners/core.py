@@ -144,14 +144,6 @@ def _created_view(meeting):
     }
 
 
-def _flag(action, key):
-    """Designer boolean fields arrive as "true"/"false" strings."""
-    value = action.get(key)
-    if isinstance(value, str):
-        return value.strip().lower() in ("true", "1", "yes", "on")
-    return bool(value)
-
-
 def _participant_view(participant):
     """One attendee as steps consume them: who, and when they were in the
     room — the API row trimmed to the keys an attendance email or a sheet

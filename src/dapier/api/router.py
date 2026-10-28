@@ -16,6 +16,7 @@ import boto3
 
 from . import admin
 from ..connections.providers import oauth_clients
+from ..http import header
 
 
 queue = boto3.client("sqs")
@@ -171,14 +172,6 @@ def _body(event):
     return base64.b64decode(raw) if event.get("isBase64Encoded") else raw.encode()
 
 
-def _header(event, name):
-    expected = name.lower()
-    return next(
-        (str(value) for key, value in (event.get("headers") or {}).items() if key.lower() == expected),
-        "",
-    )
-
-
 def _refuse_zoom_delivery(connection_id):
     """Record a rejected Zoom delivery in the trigger inbox.
 
@@ -259,7 +252,7 @@ def _verify_youtube(event, body):
         return True
     if _youtube_secret is None:
         _youtube_secret = secret_value(secret_id)
-    signature = _header(event, "x-hub-signature")
+    signature = header(event, "x-hub-signature")
     if not signature.startswith("sha1="):
         return False
     expected = hmac.new(_youtube_secret.encode(), body, hashlib.sha1).hexdigest()
@@ -285,7 +278,7 @@ def _dropbox_secrets():
 
 
 def _verify_dropbox(event, body):
-    signature = _header(event, "x-dropbox-signature")
+    signature = header(event, "x-dropbox-signature")
     if not signature:
         return False
     return any(
@@ -341,7 +334,7 @@ def _hook_item(name):
 
 def _bearer_token(event):
     """Token from ``Authorization: Bearer <token>`` (bare values tolerated)."""
-    value = _header(event, "authorization").strip()
+    value = header(event, "authorization").strip()
     scheme, _, token = value.partition(" ")
     return token.strip() if scheme.lower() == "bearer" else value
 
@@ -444,13 +437,13 @@ def _webhook_hook(event, name, body, query):
         # signature is sufficient on its own.
         if not hook_triggers.verify_signature(
                 item["secret"], body,
-                _header(event, hook_triggers.signature_header_for(item))):
+                header(event, hook_triggers.signature_header_for(item))):
             return _response(401, {"error": "invalid signature"})
     else:
         supplied = _bearer_token(event)
         if not supplied or not hmac.compare_digest(supplied, item.get("token") or ""):
             return _response(401, {"error": "invalid token"})
-    content_type = _header(event, "content-type").split(";")[0].strip().lower()
+    content_type = header(event, "content-type").split(";")[0].strip().lower()
     payload = _webhook_payload(body, content_type)
     mode = ((item.get("response") or {}).get("mode")) or "ack"
     if mode == "challenge":
@@ -623,7 +616,7 @@ def _telegram_hook(event, name, body):
     item = _hook_item(name)
     if not item or item.get("kind") != "telegram":
         return _response(404, {"error": "unknown hook"})
-    secret = _header(event, TELEGRAM_SECRET_HEADER)
+    secret = header(event, TELEGRAM_SECRET_HEADER)
     if not secret or not hmac.compare_digest(secret, item.get("token") or ""):
         return _response(401, {"error": "invalid secret"})
     try:

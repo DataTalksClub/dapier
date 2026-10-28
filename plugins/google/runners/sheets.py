@@ -7,6 +7,7 @@ import urllib.parse
 from src.dapier.connections import tokens
 from src.dapier.engine.actions import base
 from src.dapier.engine.actions.templating import render
+from src.dapier.engine.actions.base import flag
 
 VALUE_INPUT_OPTIONS = ("USER_ENTERED", "RAW")
 
@@ -188,14 +189,6 @@ def _create_rows(action, event, steps=None):
         raise
 
 
-def _flag(action, key):
-    """Designer boolean fields arrive as "true"/"false" strings."""
-    value = action.get(key)
-    if isinstance(value, str):
-        return value.strip().lower() in ("true", "1", "yes", "on")
-    return bool(value)
-
-
 _NOT_FOUND = {"found": False, "row_number": None, "row": None, "values": None}
 
 
@@ -241,7 +234,7 @@ def run_sheets_find_row(action, event, *, transport=None, steps=None):
                 return {"found": True, "row_number": offset + 1,
                         "row": row_dict, "values": cells}
 
-    if not _flag(action, "create_if_missing"):
+    if not flag(action, "create_if_missing"):
         return dict(_NOT_FOUND)
     create_rows = _create_rows(action, event, steps)
     option = str(action.get("value_input_option") or "USER_ENTERED").strip().upper()

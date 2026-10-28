@@ -15,6 +15,7 @@ from src.dapier.engine import logic_pkg as logic
 from src.dapier.engine.actions import base
 from src.dapier.engine.actions import telegram_format
 from src.dapier.engine.actions.templating import render
+from src.dapier.engine.actions.base import flag
 
 SLACK_LOOKUP_BY_EMAIL_URL = "https://slack.com/api/users.lookupByEmail"
 SLACK_CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list"
@@ -122,14 +123,6 @@ def _slack_rpc(url, token, payload, *, transport=None):
     return data
 
 
-def _flag(action, key):
-    """Designer boolean fields arrive as "true"/"false" strings."""
-    value = action.get(key)
-    if isinstance(value, str):
-        return value.strip().lower() in ("true", "1", "yes", "on")
-    return bool(value)
-
-
 def run_slack_find(action, event, steps=None, transport=None):
     """Look up one workspace user or channel; a miss is a result, not an error.
 
@@ -191,7 +184,7 @@ def run_slack_find(action, event, steps=None, transport=None):
         cursor = (data.get("response_metadata") or {}).get("next_cursor")
         if not cursor:
             break
-    if not _flag(action, "create_if_missing"):
+    if not flag(action, "create_if_missing"):
         return {"found": False, "channel": None}
     # Find-or-create channel (Zapier's pairing): the missed query is the name
     # to reserve, normalized exactly like slack_create_channel normalizes.
@@ -199,7 +192,7 @@ def run_slack_find(action, event, steps=None, transport=None):
     if not name:
         return {"found": False, "channel": None}
     data = _slack_rpc(SLACK_CONVERSATIONS_CREATE_URL, token,
-                      {"name": name, "is_private": _flag(action, "is_private")},
+                      {"name": name, "is_private": flag(action, "is_private")},
                       transport=transport)
     if not data.get("ok"):
         raise RuntimeError(f"Slack create-channel failed: {data.get('error', 'unknown_error')}")
@@ -207,7 +200,7 @@ def run_slack_find(action, event, steps=None, transport=None):
     return {"found": True, "created": True, "channel": {
         "id": channel.get("id"),
         "name": channel.get("name") or name,
-        "is_private": bool(channel.get("is_private", _flag(action, "is_private"))),
+        "is_private": bool(channel.get("is_private", flag(action, "is_private"))),
     }}
 
 

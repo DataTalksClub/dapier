@@ -12,6 +12,7 @@ from ..secrets import value as secret_value
 from .. import audit as audit_log
 from .. import http
 from . import actors, authz
+from ..http import header
 
 SESSION_COOKIE = "dapier_session"
 OAUTH_COOKIE = "dapier_oauth_state"
@@ -58,17 +59,10 @@ def _verify(token, kind="session"):
 def _cookie(event, name):
     cookies = event.get("cookies") or []
     if not cookies:
-        raw = _header(event, "cookie")
+        raw = header(event, "cookie")
         cookies = [part.strip() for part in raw.split(";") if part.strip()]
     prefix = f"{name}="
     return next((part[len(prefix):] for part in cookies if part.startswith(prefix)), "")
-
-def _header(event, name):
-    expected = name.lower()
-    return next(
-        (str(value) for key, value in (event.get("headers") or {}).items() if key.lower() == expected),
-        "",
-    )
 
 def _session_payload(event):
     return _verify(_cookie(event, SESSION_COOKIE)) or {}
@@ -108,12 +102,12 @@ def _csrf_ok(event, method):
         return True
     if not _cookie(event, SESSION_COOKIE):
         return True
-    host = _header(event, "host").lower()
-    for header in (_header(event, "origin"), _header(event, "referer")):
-        if not header:
+    host = header(event, "host").lower()
+    for source in (header(event, "origin"), header(event, "referer")):
+        if not source:
             continue
         try:
-            if urllib.parse.urlparse(header).hostname.lower() == host:
+            if urllib.parse.urlparse(source).hostname.lower() == host:
                 return True
         except ValueError:
             continue

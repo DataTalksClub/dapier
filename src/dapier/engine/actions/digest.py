@@ -28,6 +28,7 @@ from itertools import count
 
 from .storage import _scope, _table, _ttl, kv_delete, kv_set
 from .templating import render
+from .base import flag
 
 DIGEST_DEFAULT_MAX_ITEMS = 500
 
@@ -47,20 +48,12 @@ def _prefix(key):
     return f"digest/{key}/"
 
 
-def _flag(action, key):
-    """Designer boolean fields arrive as "true"/"false" strings."""
-    value = action.get(key)
-    if isinstance(value, str):
-        return value.strip().lower() in ("true", "1", "yes", "on")
-    return bool(value)
-
-
 def _clears(action):
     """Whether a flush clears what it read — ``reset`` defaults to true."""
     raw = action.get("reset")
     if raw is None or (isinstance(raw, str) and not raw.strip()):
         return True
-    return _flag(action, "reset")
+    return flag(action, "reset")
 
 
 def _deep_render(value, event, steps):
@@ -156,7 +149,7 @@ def run_digest_add(action, event, workflow_id, steps=None):
     cap = _max_items(action)
     prefix = _prefix(key)
     total = _pending_count(workflow_id, prefix)
-    if _flag(action, "dedupe") and any(
+    if flag(action, "dedupe") and any(
             p.get("value") == item for p in _pending(workflow_id, prefix, cap)):
         return {"key": key, "added": False, "count": total}
     over = total + 1 - cap

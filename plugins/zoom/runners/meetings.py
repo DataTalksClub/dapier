@@ -4,7 +4,9 @@ import urllib.parse
 
 from src.dapier.connections import tokens
 from src.dapier.engine.actions.templating import render
-from .core import (_collect_participants, _created_view, _flag, _get_json,
+from src.dapier.engine.actions.base import flag
+
+from .core import (_collect_participants, _created_view, _get_json,
                    _meeting_view, _pkg, _raise_zoom_error, _rendered,
                    _request_json, _topic_matches, _topic_query,
                    _update_fields)
@@ -57,7 +59,7 @@ def _find_meeting_by_topic(action, event, steps, access_token, *, transport=None
     topic, mode, scope = _topic_query(
         action, event, steps,
         needs="zoom_find_meeting needs meeting_id or topic")
-    if scope == "past" and _flag(action, "create_if_missing"):
+    if scope == "past" and flag(action, "create_if_missing"):
         raise ValueError(
             "zoom_find_meeting create_if_missing only applies to the "
             "upcoming scope — a past meeting cannot be created")
@@ -74,7 +76,7 @@ def _find_meeting_by_topic(action, event, steps, access_token, *, transport=None
         if isinstance(meeting, dict) and _topic_matches(meeting.get("topic"), topic.lower(), mode):
             return {"found": True, "meeting": _meeting_view(meeting),
                     "matched_by": "topic", "scope": scope}
-    if not _flag(action, "create_if_missing"):
+    if not flag(action, "create_if_missing"):
         return {"found": False, "meeting": None, "matched_by": "topic", "scope": scope}
     return _create_missing_meeting(action, event, steps, access_token,
                                    transport=transport)

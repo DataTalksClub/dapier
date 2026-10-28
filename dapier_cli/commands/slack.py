@@ -1,19 +1,15 @@
 """Implementation of the `dapier slack` commands."""
 
-import json
 from urllib.parse import urlencode
 
 from .. import api
+from .shared import print_json
 
 __all__ = [
     "slack_find_user", "slack_open_dm", "slack_history", "slack_dm_export",
 ]
 
 DEFAULT_CONNECTION_ID = "slack-alexey"
-
-
-def _print_json(data):
-    print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def slack_find_user(api_url, query, connection_id=DEFAULT_CONNECTION_ID, limit=50, debug=False):
@@ -42,7 +38,7 @@ def slack_open_dm(api_url, user, connection_id=DEFAULT_CONNECTION_ID, debug=Fals
     data = api.call(
         api_url, "POST", "/api/agent/slack/dm",
         body={"user": user, "connection_id": connection_id}, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
@@ -60,7 +56,7 @@ def slack_history(api_url, channel, connection_id=DEFAULT_CONNECTION_ID, limit=1
     if latest:
         params["latest"] = latest
     data = api.call(api_url, "GET", "/api/agent/slack/history?" + urlencode(params), debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
@@ -74,5 +70,5 @@ def slack_dm_export(api_url, user, connection_id=DEFAULT_CONNECTION_ID, limit=20
     if cursor:
         params["cursor"] = cursor
     data = api.call(api_url, "GET", "/api/agent/slack/dm-export?" + urlencode(params), debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0

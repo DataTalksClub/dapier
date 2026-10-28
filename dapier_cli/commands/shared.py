@@ -25,3 +25,7 @@ def read_json_file(path):
         return None, f"Cannot read {path}: {exc}"
     except ValueError as exc:
         return None, f"{path} is not valid JSON: {exc}"
+
+
+def print_json(data):
+    print(json.dumps(data, indent=2, ensure_ascii=False))

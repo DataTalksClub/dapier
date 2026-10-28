@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from .. import api
+from .shared import print_json
 
 __all__ = [
     "typefully_social_sets", "typefully_drafts", "typefully_draft",
@@ -13,10 +14,6 @@ __all__ = [
 ]
 
 DEFAULT_SOCIAL_SET_ID = 182343
-
-
-def _print_json(data):
-    print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def typefully_social_sets(api_url, debug=False):
@@ -38,14 +35,14 @@ def typefully_drafts(api_url, social_set_id=DEFAULT_SOCIAL_SET_ID, status=None, 
         params["status"] = status
     path = "/api/agent/typefully/drafts?" + urlencode(params)
     data = api.call(api_url, "GET", path, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
 def typefully_draft(api_url, draft_id, social_set_id=DEFAULT_SOCIAL_SET_ID, debug=False):
     path = f"/api/agent/typefully/social-sets/{int(social_set_id)}/drafts/{int(draft_id)}"
     data = api.call(api_url, "GET", path, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
@@ -54,7 +51,7 @@ def typefully_queue(api_url, start_date, end_date, social_set_id=DEFAULT_SOCIAL_
     path = (f"/api/agent/typefully/social-sets/{int(social_set_id)}/queue?"
             + urlencode({"start_date": start_date, "end_date": end_date}))
     data = api.call(api_url, "GET", path, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
@@ -86,7 +83,7 @@ def typefully_create_draft(api_url, path, social_set_id=DEFAULT_SOCIAL_SET_ID,
                       " (or pass --allow-schedule)", file=sys.stderr)
                 return 2
     data = api.call(api_url, "POST", endpoint, body=body, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
@@ -122,7 +119,7 @@ def typefully_patch_draft(api_url, draft_id, path, social_set_id=DEFAULT_SOCIAL_
         return 2
     endpoint = f"/api/agent/typefully/social-sets/{int(social_set_id)}/drafts/{draft_id}"
     data = api.call(api_url, "PATCH", endpoint, body=body, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0
 
 
@@ -145,7 +142,7 @@ def typefully_upload_media(api_url, file, alt_text=None, file_name=None,
     # Print identifiers only: the signed upload URL never leaves the server,
     # and file bytes must never reach stdout.
     safe = {key: data[key] for key in ("media_id", "file_name", "status", "error_reason") if key in data}
-    _print_json(safe if safe else {"status": "unknown"})
+    print_json(safe if safe else {"status": "unknown"})
     return 0
 
 
@@ -155,5 +152,5 @@ def typefully_media_status(api_url, media_id, social_set_id=DEFAULT_SOCIAL_SET_I
         return 2
     path = f"/api/agent/typefully/social-sets/{int(social_set_id)}/media/{str(media_id).strip()}"
     data = api.call(api_url, "GET", path, debug=debug)
-    _print_json(data)
+    print_json(data)
     return 0

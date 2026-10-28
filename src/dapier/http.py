@@ -54,3 +54,12 @@ def _request_json(event):
     if not isinstance(value, dict):
         raise ValueError("request body must be an object")
     return value
+
+
+def header(event, name):
+    """A request header's value, matched case-insensitively ("" if absent)."""
+    expected = name.lower()
+    return next(
+        (str(value) for key, value in (event.get("headers") or {}).items() if key.lower() == expected),
+        "",
+    )

@@ -75,3 +75,11 @@ def _default_transport(method, url, *, headers, body, timeout=15):
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.status, response.read()
+
+
+def flag(action, key):
+    """A designer boolean field: they arrive as "true"/"false" strings."""
+    value = action.get(key)
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    return bool(value)
