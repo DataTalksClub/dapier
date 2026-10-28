@@ -181,9 +181,10 @@ def test_console_groups_rows_by_service():
 
 
 def test_oauth_rows_offer_reconnect():
-    """Zoom meetings, YouTube and Slack use OAuth start; Telegram pastes a token."""
+    """Zoom meetings, YouTube and Slack use OAuth start; Telegram pastes a
+    token. The API's oauth_consent says which (records.uses_oauth_consent)."""
     assert "usesOAuthConsent" in JS
-    assert "connection.provider !== 'telegram'" in JS
+    assert "connection.oauth_consent === true" in JS
     assert "usesOAuthConsent(connection) && status !== 'connected'" in JS
 
 

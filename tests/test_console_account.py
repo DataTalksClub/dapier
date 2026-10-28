@@ -106,7 +106,7 @@ def test_account_identity_prefers_the_name_and_never_shows_a_subject_id():
     script = source + """
 console.log(JSON.stringify([
   accountIdentity({ username: 'alexey@datatalks.club', email: 'alexey@datatalks.club', name: 'Alexey Grigorev' }),
-  accountIdentity({ username: 'grace@datatalks.club' }),
+  accountIdentity({ username: 'grace@datatalks.club', email: 'grace@datatalks.club' }),
   accountIdentity({ username: '84b8d488-2001-70be-d465-f84bfd64ef96' }),
 ]));
 """

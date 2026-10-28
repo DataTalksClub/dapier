@@ -272,10 +272,8 @@ const pastesToken = (connection) => TOKEN_PROVIDERS.includes(connection.provider
   && (connection.provider !== 'zoom' || isZoomWebhook(connection));
 /* The API says whether a connection finishes/renews through OAuth consent
    (oauth_consent): pasted-token providers — plugins add their own — and
-   Zoom webhook connections never do. The fallback covers older payloads. */
-const usesOAuthConsent = (connection) => connection.oauth_consent ?? (
-  connection.provider !== 'telegram'
-  && !isZoomWebhook(connection));
+   Zoom webhook connections never do. */
+const usesOAuthConsent = (connection) => connection.oauth_consent === true;
 /* Google, YouTube, and Zoom API grants verify an account (email, channel,
    Zoom user) during consent; one without a verified identity never
    finished signing in. Token and no-auth providers have no identity to

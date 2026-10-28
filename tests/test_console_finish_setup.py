@@ -65,11 +65,12 @@ def test_zoom_webhook_finish_setup_opens_manage_not_oauth():
 def test_oauth_connections_still_finish_or_reconnect_through_consent():
     for connection, label in ((ZOOM_API, "Finish setup"), (GOOGLE, "Finish setup"), (DROPBOX, "Reconnect"),
                               (SLACK, "Reconnect")):
-        for view in (connection, public_view(connection)):
-            markup = _row(view)
-            assert "connection-oauth" in markup and label in markup
-            assert f"/api/admin/oauth/{connection['connection_id']}/start" in markup
-            assert "connection-finish" not in markup
+        # The console renders the API's public view, which always says
+        # whether the connection goes through OAuth consent.
+        markup = _row(public_view(connection))
+        assert "connection-oauth" in markup and label in markup
+        assert f"/api/admin/oauth/{connection['connection_id']}/start" in markup
+        assert "connection-finish" not in markup
 
 
 def test_token_connections_get_no_consent_button():

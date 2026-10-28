@@ -22,23 +22,18 @@ export function displayNameFromUsername(username) {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-function emailFromUsername(username) {
-  const raw = String(username || '').trim();
-  return raw.includes('@') ? raw : '';
-}
-
 /* A session subject (a Cognito sub UUID) is not a name; never print it. */
 function isOpaqueId(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
     || /^[0-9a-f-]{20,}$/i.test(value);
 }
 
-/* /api/admin/me carries the ID token's name and the sign-in email; older
-   sessions carry only the username (the email). The chrome shows a person:
+/* /api/admin/me carries the ID token's name and the sign-in email. The
+   chrome shows a person:
    the name, else one derived from the email, else a plain "Operator". */
 export function accountIdentity(me) {
   const username = String((me && me.username) || '').trim();
-  const email = String((me && me.email) || '').trim() || emailFromUsername(username);
+  const email = String((me && me.email) || '').trim();
   let name = String((me && me.name) || '').trim();
   if (!name) {
     if (email) name = displayNameFromUsername(email);

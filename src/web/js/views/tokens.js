@@ -35,7 +35,7 @@ function renderGrantConnections() {
   // Zoom webhooks only verify deliveries — nothing to grant. Zoom API
   // connections are OAuth and issue tokens like any other.
   const isZoomWebhook = (connection) => connection.provider === 'zoom'
-    && !(connection.oauth_consent ?? ((connection.granted_scopes || connection.scopes || []).length > 0));
+    && connection.oauth_consent !== true;
   const connections = ((state.data || {}).connections || []).filter((connection) => !isZoomWebhook(connection));
   select.innerHTML = connections.map((connection) => `<option value="${escapeHtml(connection.connection_id)}">${escapeHtml(accountLabel(connection))}</option>`).join('');
   select.closest('label').hidden = connections.length === 0;
