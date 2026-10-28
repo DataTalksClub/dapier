@@ -296,7 +296,7 @@ def test_resume_path_gates_through_the_same_hook(usage_table, monkeypatch):
 # --- the engine routes the gate through the action-error machinery ---
 
 def _run_gate_chain(monkeypatch, step, before_action):
-    from src.dapier.engine import logic
+    from src.dapier.engine import logic_pkg as logic
     from src.dapier.engine.logic_pkg import execution
 
     ran, seen = [], {"after": [], "error": []}
@@ -316,7 +316,7 @@ def _run_gate_chain(monkeypatch, step, before_action):
 
 
 def test_quota_gate_failure_takes_the_action_error_path(usage_table, monkeypatch):
-    from src.dapier.engine import logic
+    from src.dapier.engine import logic_pkg as logic
 
     usage_rollup.api_quota_set(1)
     usage_table.by_month = {"202609": {"_total": 1}}

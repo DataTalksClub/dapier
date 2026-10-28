@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 
 from src.dapier.connectors import registry
-from src.dapier.engine import execute, logic
+from src.dapier.engine import execute, logic_pkg as logic
 
 
 EVENT = {

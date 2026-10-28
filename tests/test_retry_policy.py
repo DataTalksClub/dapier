@@ -17,7 +17,7 @@ import boto3
 import pytest
 
 from src.dapier.engine import worker
-from src.dapier.engine.logic import run_chain
+from src.dapier.engine.logic_pkg import run_chain
 
 
 EVENT = {"id": "evt-1", "connector": "email", "event": "message.received",

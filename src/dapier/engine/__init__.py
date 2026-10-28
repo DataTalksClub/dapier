@@ -10,7 +10,7 @@ from .actions.email import run_email_send  # noqa: F401
 from .actions.dataops import run_dataops  # noqa: F401
 from .actions.render import run_render_job  # noqa: F401
 from .actions.code import run_code, run_js  # noqa: F401
-from .logic import run_chain
+from .logic_pkg import run_chain
 
 
 def _run_connector(action, event, workflow_id, steps=None):
@@ -29,11 +29,11 @@ def execute(event, before_action=None, after_action=None, on_action_error=None, 
     passes exactly the workflow under test); default is the full catalog.
 
     The chain may mix connector actions with logic steps (filter, condition, paths,
-    delay, for_each — see engine.logic). The hooks carry the step telemetry:
+    delay, for_each — see engine.logic_pkg). The hooks carry the step telemetry:
     ``before_action`` also gets the action type, ``after_action`` gets the
     runner's output summary, the step duration, and the terminal status
     (``completed``, ``filtered``, or ``failed`` for a step that failed under
-    ``on_error: continue|run`` — engine.logic keeps the run going), and
+    ``on_error: continue|run`` — engine.logic_pkg keeps the run going), and
     ``on_action_error`` gets the duration of the failed attempt. Runners
     return a small JSON-safe dict describing what happened (message ids,
     paths, HTTP statuses) — it lands on the run record.

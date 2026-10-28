@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
-from .. import logic
+from .. import logic_pkg as logic
 
 
 logger = logging.getLogger(__name__)

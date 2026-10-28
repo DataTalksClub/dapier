@@ -8,7 +8,7 @@ import yaml
 
 from src.dapier.api import designer_store, runs as runs_api
 from src.dapier.connectors import registry
-from src.dapier.engine import dryrun, logic, naming
+from src.dapier.engine import dryrun, logic_pkg as logic, naming
 
 
 EVENT = {

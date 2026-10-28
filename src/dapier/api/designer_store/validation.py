@@ -36,7 +36,7 @@ ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 # Logic-step bounds the engine enforces at runtime; rejected here at save time.
 # A delay past the engine's 60s inline sleep cap suspends the run and resumes
 # it from the queue, so totals up to DELAY_MAX_DAYS are legal (the executions
-# table's 90-day TTL is the ceiling — see engine.logic.MAX_SUSPENDED_SECONDS).
+# table's 90-day TTL is the ceiling — see engine.logic_pkg.MAX_SUSPENDED_SECONDS).
 DELAY_MAX_DAYS = 90
 LOOP_MAX_ITERATIONS = 100
 # Mirrors engine.matching._matches_filter (and the designer's logicOperators):
@@ -259,7 +259,7 @@ def _validate_steps(steps, where="actions"):
     keys are shape-checked on every step, and error_actions recurses as a
     nested chain.
     """
-    from ...engine import logic
+    from ...engine import logic_pkg as logic
     from ...connectors import registry
 
     for index, step in enumerate(steps or []):
@@ -364,7 +364,7 @@ def _validate_steps(steps, where="actions"):
 
 
 def _validate_union(step, label):
-    """Save-time check for a union step (mirrors engine.logic._run_union)."""
+    """Save-time check for a union step (mirrors engine.logic_pkg._run_union)."""
     from_val = step.get("from")
     if from_val is not None:
         if not isinstance(from_val, str) or not from_val.strip():
@@ -386,7 +386,7 @@ def _validate_union(step, label):
 
 
 def _validate_decision(step, label):
-    """Save-time check for a decision step (mirrors engine.logic._run_decision).
+    """Save-time check for a decision step (mirrors engine.logic_pkg._run_decision).
 
     ``mode`` is ``if`` (then/else branches) or ``switch`` (``choices`` plus
     ``cases``); omitted, it is inferred — a step carrying choices/cases is a
@@ -398,7 +398,7 @@ def _validate_decision(step, label):
     unusable or off-list reply. Branches recurse as step chains, like
     condition's then/else.
     """
-    from ...engine import logic
+    from ...engine import logic_pkg as logic
 
     mode = logic._decision_mode(step)
     if mode not in logic.DECISION_MODES:
@@ -452,7 +452,7 @@ def _validate_decision(step, label):
 
 
 def _validate_digest(step, label):
-    """Save-time check for a digest step (mirrors engine.logic._run_digest).
+    """Save-time check for a digest step (mirrors engine.logic_pkg._run_digest).
 
     ``mode`` is accumulate (the engine default) or flush; ``key`` is
     required and names the digest — a literal, since the accumulate and
@@ -462,7 +462,7 @@ def _validate_digest(step, label):
     (it drains what earlier runs appended). At run time the engine
     validates the rendered items; only shape is checked here.
     """
-    from ...engine import logic
+    from ...engine import logic_pkg as logic
 
     mode = str(step.get("mode") or "accumulate").strip().lower() or "accumulate"
     if mode not in logic.DIGEST_MODES:
@@ -491,7 +491,7 @@ def _validate_digest(step, label):
 
 
 def _validate_delay(step, label):
-    """Save-time check for a delay step (mirrors engine.logic._delay_request).
+    """Save-time check for a delay step (mirrors engine.logic_pkg._delay_request).
 
     Durations — ``days``/``hours``/``minutes``/``seconds`` — combine; each is
     a non-negative number or a ``{template}`` rendered when the step runs.
@@ -502,7 +502,7 @@ def _validate_delay(step, label):
     "max 60 seconds" bound no longer applies. Template values can only be
     checked for shape here — the engine validates the rendered numbers.
     """
-    from ...engine import logic
+    from ...engine import logic_pkg as logic
 
     total = 0.0
     templated = False

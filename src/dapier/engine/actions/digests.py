@@ -60,7 +60,7 @@ def _key(key):
     return key
 
 
-# The plain state layer under the logic step (engine.logic._run_digest):
+# The plain state layer under the logic step (engine.logic_pkg._run_digest):
 # get/append/claim, so the engine and any future caller share one set of
 # table rules.
 

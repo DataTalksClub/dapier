@@ -6,7 +6,7 @@ import json
 import pytest
 
 from src.dapier.api import router as ingress
-from src.dapier.engine.logic import RunSuspended
+from src.dapier.engine.logic_pkg import RunSuspended
 from src.dapier.triggers import hook_triggers
 
 

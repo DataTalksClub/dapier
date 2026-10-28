@@ -93,7 +93,7 @@ class Connector:
 
 @dataclass(frozen=True)
 class LogicStep:
-    """Catalog metadata for an in-workflow logic step (engine.logic)."""
+    """Catalog metadata for an in-workflow logic step (engine.logic_pkg)."""
 
     type: str
     label: str
@@ -244,7 +244,7 @@ ON_FAIL_STEP_KEYS = frozenset({"on_fail"})
 # never on logic steps. ``autoretry: {attempts, initial_seconds,
 # max_seconds}`` — ``attempts`` (1..AUTORETRY_ATTEMPTS_MAX) is required, the
 # seconds (AUTORETRY_SECONDS_BOUNDS) are optional with engine defaults 1 and
-# 60 (engine.logic.AUTORETRY_DEFAULTS — keep in sync). The engine retries
+# 60 (engine.logic_pkg.AUTORETRY_DEFAULTS — keep in sync). The engine retries
 # the action with exponential backoff before any on_fail/on_error policy
 # applies; the bounds keep those inline backoff sleeps small inside one
 # invocation.
@@ -260,7 +260,7 @@ def validate_autoretry_key(step, where, error=ActionError):
     Sibling of :func:`validate_error_keys`/:func:`validate_on_fail_key`:
     shape-checks the mapping and its bounds with clear messages, and rejects
     the key on logic steps — retrying a filter, a delay or a loop is not a
-    thing. The engine's run-time plan parser (engine.logic._autoretry_plan)
+    thing. The engine's run-time plan parser (engine.logic_pkg._autoretry_plan)
     calls this same validator, so a config that slips past a save fails the
     step with the same message.
     """

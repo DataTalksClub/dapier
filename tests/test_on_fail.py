@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.engine import execute, logic
+from src.dapier.engine import execute, logic_pkg as logic
 
 
 EVENT = {

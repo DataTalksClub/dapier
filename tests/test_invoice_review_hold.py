@@ -8,7 +8,7 @@ import yaml
 
 from src.dapier.engine.actions.code import run_code
 from src.dapier.engine.actions.templating import render
-from src.dapier.engine.logic import run_chain
+from src.dapier.engine.logic_pkg import run_chain
 
 ROOT = Path(__file__).resolve().parents[1]
 

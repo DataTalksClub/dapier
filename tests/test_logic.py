@@ -18,7 +18,7 @@ from unittest import mock
 import pytest
 
 from conftest import fake_logic_time
-from src.dapier.engine import logic
+from src.dapier.engine import logic_pkg as logic
 from src.dapier.engine.actions import templating
 
 

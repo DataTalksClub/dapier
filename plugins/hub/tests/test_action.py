@@ -155,7 +155,7 @@ def test_cli_catalog_uses_shared_http_catalog(monkeypatch, capsys):
 
 
 def test_registered_runner_uses_qualified_loop_identity(configured, monkeypatch):
-    from src.dapier.engine import logic
+    from src.dapier.engine import logic_pkg as logic
 
     ids = []
 
@@ -173,7 +173,7 @@ def test_registered_runner_uses_qualified_loop_identity(configured, monkeypatch)
 
 
 def test_generated_engine_identity_cannot_replace_required_explicit_id(configured, monkeypatch):
-    from src.dapier.engine import logic
+    from src.dapier.engine import logic_pkg as logic
 
     monkeypatch.setattr(action, "service_token", lambda: pytest.fail("credential read before explicit id"))
     with pytest.raises(ValueError, match="non-empty id"):

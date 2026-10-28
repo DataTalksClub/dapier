@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timezone
 
 from ..auth import visibility
-from .logic import QuotaExceeded
+from .logic_pkg import QuotaExceeded
 
 logger = logging.getLogger(__name__)
 

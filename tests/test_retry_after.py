@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.engine import logic
+from src.dapier.engine import logic_pkg as logic
 from src.dapier.engine.actions import webhook as webhook_action
 from src.dapier.engine.actions.webhook import HttpError
 

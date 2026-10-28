@@ -25,7 +25,7 @@ def test_error_modes_match_the_engine():
     duplicated (registry must not import the engine package); this pins the
     "keep in sync" comment so the two can only drift together with a test
     failure."""
-    from src.dapier.engine import logic
+    from src.dapier.engine import logic_pkg as logic
 
     assert registry.ON_ERROR_MODES == logic.ERROR_MODES
     assert registry.ON_FAIL_MODES == logic.ON_FAIL_MODES

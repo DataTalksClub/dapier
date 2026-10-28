@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from src.dapier.engine import execute, logic
+from src.dapier.engine import execute, logic_pkg as logic
 from conftest import fake_logic_time
-from src.dapier.engine.logic import parse_moment
+from src.dapier.engine.logic_pkg import parse_moment
 
 
 EVENT = {

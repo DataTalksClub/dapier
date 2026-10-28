@@ -278,7 +278,7 @@ def _autoretry_plan(step, action_id):
     The shape and bounds are validated by ``registry.validate_autoretry_key``
     (the save-time validator shares the checks, so both surfaces reject a
     bad config with the same messages); the engine imports it lazily —
-    engine.logic stays import-light. A logic step carrying the key is
+    engine.logic_pkg stays import-light. A logic step carrying the key is
     rejected here too.
     """
     config = step.get("autoretry")

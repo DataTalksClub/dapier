@@ -1,6 +1,6 @@
 """In-workflow logic steps, as catalog metadata for the designer.
 
-These steps execute inside ``engine.logic`` (filter, condition, paths,
+These steps execute inside ``engine.logic_pkg`` (filter, condition, paths,
 _decision, delay, for_each, digest), not through the connector dispatch — the registry carries their
 inspector schema so ``GET /api/catalog`` is the complete step palette.
 """

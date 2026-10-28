@@ -11,7 +11,7 @@ import os
 import re
 
 from src.dapier.connections import credentials
-from src.dapier.engine import logic
+from src.dapier.engine import logic_pkg as logic
 from src.dapier.engine.actions import base
 from src.dapier.engine.actions import telegram_format
 from src.dapier.engine.actions.templating import render

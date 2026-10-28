@@ -50,7 +50,7 @@ actions:
 
 
 def failure(message="OAuth expired"):
-    """An action exception the way engine.logic tags it for the worker."""
+    """An action exception the way engine.logic_pkg tags it for the worker."""
     exc = RuntimeError(message)
     exc.dapier_workflow = "flaky-flow"
     exc.dapier_step_id = "a1"

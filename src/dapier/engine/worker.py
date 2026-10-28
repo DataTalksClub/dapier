@@ -10,7 +10,7 @@ from decimal import Decimal
 from ..connectors.ingress import normalize_event, processing_id
 from ..triggers import failure_counts, inbox
 from . import _run_connector, usage
-from .logic import CompletedStep, RunSuspended, resume_chain, run_chain
+from .logic_pkg import CompletedStep, RunSuspended, resume_chain, run_chain
 from .history import is_redacted, redact
 from .matching import all_workflows, matches
 from .notify import notify_auto_pause, notify_failure
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Parked runs: the envelope a suspended run leaves on the event queue
-# (engine.logic's RunSuspended note has the scheme). The worker detects it
+# (engine.logic_pkg's RunSuspended note has the scheme). The worker detects it
 # before any trigger-event handling: it is not an event, it is a run.
 RESUME_KEY = "dapier_resume"
 
@@ -37,7 +37,7 @@ RETRY_ATTEMPT_BOUNDS = (1, 5)
 RETRY_BACKOFF_BOUNDS = (1, 900)
 RETRY_DEFAULTS = {"attempts": 1, "backoff_seconds": 60}
 
-# Steps the engine runs itself (engine.logic) rather than dispatching to a
+# Steps the engine runs itself (engine.logic_pkg) rather than dispatching to a
 # connector runner; their failures are configuration problems a repeat cannot
 # fix, so they fall through to the failure path at once.
 LOGIC_STEP_TYPES = frozenset({"filter", "condition", "delay", "paths", "for_each", "union"})

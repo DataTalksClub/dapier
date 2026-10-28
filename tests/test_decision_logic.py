@@ -18,7 +18,7 @@ from unittest import mock
 
 import pytest
 
-from src.dapier.engine import dryrun, logic
+from src.dapier.engine import dryrun, logic_pkg as logic
 
 
 EVENT = {

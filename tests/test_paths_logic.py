@@ -8,7 +8,7 @@ import unittest
 
 import pytest
 
-from src.dapier.engine import logic
+from src.dapier.engine import logic_pkg as logic
 
 
 EVENT = {

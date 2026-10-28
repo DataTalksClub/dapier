@@ -1,7 +1,7 @@
 import json
 import pytest
 from src.dapier.connectors import registry
-from src.dapier.engine.logic import run_chain
+from src.dapier.engine.logic_pkg import run_chain
 from plugins.cmp import read_course
 
 TOKEN = "private-legacy-token"

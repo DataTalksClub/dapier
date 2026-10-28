@@ -1,7 +1,7 @@
 """Real delays: park-and-resume for waits past one invocation (gap G2).
 
 A delay past ``logic.MAX_DELAY_SECONDS`` suspends the chain (``RunSuspended``,
-engine.logic); the worker catches it and parks the run on the event queue: a
+engine.logic_pkg); the worker catches it and parks the run on the event queue: a
 ``dapier_resume`` envelope with SQS ``DelaySeconds = min(remaining, 900)``.
 SQS cannot delay longer than 900s, so longer waits chain — every arrival
 that lands before ``resume_at`` re-enqueues for the remainder, and the
@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from conftest import fake_logic_time
-from src.dapier.engine import logic, worker
+from src.dapier.engine import logic_pkg as logic, worker
 from botocore.exceptions import ClientError
 
 

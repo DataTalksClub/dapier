@@ -12,7 +12,7 @@ from src.dapier.connectors.webhook import run_http_request
 from src.dapier.engine import worker
 from src.dapier.engine.actions.storage import kv_set, run_storage_get
 from src.dapier.engine.history import redact
-from src.dapier.engine.logic import CompletedStep, run_chain
+from src.dapier.engine.logic_pkg import CompletedStep, run_chain
 
 
 @pytest.fixture

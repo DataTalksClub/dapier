@@ -38,7 +38,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import matching
-from .logic import RunSuspended
+from .logic_pkg import RunSuspended
 
 def _supported_action_types():
     """Every type the engine can dispatch, read from the connector registry
@@ -141,7 +141,7 @@ def _render_warnings(action, rendered):
 
 
 def _dry_run_steps(actions, envelope, step_outputs, *, strict=False, prefix="", workflow_id=""):
-    from . import logic
+    from . import logic_pkg as logic
 
     steps = []
     for index, action in enumerate(actions or []):
@@ -460,7 +460,7 @@ def _evaluate_logic_step(step, step_type, envelope, context,
     symmetry with the connector path, and ``workflow_id`` scopes the digest
     peek.
     """
-    from . import logic
+    from . import logic_pkg as logic
 
     data = {**(envelope.get("data") or {}), "steps": steps_context or {}}
     if step_type == "filter":
@@ -691,7 +691,7 @@ def _iter_steps(steps, prefix=""):
     prefix — a loop body step is testable against the sample data directly),
     and ``<step>.error.<sub>`` for error branches.
     """
-    from . import logic
+    from . import logic_pkg as logic
 
     for index, step in enumerate(steps or []):
         if not isinstance(step, dict):

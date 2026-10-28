@@ -154,7 +154,7 @@ delay, for_each, digest) cannot carry the key; the save-time validator
 (``registry.validate_autoretry_key``) and the engine both reject that.
 
 Module layout (the historical single ``engine/logic.py`` is now a shim
-re-exporting everything here, so ``from .logic import run_chain`` keeps
+re-exporting everything here, so ``from .logic_pkg import run_chain`` keeps
 working):
 
     - core:       constants, the error types, and the pure helpers

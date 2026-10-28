@@ -18,7 +18,7 @@ MAX_LOOP_ITERATIONS = 100
 MAX_SUSPENDED_SECONDS = 90 * 86400
 
 # What a step failure does; keep in sync with registry.ON_ERROR_MODES, the
-# save-time validator (engine.logic stays import-light, so the literal lives
+# save-time validator (engine.logic_pkg stays import-light, so the literal lives
 # here too).
 ERROR_MODES = ("halt", "continue", "run")
 
@@ -49,7 +49,7 @@ class QuotaExceeded(Exception):
     try so the ordinary action-error machinery applies — the step closes
     ``failed`` with the quota message and honors on_fail/on_error exactly
     like a connector the plan disallows. Lives here (not in usage) so
-    engine.logic stays dependency-free.
+    engine.logic_pkg stays dependency-free.
     """
 
 

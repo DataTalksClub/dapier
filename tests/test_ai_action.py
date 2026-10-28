@@ -492,7 +492,7 @@ class EngineErrorTests(unittest.TestCase):
                 raise AssertionError("HTTP 429 must raise HttpError")
 
     def test_retry_after_hint_reaches_the_engine_backoff(self):
-        from src.dapier.engine import logic
+        from src.dapier.engine import logic_pkg as logic
 
         error = HttpError("ai_complete returned HTTP 503", status=503, retry_after=7.0)
         assert logic._retry_after_hint(error, {"max_seconds": 60}) == 7.0

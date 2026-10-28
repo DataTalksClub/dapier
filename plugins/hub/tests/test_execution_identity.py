@@ -1,5 +1,5 @@
 """Hub retries must use the same qualified step identity as run history."""
-from src.dapier.engine import logic
+from src.dapier.engine import logic_pkg as logic
 from src.dapier.engine.logic_pkg.execution import current_action_id
 from plugins.hub.session import request_key
 import pytest

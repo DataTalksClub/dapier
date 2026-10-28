@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 
 from src.dapier.api import designer_store
-from src.dapier.engine import logic
+from src.dapier.engine import logic_pkg as logic
 
 
 ROOT = Path(__file__).resolve().parents[1]
