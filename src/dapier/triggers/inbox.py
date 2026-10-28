@@ -57,11 +57,6 @@ UNMATCHED = "unmatched"
 FAILED = "failed"
 IGNORED = "ignored"
 
-# Terminal step statuses, mirrored from engine.worker — a redelivery may
-# skip a step that already finished, never one still being processed.
-_DONE_STATUSES = ("completed", "filtered")
-
-
 # What happened to an event, in the words the console and CLI show. Derived
 # from the stored status: ``handled`` ran at least one workflow, ``failed``
 # raised in a run, ``refused`` was dropped by the sender allow-list,
@@ -433,11 +428,6 @@ def complete(inbox_id, matched, *, error=None, table_ref=None):
     return status
 
 
-def note_replay_bounced(inbox_id, error, *, table_ref=None):
-    """Record that a replay of this event failed before reaching the queue."""
-    return complete(inbox_id, None, error=error, table_ref=table_ref)
-
-
 def _display_body(data):
     """Full text/html for the reading pane.
 
@@ -805,8 +795,3 @@ def _sqs():
     import boto3
 
     return boto3.client("sqs")
-
-
-def dedupe_skip_statuses():
-    """Step statuses a redelivery may treat as done (engine.worker mirror)."""
-    return _DONE_STATUSES

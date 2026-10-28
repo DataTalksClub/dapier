@@ -138,11 +138,6 @@ _BY_ID = {spec["id"]: spec for spec in CATALOG}
 _STANDALONE_IDS = {spec["id"] for spec in CATALOG if spec.get("standalone")}
 
 
-def catalog_entry(service_id):
-    """Return the catalog spec for ``service_id``, or None."""
-    return _BY_ID.get(service_id)
-
-
 def _scopes_of(connection):
     granted = [str(scope) for scope in (connection.get("granted_scopes") or []) if scope]
     if granted:

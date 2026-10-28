@@ -430,22 +430,6 @@ def delete_connection(event, connection_id):
     return _no_store(_json_response(status, payload))
 
 
-def _operator_connection(event, connection_id, action):
-    """Authenticate an operator and load the connection they named.
-
-    Returns ``(subject, connection, None)`` or ``(None, None, error_response)``.
-    Discovery reads, like every other management action, are operator-gated.
-    """
-    subject, error = require_operator(event, action)
-    if error:
-        return None, None, error
-    connections_table, _ = _tables()
-    connection = connections.get_connection(connections_table, connection_id)
-    if not connection:
-        return None, None, _json_response(404, {"error": f"Unknown connection '{connection_id}'"})
-    return subject, connection, None
-
-
 def connections_discover_api(event, connection_id, resource=None):
     """Operator-only Zapier-style discovery over the CLI's bearer authentication.
 
