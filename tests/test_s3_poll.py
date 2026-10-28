@@ -68,13 +68,17 @@ def build(name="s3-watch", **body):
     return poll_triggers.build_item({"name": name, **body}, "op@example.test")
 
 
+ROLE = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+
+
 @pytest.fixture
-def aws_keys(monkeypatch):
-    """The stored key pair the connector resolves from the credential store."""
+def aws_role(monkeypatch):
+    """The stored role configuration the connector resolves, with the
+    deployment allowlist admitting it; moto serves STS and S3."""
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", ROLE)
     monkeypatch.setattr(
         "src.dapier.connections.credentials.get_credential",
-        lambda credential_id: {"access_key_id": "testing",
-                               "secret_access_key": "testing"})
+        lambda credential_id: {"role_arn": ROLE})
 
 
 def run_fire(item, *, cursors, fail_on=None):
@@ -137,7 +141,7 @@ class TestS3Save:
 
 class TestS3Fetch:
     @mock_aws
-    def test_the_listing_becomes_json_items(self, aws_keys):
+    def test_the_listing_becomes_json_items(self, aws_role):
         client = boto3.client("s3", region_name="eu-west-1")
         client.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={"LocationConstraint": "eu-west-1"})
         client.put_object(Bucket=BUCKET, Key="inbox/a.txt", Body=b"hello")
@@ -158,7 +162,7 @@ class TestS3Fetch:
             assert entry["id"] == f"{entry['last_modified']}|{entry['key']}"
 
     @mock_aws
-    def test_the_prefix_limits_the_watch(self, aws_keys):
+    def test_the_prefix_limits_the_watch(self, aws_role):
         client = boto3.client("s3", region_name="eu-west-1")
         client.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={"LocationConstraint": "eu-west-1"})
         client.put_object(Bucket=BUCKET, Key="other/hidden.txt", Body=b"x")
@@ -170,7 +174,7 @@ class TestS3Fetch:
         assert [entry["key"] for entry in items] == ["inbox/seen.txt"]
 
     @mock_aws
-    def test_a_failed_list_is_a_runtime_error(self, aws_keys):
+    def test_a_failed_list_is_a_runtime_error(self, aws_role):
         with pytest.raises(RuntimeError, match="s3 list failed"):
             poll_triggers.fetch_page(build(bucket="no-such-bucket-here"))
 
@@ -189,7 +193,7 @@ class TestS3Fetch:
 
 class TestS3Fire:
     @mock_aws
-    def test_the_first_fire_seeds_and_fires_nothing(self, aws_keys):
+    def test_the_first_fire_seeds_and_fires_nothing(self, aws_role):
         client = boto3.client("s3", region_name="eu-west-1")
         client.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={"LocationConstraint": "eu-west-1"})
         client.put_object(Bucket=BUCKET, Key="inbox/a.txt", Body=b"hello")
@@ -201,7 +205,7 @@ class TestS3Fire:
         assert fired == []
 
     @mock_aws
-    def test_a_new_object_fires_as_an_s3_event(self, aws_keys):
+    def test_a_new_object_fires_as_an_s3_event(self, aws_role):
         client = boto3.client("s3", region_name="eu-west-1")
         client.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={"LocationConstraint": "eu-west-1"})
         client.put_object(Bucket=BUCKET, Key="inbox/a.txt", Body=b"hello")
@@ -221,7 +225,7 @@ class TestS3Fire:
         assert event["data"]["key"] == "inbox/b.txt"
 
     @mock_aws
-    def test_an_unchanged_bucket_fires_nothing(self, aws_keys):
+    def test_an_unchanged_bucket_fires_nothing(self, aws_role):
         client = boto3.client("s3", region_name="eu-west-1")
         client.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={"LocationConstraint": "eu-west-1"})
         client.put_object(Bucket=BUCKET, Key="inbox/a.txt", Body=b"hello")
@@ -235,7 +239,7 @@ class TestS3Fire:
         assert fired == []
 
     @mock_aws
-    def test_an_overwrite_fires_again(self, aws_keys):
+    def test_an_overwrite_fires_again(self, aws_role):
         """A rewritten object is a new version of the file: its composite id
         (last_modified|key) moves, so the new version fires."""
         client = boto3.client("s3", region_name="eu-west-1")
@@ -253,7 +257,7 @@ class TestS3Fire:
         assert fired[0]["data"]["key"] == "inbox/a.txt"
 
     @mock_aws
-    def test_a_failed_object_stays_unseen_so_it_retries(self, aws_keys):
+    def test_a_failed_object_stays_unseen_so_it_retries(self, aws_role):
         client = boto3.client("s3", region_name="eu-west-1")
         client.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={"LocationConstraint": "eu-west-1"})
         client.put_object(Bucket=BUCKET, Key="inbox/a.txt", Body=b"hello")

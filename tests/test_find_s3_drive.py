@@ -49,13 +49,20 @@ class FakeS3:
             raise AssertionError("unexpected extra list_objects_v2 page")
         return self.pages[len(self.calls) - 1]
 
+    def assume_role(self, **kwargs):
+        return {"Credentials": {"AccessKeyId": "temporary-access",
+                                "SecretAccessKey": "temporary-secret",
+                                "SessionToken": "temporary-session"}}
+
+
+
 
 def run_s3_find_with(overrides=None, *, s3_client=None):
     action = {"type": "s3_find", "bucket": "backups", "pattern": "report.pdf",
               **(overrides or {})}
-    with patch("src.dapier.connections.credentials.get_credential",
-               return_value={"access_key_id": "AKIAEXAMPLE0000",
-                             "secret_access_key": "b" * 40}):
+    with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}), \
+         patch("src.dapier.connections.credentials.get_credential",
+               return_value={"role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}):
         return run_s3_find(action, {"data": {}}, steps={}, s3_client=s3_client)
 
 
@@ -289,12 +296,17 @@ class DriveFindTests(unittest.TestCase):
 class RegistryTests(unittest.TestCase):
     """The registry entries are what the engine and trigger validation use."""
 
-    CREDENTIAL = {"access_key_id": "AKIAEXAMPLE0000", "secret_access_key": "b" * 40}
+    CREDENTIAL = {"role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}
+
+    def role_patch(self):
+        """The allowlist env plus the stored role the resolver reads."""
+        return patch("src.dapier.connections.credentials.get_credential",
+                     return_value=self.CREDENTIAL)
 
     def test_run_action_finds_through_the_registered_runner(self):
         s3 = FakeS3(page([{"Key": "report.pdf", "Size": 5}]))
-        with patch("src.dapier.connections.credentials.get_credential",
-                   return_value=self.CREDENTIAL), \
+        with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}), \
+             self.role_patch(), \
              patch("boto3.client", return_value=s3):
             output = run_action(
                 {"type": "s3_find", "bucket": "backups", "pattern": "report.pdf"},
@@ -338,8 +350,8 @@ class RegistryTests(unittest.TestCase):
         s3 = FakeS3(page([{"Key": "reports/2026/report.pdf", "Size": 9,
                            "LastModified": datetime(
                                2026, 9, 26, 21, 3, 49, tzinfo=timezone.utc)}]))
-        with patch("src.dapier.connections.credentials.get_credential",
-                   return_value=self.CREDENTIAL), \
+        with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}), \
+             self.role_patch(), \
              patch("boto3.client", return_value=s3):
             items = DISCOVERIES["s3.objects"].run(
                 {"credential_id": "aws"}, {"bucket": "backups"})

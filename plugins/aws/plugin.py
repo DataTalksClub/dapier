@@ -1,6 +1,6 @@
 """Amazon S3 connector: upload files to and find objects in a bucket with
-an assumed IAM role or legacy AWS keys, plus bucket/object discovery, the
-identity health check, the new/updated/deleted-file poll sources, and the trigger chip's
+an assumed IAM role, plus bucket/object discovery, the identity health check,
+the new/updated/deleted-file poll sources, and the trigger chip's
 sample pull."""
 import json
 
@@ -269,7 +269,7 @@ register_discovery(Discovery(
 
 
 def _run_test(connection):
-    """Verify the effective assumed role or legacy AWS identity."""
+    """Verify the assumed role's identity."""
     from src.dapier.connections import aws
 
     try:

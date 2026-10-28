@@ -319,15 +319,22 @@ def test_aws_sts_check_resolves_under_its_own_name(monkeypatch):
     assert registry.connection_test_for("s3") is None
 
     class FakeSts:
+        def assume_role(self, **kwargs):
+            return {"Credentials": {"AccessKeyId": "temporary-access",
+                                    "SecretAccessKey": "temporary-secret",
+                                    "SessionToken": "temporary-session"}}
+
         def get_caller_identity(self):
             return {"Account": "123456789012", "Arn": "arn:aws:iam::123456789012:user/dapier",
                     "UserId": "AIDEXAMPLE"}
 
     monkeypatch.setattr(boto3, "client", lambda service, **kwargs: FakeSts())
     monkeypatch.setenv("CREDENTIALS_TABLE", "credentials")
+    monkeypatch.setenv(
+        "AWS_ASSUMABLE_ROLE_ARNS",
+        "arn:aws:iam::387546586013:role/dapier-mailchimp-backup")
     tables = {"credentials": Table({"aws": {"credential_id": "aws", "value": {
-        "access_key_id": "AKIAIOSFODNN7EXAMPLE",
-        "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}}})}
+        "role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}}})}
 
     class Dynamo:
         def Table(self, name):

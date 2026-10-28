@@ -36,7 +36,8 @@ YOUTUBE_CONNECTION = {"connection_id": "google", "provider": "youtube",
                       "status": "connected", "credential_id": "oauth#google"}
 ZOOM_CONNECTION = {"connection_id": "zoom-main", "provider": "zoom",
                    "status": "connected", "credential_id": "oauth#zoom-main"}
-AWS_KEYS = {"access_key_id": "AKIAEXAMPLE0000", "secret_access_key": "b" * 40}
+ROLE = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+AWS_CONFIG = {"role_arn": ROLE}
 
 EVENT = {"id": "evt/1", "connector": "schedule", "event": "schedule.fired",
          "occurred_at": "2026-09-28T09:00:00+00:00",
@@ -65,6 +66,11 @@ class FakeS3:
     def __init__(self, responses=None):
         self.responses = responses or {}
         self.calls = []
+
+    def assume_role(self, **kwargs):
+        return {"Credentials": {"AccessKeyId": "temporary-access",
+                                "SecretAccessKey": "temporary-secret",
+                                "SessionToken": "temporary-session"}}
 
     def __getattr__(self, name):
         def _call(**kwargs):
@@ -262,9 +268,10 @@ def s3_response(body, content_type=None):
 
 def run_read(action, event=None, *, s3_client=None, steps=None):
     action = {"type": "s3_read_object", "credential_id": "aws", **action}
-    with patch("src.dapier.connections.credentials.get_credential",
-               return_value=dict(AWS_KEYS)), \
-         patch.dict("os.environ", {"RENDER_ARTIFACTS_BUCKET": "artifacts"}):
+    with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup",
+                                   "RENDER_ARTIFACTS_BUCKET": "artifacts"}), \
+         patch("src.dapier.connections.credentials.get_credential",
+               return_value=dict(AWS_CONFIG)):
         return run_s3_read_object(action, event or EVENT, steps=steps,
                                   s3_client=s3_client)
 
@@ -325,8 +332,9 @@ class S3ReadObjectTests(unittest.TestCase):
         s3 = FakeS3({"get_object": s3_response(b"bytes", "application/pdf")})
         with patch("boto3.client", return_value=s3), \
              patch("src.dapier.connections.credentials.get_credential",
-                   return_value=dict(AWS_KEYS)), \
-             patch.dict("os.environ", {"RENDER_ARTIFACTS_BUCKET": "artifacts"}):
+                   return_value=dict(AWS_CONFIG)), \
+             patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup",
+                                       "RENDER_ARTIFACTS_BUCKET": "artifacts"}):
             output = registry.run_action(
                 {"type": "s3_read_object", "bucket": "backups",
                  "key": "a/report.pdf", "id": "fetch"},
@@ -341,8 +349,9 @@ class S3ReadObjectTests(unittest.TestCase):
 
 def run_presign(action, event=None, *, s3_client=None, steps=None):
     action = {"type": "s3_presign_url", "credential_id": "aws", **action}
-    with patch("src.dapier.connections.credentials.get_credential",
-               return_value=dict(AWS_KEYS)):
+    with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"}), \
+         patch("src.dapier.connections.credentials.get_credential",
+               return_value=dict(AWS_CONFIG)):
         return run_s3_presign_url(action, event or EVENT, steps=steps,
                                   s3_client=s3_client)
 
@@ -416,8 +425,9 @@ class S3PresignUrlTests(unittest.TestCase):
 
 def run_delete(action, event=None, *, s3_client=None, steps=None):
     action = {"type": "s3_delete_object", "credential_id": "aws", **action}
-    with patch("src.dapier.connections.credentials.get_credential",
-               return_value=dict(AWS_KEYS)):
+    with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": ROLE}), \
+         patch("src.dapier.connections.credentials.get_credential",
+               return_value=dict(AWS_CONFIG)):
         return run_s3_delete_object(action, event or EVENT, steps=steps,
                                     s3_client=s3_client)
 
@@ -447,7 +457,8 @@ class S3DeleteObjectTests(unittest.TestCase):
         s3 = FakeS3()
         with patch("boto3.client", return_value=s3), \
              patch("src.dapier.connections.credentials.get_credential",
-                   return_value=dict(AWS_KEYS)):
+                   return_value=dict(AWS_CONFIG)), \
+             patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": ROLE}):
             output = registry.run_action(
                 {"type": "s3_delete_object", "bucket": "backups",
                  "key": "tmp/old.pdf"}, EVENT, "wf-1", steps={})

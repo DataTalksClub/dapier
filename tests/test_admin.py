@@ -109,12 +109,15 @@ def test_save_slack_credential_is_write_only(monkeypatch):
     assert writes[0] == ("slack", {"token": token}, {"provider": "slack"})
 
 
-def test_save_aws_credential_stores_the_key_pair(monkeypatch):
+ROLE = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+
+
+def test_save_aws_credential_stores_the_role(monkeypatch):
     writes = []
     monkeypatch.setattr(credentials_module, "put_credential",
                         lambda credential_id, value, **kwargs: writes.append((credential_id, value, kwargs)))
-    body = {"access_key_id": "AKIAIOSFODNN7EXAMPLE",
-            "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", ROLE)
+    body = {"role_arn": ROLE}
 
     response = admin.save_credential("aws", request("PUT", "/api/admin/credentials/aws", body))
 
@@ -122,20 +125,22 @@ def test_save_aws_credential_stores_the_key_pair(monkeypatch):
     assert writes[0] == ("aws", body, {"provider": "aws"})
 
 
-def test_save_aws_credential_rejects_bad_keys(monkeypatch):
+def test_save_aws_credential_rejects_keys_and_unapproved_roles(monkeypatch):
     writes = []
     monkeypatch.setattr(credentials_module, "put_credential",
                         lambda credential_id, value, **kwargs: writes.append((credential_id, value, kwargs)))
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", ROLE)
 
-    short_secret = admin.save_credential("aws", request(
+    key_pair = admin.save_credential("aws", request(
         "PUT", "/api/admin/credentials/aws",
-        {"access_key_id": "AKIAIOSFODNN7EXAMPLE", "secret_access_key": "too-short"}))
-    bad_access_key = admin.save_credential("aws", request(
+        {"access_key_id": "AKIAIOSFODNN7EXAMPLE",
+         "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}))
+    unapproved = admin.save_credential("aws", request(
         "PUT", "/api/admin/credentials/aws",
-        {"access_key_id": "not a key!", "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}))
+        {"role_arn": "arn:aws:iam::111111111111:role/other"}))
 
-    assert short_secret["statusCode"] == 400
-    assert bad_access_key["statusCode"] == 400
+    assert key_pair["statusCode"] == 400
+    assert unapproved["statusCode"] == 400
     assert writes == []
 
 

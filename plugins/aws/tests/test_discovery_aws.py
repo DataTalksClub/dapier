@@ -37,17 +37,25 @@ class Table:
         return {"Item": dict(item)} if item else {}
 
 
+ROLE_ARN = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+
+
 def aws_keys(monkeypatch):
-    """The stored "aws" credential holds a key pair; s3/STS calls are faked."""
+    """The stored "aws" credential holds a role; s3/STS calls are faked."""
     from src.dapier.connections import credentials as credentials_module
 
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", ROLE_ARN)
     monkeypatch.setattr(credentials_module, "get_credential",
-                        lambda credential_id: {
-                            "access_key_id": "AKIDEXAMPLE", "secret_access_key": "secret"})
+                        lambda credential_id: {"role_arn": ROLE_ARN})
 
     class FakeClient:
         def __init__(self, service, **kwargs):
             self.service = service
+
+        def assume_role(self, **kwargs):
+            return {"Credentials": {"AccessKeyId": "temporary-access",
+                                    "SecretAccessKey": "temporary-secret",
+                                    "SessionToken": "temporary-session"}}
 
         def list_buckets(self):
             return {"Buckets": [{"Name": "bucket-a"}, {"Name": "bucket-b"}]}

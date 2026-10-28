@@ -744,6 +744,11 @@ class FakeS3Objects:
         self.calls.append(kwargs)
         return {"Contents": self.contents}
 
+    def assume_role(self, **kwargs):
+        return {"Credentials": {"AccessKeyId": "temporary-access",
+                                "SecretAccessKey": "temporary-secret",
+                                "SessionToken": "temporary-session"}}
+
 
 def test_s3_objects_discovery_passes_the_prefix_through(monkeypatch):
     import boto3
@@ -751,9 +756,9 @@ def test_s3_objects_discovery_passes_the_prefix_through(monkeypatch):
     from src.dapier.connectors import registry
 
     fake = FakeS3Objects([{"Key": "reports/2026/report.pdf", "Size": 9}])
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", "arn:aws:iam::387546586013:role/dapier-mailchimp-backup")
     monkeypatch.setattr(discovery.credentials, "get_credential",
-                        lambda credential_id: {"access_key_id": "AKIAX",
-                                               "secret_access_key": "b" * 40})
+                        lambda credential_id: {"role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"})
     monkeypatch.setattr(boto3, "client", lambda service, **kwargs: fake)
     items = registry.DISCOVERIES["s3.objects"].run(
         {"credential_id": "aws"}, {"bucket": "backups", "prefix": "reports/2026/"})
@@ -769,9 +774,9 @@ def test_s3_objects_discovery_omits_the_prefix_when_absent(monkeypatch):
     from src.dapier.connectors import registry
 
     fake = FakeS3Objects([])
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", "arn:aws:iam::387546586013:role/dapier-mailchimp-backup")
     monkeypatch.setattr(discovery.credentials, "get_credential",
-                        lambda credential_id: {"access_key_id": "AKIAX",
-                                               "secret_access_key": "b" * 40})
+                        lambda credential_id: {"role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"})
     monkeypatch.setattr(boto3, "client", lambda service, **kwargs: fake)
     registry.DISCOVERIES["s3.objects"].run(
         {"credential_id": "aws"}, {"bucket": "backups"})

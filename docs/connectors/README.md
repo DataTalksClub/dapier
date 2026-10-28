@@ -9,7 +9,7 @@ Provider-specific setup and verified account details live in separate guides:
 | Slack | [Slack](../../plugins/slack/README.md) (plugin) | `slack` (bot paste), `slack-user` (OAuth user token) | OAuth user scopes for the user connection; pasted bot or user token for the legacy bot connection |
 | Zoom | [Zoom](../../plugins/zoom/README.md) (plugin) | `zoom-api` (OAuth), `zoom` (cloud-recording webhook) | OAuth for API access; separate webhook signing token for recordings |
 | Telegram | [Telegram](../../plugins/telegram/README.md) (plugin) | `telegram` (e.g. `telegram-bot`) | Pasted BotFather bot token |
-| Amazon S3 | [AWS / S3](../../plugins/aws/README.md) (plugin) | `aws`, `s3` (pseudo connections) | Stored IAM access key pair |
+| Amazon S3 | [AWS / S3](../../plugins/aws/README.md) (plugin) | `aws` (pseudo connection) | Stored IAM role |
 | AI (LLM) | [AI](ai.md) | `connection_id` (default `llm`) | Verified connection: Anthropic OIDC or a stored API key |
 
 This page covers the shared Dapier connection, scope, credential, and lifecycle

@@ -444,13 +444,22 @@ def test_s3_object_options_pass_the_bucket_through(monkeypatch):
             self.calls.append(kwargs)
             return {"Contents": [{"Key": "reports/2026/report.pdf", "Size": 9}]}
 
+        def assume_role(self, **kwargs):
+            return {"Credentials": {"AccessKeyId": "temporary-access",
+                                    "SecretAccessKey": "temporary-secret",
+                                    "SessionToken": "temporary-session"}}
+
     fake = FakeS3()
+    monkeypatch.setenv(
+        "AWS_ASSUMABLE_ROLE_ARNS",
+        "arn:aws:iam::387546586013:role/dapier-mailchimp-backup")
     monkeypatch.setattr(
         "src.dapier.connections.credentials.get_credential",
-        lambda credential_id: {"access_key_id": "AKIAX", "secret_access_key": "b" * 40})
+        lambda credential_id: {
+            "role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"})
     monkeypatch.setattr(boto3, "client", lambda service, **kwargs: fake)
     configure_connections(monkeypatch, {
-        "aws-1": {"connection_id": "aws-1", "provider": "s3", "status": "connected"}})
+        "aws-1": {"connection_id": "aws-1", "provider": "aws", "status": "connected"}})
     status, payload = trigger_discovery.api_discover(
         {"connector": "s3", "kind": "options", "resource": "s3.objects",
          "event": "backups", "connection_id": "aws-1"})

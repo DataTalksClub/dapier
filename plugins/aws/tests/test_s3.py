@@ -7,6 +7,8 @@ import pytest
 from src.dapier.connectors.registry import action_specs, run_action
 from plugins.aws.runners.s3 import run_s3_upload
 
+ROLE_ARN = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+
 
 class FakeTransport:
     def __init__(self, status=200, body=b"file-bytes"):
@@ -26,6 +28,11 @@ class FakeS3:
 
     def put_object(self, Bucket, Key, Body, **kwargs):
         self.objects[(Bucket, Key)] = (Body, kwargs)
+
+    def assume_role(self, **kwargs):
+        return {"Credentials": {"AccessKeyId": "temporary-access",
+                                "SecretAccessKey": "temporary-secret",
+                                "SessionToken": "temporary-session"}}
 
 
 DRIVE_FILE_EVENT = {
@@ -49,13 +56,14 @@ ACTION = {
 
 def run(overrides=None, event=None, *, transport=None, s3_client=None, steps=None):
     transport = transport if transport is not None else FakeTransport()
-    with patch("src.dapier.engine.actions.base._connected_connection",
+    with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": ROLE_ARN}), \
+         patch("src.dapier.engine.actions.base._connected_connection",
                return_value={"connection_id": "google-drive", "provider": "google",
                              "status": "connected"}), \
          patch("src.dapier.connections.tokens.get_access_token",
                return_value=("drive-token", {})), \
          patch("src.dapier.connections.credentials.get_credential",
-               return_value={"access_key_id": "AKIAEXAMPLE0000", "secret_access_key": "b" * 40}):
+               return_value={"role_arn": ROLE_ARN}):
         return run_s3_upload({**ACTION, **(overrides or {})}, event or DRIVE_FILE_EVENT,
                              transport=transport, steps=steps or {}, s3_client=s3_client)
 
@@ -175,13 +183,13 @@ class UploadErrorTests(unittest.TestCase):
                 run_s3_upload(action, DRIVE_FILE_EVENT, steps={}, s3_client=FakeS3())
         self.assertIn("not configured", str(caught.exception))
 
-    def test_credential_without_aws_keys_fails(self):
+    def test_credential_without_a_role_fails(self):
         action = {**ACTION, "source_connection_id": ""}
         with patch("src.dapier.connections.credentials.get_credential",
                    return_value={"token": "not-aws"}):
             with self.assertRaises(ValueError) as caught:
                 run_s3_upload(action, DRIVE_FILE_EVENT, steps={}, s3_client=FakeS3())
-        self.assertIn("does not contain AWS keys", str(caught.exception))
+        self.assertIn("holds no role_arn", str(caught.exception))
 
 
 class RegistryDispatchTests(unittest.TestCase):
@@ -190,15 +198,15 @@ class RegistryDispatchTests(unittest.TestCase):
     def test_run_action_downloads_and_uploads(self):
         transport = FakeTransport()
         s3 = FakeS3()
-        with patch("src.dapier.engine.actions.base._connected_connection",
+        with patch.dict("os.environ", {"AWS_ASSUMABLE_ROLE_ARNS": ROLE_ARN}), \
+             patch("src.dapier.engine.actions.base._connected_connection",
                    return_value={"connection_id": "google-drive", "provider": "google",
                                  "status": "connected"}), \
              patch("src.dapier.engine.actions.base._default_transport", transport), \
              patch("src.dapier.connections.tokens.get_access_token",
                    return_value=("drive-token", {})), \
              patch("src.dapier.connections.credentials.get_credential",
-                   return_value={"access_key_id": "AKIAEXAMPLE0000",
-                                 "secret_access_key": "b" * 40}), \
+                   return_value={"role_arn": ROLE_ARN}), \
              patch("boto3.client", return_value=s3):
             output = run_action(dict(ACTION), DRIVE_FILE_EVENT, "wf-1", steps={})
 

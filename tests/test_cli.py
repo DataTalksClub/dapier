@@ -511,7 +511,7 @@ def test_credentials_set_rejects_unknown_provider_and_empty_value(monkeypatch, t
                                     str(tmp_path / "missing")) == 2
 
 
-def test_credentials_set_aws_posts_the_key_pair_json(monkeypatch, tmp_path, capsys):
+def test_credentials_set_aws_posts_the_role_json(monkeypatch, tmp_path, capsys):
     posted = {}
 
     def fake_call(api_url, method, path, body=None, **kwargs):
@@ -519,24 +519,24 @@ def test_credentials_set_aws_posts_the_key_pair_json(monkeypatch, tmp_path, caps
         return {"provider": "aws", "configured": True}
 
     monkeypatch.setattr(commands.api, "call", fake_call)
-    keys = tmp_path / "aws.json"
-    keys.write_text(json.dumps({"access_key_id": "AKIAIOSFODNN7EXAMPLE",
-                                "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}))
-    assert commands.credentials_set("https://api.example.test", "aws", str(keys)) == 0
+    role = tmp_path / "aws.json"
+    config = {"role_arn": "arn:aws:iam::387546586013:role/dapier-mailchimp-backup",
+              "region": "eu-west-1"}
+    role.write_text(json.dumps(config))
+    assert commands.credentials_set("https://api.example.test", "aws", str(role)) == 0
     assert posted == {"method": "PUT", "path": "/api/agent/credentials/aws",
-                      "body": {"access_key_id": "AKIAIOSFODNN7EXAMPLE",
-                               "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}}
+                      "body": config}
     out, _ = capsys.readouterr()
-    assert "AKIA" not in out
+    assert "arn:aws" not in out
 
 
-def test_credentials_set_aws_rejects_non_json_and_wrong_keys(monkeypatch, tmp_path):
+def test_credentials_set_aws_rejects_non_json_and_roleless_bodies(monkeypatch, tmp_path):
     monkeypatch.setattr(commands.api, "call", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call")))
     raw = tmp_path / "raw.txt"
-    raw.write_text("AKIAIOSFODNN7EXAMPLE")
+    raw.write_text("arn:aws:iam::387546586013:role/dapier-mailchimp-backup")
     assert commands.credentials_set("https://api.example.test", "aws", str(raw)) == 2
     partial = tmp_path / "partial.json"
-    partial.write_text(json.dumps({"access_key_id": "AKIAIOSFODNN7EXAMPLE"}))
+    partial.write_text(json.dumps({"region": "eu-west-1"}))
     assert commands.credentials_set("https://api.example.test", "aws", str(partial)) == 2
 
 

@@ -26,6 +26,9 @@ def iso(hour, minute=0):
     return ts(hour, minute).isoformat()
 
 
+ROLE_ARN = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+
+
 class FakeS3:
     """list_objects_v2 stand-in: responses keyed by ContinuationToken."""
 
@@ -37,17 +40,24 @@ class FakeS3:
         self.calls.append(kwargs)
         return self.pages[kwargs.get("ContinuationToken")]
 
+    def assume_role(self, **kwargs):
+        return {"Credentials": {"AccessKeyId": "temporary-access",
+                                "SecretAccessKey": "temporary-secret",
+                                "SessionToken": "temporary-session"}}
+
 
 def s3_entry(key, modified, size=100, etag='"etag-1"'):
     return {"Key": key, "Size": size, "LastModified": modified, "ETag": etag}
 
 
 def stub_aws(monkeypatch, pages):
-    """Stored AWS keys plus the FakeS3 the boto3 client seam hands back."""
+    """A stored role configuration plus the FakeS3 the boto3 client seam
+    hands back for both the STS assumption and the S3 calls."""
     fake = FakeS3(pages)
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", ROLE_ARN)
     monkeypatch.setattr(
         "src.dapier.connections.credentials.get_credential",
-        lambda credential_id: {"access_key_id": "AKIAX", "secret_access_key": "b" * 40})
+        lambda credential_id: {"role_arn": ROLE_ARN})
     monkeypatch.setattr(boto3, "client", lambda service, **kwargs: fake)
     return fake
 
@@ -210,12 +220,12 @@ class TestFetch:
         with pytest.raises(RuntimeError, match="not configured"):
             spec.fetch(s3_item(), None)
 
-    def test_keys_without_aws_secrets_are_a_fetch_failure(self, spec, monkeypatch):
+    def test_credentials_without_a_role_are_a_fetch_failure(self, spec, monkeypatch):
         monkeypatch.setattr(
             "src.dapier.connections.credentials.get_credential",
             lambda credential_id: {"token": "not-aws"})
 
-        with pytest.raises(RuntimeError, match="does not contain AWS keys"):
+        with pytest.raises(RuntimeError, match="holds no role_arn"):
             spec.fetch(s3_item(), None)
 
     def test_a_provider_error_is_a_fetch_failure(self, spec, monkeypatch):

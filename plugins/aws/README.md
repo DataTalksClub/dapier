@@ -15,12 +15,11 @@ bucket is `dapier-zoom-transcripts-817685572750`; keys are
 Zoom calls independently of the AISL agent and does not store video. The
 Zoom app must subscribe to the transcript-ready event.
 
-S3 actions use the configured `aws` credential. Operators can select an IAM
-role that Dapier assumes with its Lambda execution identity, or retain a legacy
-access key pair. `aws` is a pseudo connection backed by that credential;
-there is no OAuth client. The provider name is `aws` — `s3` is only the
-discovery-source/trigger name (like `google-drive` under provider `google`),
-not a second provider or connection name.
+S3 actions use the configured `aws` credential: an IAM role that Dapier
+assumes with its Lambda execution identity. `aws` is a pseudo connection
+backed by that credential; there is no OAuth client. The provider name is
+`aws` — `s3` is only the discovery-source/trigger name (like `google-drive`
+under provider `google`), not a second provider or connection name.
 
 ## Configure an IAM role
 
@@ -66,21 +65,20 @@ visible to the AWS identity. Object discovery still checks real bucket access.
 `dapier connections discover aws` exposes `buckets` and `objects`; the latter
 accepts `--param bucket=<name>` and an optional prefix.
 
-## Existing access key configuration
+## Access-key credentials are retired
 
-Existing key pairs remain supported. Choose **Access keys** in the Console,
-enter the access key ID and secret, or use:
-
-```json
-{"access_key_id": "AKIA…", "secret_access_key": "…"}
-```
+Access-key mode is gone: the stored `aws` credential must be a role
+configuration. Save one from the Console (Credentials → AWS) or with:
 
 ```sh
-uv run dapier credentials set aws --file aws-keys.json
+uv run dapier credentials set aws --file aws-role.json
 ```
 
-Values are write-only. A role configuration replaces the previous key pair;
-Dapier does not retain keys or fall back to them if role assumption fails.
+```json
+{"role_arn": "arn:aws:iam::…:role/…", "region": "eu-west-1"}
+```
+
+Values are write-only, and Dapier never retains long-lived keys.
 
 ## Triggers: file events from a bucket (`s3`, `s3.updates`, `s3.deletions`)
 

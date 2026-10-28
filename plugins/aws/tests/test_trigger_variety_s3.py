@@ -175,13 +175,17 @@ def build(source, name="s3-watch", **body):
     return poll_triggers.build_item({"name": name, **body}, "op@example.test")
 
 
+ROLE_ARN = "arn:aws:iam::387546586013:role/dapier-mailchimp-backup"
+
+
 @pytest.fixture
-def aws_keys(monkeypatch):
-    """The stored key pair the connector resolves from the credential store."""
+def aws_role(monkeypatch):
+    """The stored role configuration the connector resolves from the
+    credential store; moto serves both the STS assumption and S3."""
+    monkeypatch.setenv("AWS_ASSUMABLE_ROLE_ARNS", ROLE_ARN)
     monkeypatch.setattr(
         "src.dapier.connections.credentials.get_credential",
-        lambda credential_id: {"access_key_id": "testing",
-                               "secret_access_key": "testing"})
+        lambda credential_id: {"role_arn": ROLE_ARN, "region": "eu-west-1"})
 
 
 def bucket_with(*keys_and_bodies):
@@ -260,7 +264,7 @@ def test_the_fired_events_match_the_chip():
 
 
 @mock_aws
-def test_updates_first_fire_seeds_the_snapshot_and_fires_nothing(aws_keys):
+def test_updates_first_fire_seeds_the_snapshot_and_fires_nothing(aws_role):
     bucket_with(("inbox/a.txt", b"hello"))
     cursors = FakeCursorTable()
 
@@ -276,7 +280,7 @@ def test_updates_first_fire_seeds_the_snapshot_and_fires_nothing(aws_keys):
 
 
 @mock_aws
-def test_an_overwrite_fires_as_file_updated(aws_keys):
+def test_an_overwrite_fires_as_file_updated(aws_role):
     """A rewritten object re-lists its key with a changed marker (etag,
     size): the updates source fires the object facts, not the created
     event."""
@@ -300,7 +304,7 @@ def test_an_overwrite_fires_as_file_updated(aws_keys):
 
 
 @mock_aws
-def test_an_unchanged_or_merely_newer_bucket_fires_no_updates(aws_keys):
+def test_an_unchanged_or_merely_newer_bucket_fires_no_updates(aws_role):
     """A re-listed key with the same fingerprint is not an edit, and a
     brand-new key is the created source's news — never double-fired."""
     client = bucket_with(("inbox/a.txt", b"hello"))
@@ -317,7 +321,7 @@ def test_an_unchanged_or_merely_newer_bucket_fires_no_updates(aws_keys):
 
 
 @mock_aws
-def test_a_refetched_page_does_not_refire_its_update(aws_keys):
+def test_a_refetched_page_does_not_refire_its_update(aws_role):
     """A rewound cursor re-diffs the same baseline; the seen-set absorbs
     the already-published version instead of re-running it."""
     client = bucket_with(("inbox/a.txt", b"hello"))
@@ -341,7 +345,7 @@ def test_a_refetched_page_does_not_refire_its_update(aws_keys):
 
 
 @mock_aws
-def test_deletions_first_fire_seeds_and_deletion_fires_the_key(aws_keys):
+def test_deletions_first_fire_seeds_and_deletion_fires_the_key(aws_role):
     client = bucket_with(("inbox/a.txt", b"hello"),
                          ("inbox/b.txt", b"bye"))
     cursors = FakeCursorTable()
@@ -365,7 +369,7 @@ def test_deletions_first_fire_seeds_and_deletion_fires_the_key(aws_keys):
 
 
 @mock_aws
-def test_a_key_added_after_seeding_is_never_a_deletion(aws_keys):
+def test_a_key_added_after_seeding_is_never_a_deletion(aws_role):
     client = bucket_with(("inbox/a.txt", b"hello"))
     cursors = FakeCursorTable()
     item = build("s3.deletions", bucket=BUCKET, prefix="inbox/")
@@ -379,7 +383,7 @@ def test_a_key_added_after_seeding_is_never_a_deletion(aws_keys):
 
 
 @mock_aws
-def test_a_prefix_change_re_seeds_instead_of_firing_deletions(aws_keys):
+def test_a_prefix_change_re_seeds_instead_of_firing_deletions(aws_role):
     """The operator re-scopes the watch: keys outside the new prefix must
     not read as mass deletions — the old keys were a different watch."""
     bucket_with(("logs/a.txt", b"hello"))
@@ -396,7 +400,7 @@ def test_a_prefix_change_re_seeds_instead_of_firing_deletions(aws_keys):
 
 
 @mock_aws
-def test_a_foreign_cursor_re_seeds_instead_of_diffing(aws_keys):
+def test_a_foreign_cursor_re_seeds_instead_of_diffing(aws_role):
     """A watermark-style cursor (an s3 created trigger's shape) is not a
     snapshot: diffing it would read every key as an edit and every absent
     one as deleted."""
@@ -414,7 +418,7 @@ def test_a_foreign_cursor_re_seeds_instead_of_diffing(aws_keys):
 
 
 @mock_aws
-def test_a_capped_listing_never_fires_deletions(aws_keys):
+def test_a_capped_listing_never_fires_deletions(aws_role):
     """Keys beyond the listing cap are unlisted, not absent: neither a
     capped baseline nor a capped re-listing may prove a deletion."""
     bucket_with(("inbox/a.txt", b"hello"), ("inbox/b.txt", b"bye"))
@@ -434,7 +438,7 @@ def test_a_capped_listing_never_fires_deletions(aws_keys):
 
 
 @mock_aws
-def test_a_shrunk_listing_with_a_capped_baseline_fires_nothing(aws_keys):
+def test_a_shrunk_listing_with_a_capped_baseline_fires_nothing(aws_role):
     """The bucket grew past the cap between fires and shrank back: the
     capped baseline proves nothing either, so the deletion waits for an
     uncapped fire."""
@@ -456,7 +460,7 @@ def test_a_shrunk_listing_with_a_capped_baseline_fires_nothing(aws_keys):
 
 
 @mock_aws
-def test_an_updates_poll_pulls_its_newest_object_live(monkeypatch, aws_keys):
+def test_an_updates_poll_pulls_its_newest_object_live(monkeypatch, aws_role):
     bucket_with(("invoices/4136.pdf", b"older"), ("invoices/4137.pdf", b"newest"))
     item = build("s3.updates", name="edit-watch", bucket=BUCKET)
     monkeypatch.setattr(poll_triggers, "get_item",
@@ -473,7 +477,7 @@ def test_an_updates_poll_pulls_its_newest_object_live(monkeypatch, aws_keys):
 
 
 @mock_aws
-def test_a_deletions_poll_falls_to_the_documented_example(monkeypatch, aws_keys):
+def test_a_deletions_poll_falls_to_the_documented_example(monkeypatch, aws_role):
     """A live pull cannot show an absent object: the documented file.deleted
     example answers, never a raise."""
     bucket_with(("invoices/4137.pdf", b"still here"))
@@ -491,7 +495,7 @@ def test_a_deletions_poll_falls_to_the_documented_example(monkeypatch, aws_keys)
 
 
 @mock_aws
-def test_a_failed_live_updates_pull_falls_back_instead_of_502(monkeypatch, aws_keys):
+def test_a_failed_live_updates_pull_falls_back_instead_of_502(monkeypatch, aws_role):
     item = build("s3.updates", name="edit-watch", bucket="no-such-bucket-here")
     monkeypatch.setattr(poll_triggers, "get_item",
                         lambda name, table_ref=None: item)

@@ -738,7 +738,7 @@ export const actionCatalog: ActionEntry[] = [
     type: "s3_upload",
     label: "Amazon S3",
     icon: S3Logo,
-    description: "Upload a file to an S3 bucket with stored AWS keys (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
+    description: "Upload a file to an S3 bucket with the stored AWS role (Upload File). The file comes from source_url or a staged source_s3 {bucket, key}.",
     fields: [
       { key: "credential_id", label: "Credential ID", placeholder: "aws (default)" },
       { key: "bucket", label: "Bucket", placeholder: "datatalks-mailchimp-backup", required: true,

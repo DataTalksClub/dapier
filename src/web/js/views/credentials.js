@@ -9,10 +9,7 @@ const PROVIDERS = {
   typefully: { name: 'Typefully', fields: [{ key: 'api_key', label: 'API key' }] },
   taskdeck: { name: 'Taskdeck status', fields: [{ key: 'token', label: 'Bearer token' }] },
   slack: { name: 'Slack bot', fields: [{ key: 'token', label: 'Bot token' }] },
-  aws: { name: 'AWS', fields: [
-    { key: 'access_key_id', label: 'Access key ID' },
-    { key: 'secret_access_key', label: 'Secret access key' },
-  ] },
+  aws: { name: 'AWS', fields: [] },
   openrouter: { name: 'OpenRouter', fields: [{ key: 'api_key', label: 'API key' }] },
 };
 
@@ -77,23 +74,15 @@ function openCredential(provider) {
   const spec = PROVIDERS[provider] || { name: provider, fields: [{ key: 'value', label: 'Value' }] };
   $('#credential-title').textContent = `${spec.name} credential`;
   const fields = $('#credential-fields');
-  const renderFields = (mode) => {
-    const selected = provider === 'aws' && mode === 'role' ? [
-      { key: 'role_arn', label: 'IAM role ARN', public: true },
-      { key: 'external_id', label: 'External ID (optional)', optional: true },
-      { key: 'region', label: 'Region (optional)', public: true, optional: true },
-      { key: 'buckets', label: 'Bucket names, comma-separated (optional)', public: true, optional: true },
-    ] : spec.fields;
-    const target = provider === 'aws' ? $('#aws-credential-fields') : fields;
-    target.innerHTML = selected.map((field) => `
-      <label>${escapeHtml(field.label)}<input name="${escapeHtml(field.key)}" class="${field.public ? '' : 'secret-input'}" type="${field.public ? 'text' : 'password'}" autocomplete="new-password" ${field.optional ? '' : 'required'}></label>
-    `).join('');
-  };
-  if (provider === 'aws') {
-    fields.innerHTML = '<label>Authentication<select id="aws-credential-mode"><option value="role">Assume IAM role</option><option value="keys">Access keys</option></select></label><div id="aws-credential-fields"></div>';
-    $('#aws-credential-mode').addEventListener('change', (event) => renderFields(event.target.value));
-  }
-  renderFields('role');
+  const selected = provider === 'aws' ? [
+    { key: 'role_arn', label: 'IAM role ARN', public: true },
+    { key: 'external_id', label: 'External ID (optional)', optional: true },
+    { key: 'region', label: 'Region (optional)', public: true, optional: true },
+    { key: 'buckets', label: 'Bucket names, comma-separated (optional)', public: true, optional: true },
+  ] : spec.fields;
+  fields.innerHTML = selected.map((field) => `
+    <label>${escapeHtml(field.label)}<input name="${escapeHtml(field.key)}" class="${field.public ? '' : 'secret-input'}" type="${field.public ? 'text' : 'password'}" autocomplete="new-password" ${field.optional ? '' : 'required'}></label>
+  `).join('');
   $('#credential-error').textContent = '';
   $('#credential-dialog').showModal();
   const first = $('#credential-fields input');

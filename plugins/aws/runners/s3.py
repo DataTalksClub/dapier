@@ -5,8 +5,8 @@ read, delete, or mint download links for single objects.
 (optionally authorized by a connection's bearer token) or ``source_s3`` (a
 staged ``{bucket, key}`` object, like an email attachment, a render output,
 or an earlier dropbox_read_file's output — bucket/key take templates). The
-target bucket is written with the configured assumed role or legacy access
-key pair. Internal staging uses the stack's execution identity.
+target bucket is written with the configured assumed role. Internal
+staging uses the stack's execution identity.
 
 ``s3_find`` lists the bucket with the same AWS configuration and returns the
 objects whose key (or basename) match a pattern — the first match keeps the
