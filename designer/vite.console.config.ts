@@ -28,8 +28,8 @@ function sourceBanner(): Plugin {
 }
 
 // Vendored console bundle: an IIFE that mounts the designer into the dapier
-// console at /designer (src/web/designer.js + designer.css, committed like
-// lucide.min.js). Rebuild with `make designer-console` after changing sources;
+// console at /designer/app (src/web/designer.js + designer.css, committed).
+// Rebuild with `make designer-console` after changing sources;
 // the console has no build step of its own.
 export default defineConfig({
   plugins: [react(), sourceBanner()],

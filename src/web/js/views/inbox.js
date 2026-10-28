@@ -1,6 +1,5 @@
-/* Inbox view: every inbound trigger event, matched or not — with replay.
-   The API surfaces (GET /api/admin/triggers/inbox[/id], POST …/replay)
-   existed before this view; the console just never rendered them. */
+/* Incoming events on the Runs page: every inbound trigger event, matched
+   or not — with replay (GET /api/admin/triggers/inbox[/id], POST …/replay). */
 import { state } from '../state.js';
 import { $, icons, notice, openWhenReady } from '../ui.js';
 import { api } from '../api.js';

@@ -75,6 +75,6 @@ check-dakit:
 	node src/web/vendor/check-scale.mjs --baseline dakit-scale-baseline.json $(DAKIT_CHECK_PATHS)
 
 # Rebuild the bundle vendored into the console (src/web/designer.js/.css,
-# served at /designer). Run after changing designer sources.
+# served at /designer/app). Run after changing designer sources.
 designer-console: designer-install
 	cd designer && npm run build:console

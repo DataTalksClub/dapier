@@ -19,7 +19,7 @@
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* Mono is for machine values and maxes at 500 (dakit guidelines): a name
    set in mono drops to medium instead of a faux bold. */
-.mono .cell-name, .cell-name.mono, .mono-cell .cell-name { font-weight: var(--dk-weight-medium); }
+.mono .cell-name, .cell-name.mono { font-weight: var(--dk-weight-medium); }
 .nowrap { white-space: nowrap; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* One-line clip with the full value in title (long ids, addresses). */
@@ -146,7 +146,6 @@ body[data-view="designer"] #page-tabs { display: none; }
 .page-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dk-gap-control); margin: 0; padding: 0; min-width: 0; }
 .page-tools .sub { margin: 0; flex: 1 1 160px; min-width: 0; font-size: var(--dk-text-md); font-weight: 400; color: var(--dk-text-muted); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .dk-button { flex: none; }
-.page-tools .register-summary { flex: 1 1 160px; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-tools .field-hint { margin: 0; white-space: nowrap; }
 .page-tools.section-head { margin: 0; padding: 0; flex: 1; }
 /* In-flow toolbars keep the block gap above the register they control.
@@ -252,7 +251,6 @@ details[open] > summary .section-chevron { transform: rotate(180deg); }
 .section-head .sub { margin: 0; flex: 1; font-size: var(--dk-text-sm); font-weight: 400; line-height: 1.3; }
 .section-head .text-link { margin-left: auto; height: var(--dk-size-control-md); }
 .sub { margin-top: var(--dk-space-1); font-size: var(--dk-text-md); line-height: 1.5; font-weight: var(--dk-weight-regular); color: var(--dk-text-muted); }
-.register-summary { color: var(--dk-text-muted); font-size: var(--dk-text-sm); }
 .oauth-result { display: flex; align-items: center; justify-content: space-between; gap: var(--dk-gap-block); margin: 0 0 var(--dk-gap-block); padding: var(--dk-space-4); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-info-bg); }
 .oauth-result strong { font-size: var(--dk-text-body); }
 .oauth-result p { margin-top: var(--dk-space-1); font-size: var(--dk-text-md); color: var(--dk-text-primary); }
@@ -349,7 +347,7 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .connection-name { justify-self: start; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dk-text-primary); font-size: var(--dk-text-body); font-weight: var(--dk-weight-semibold); text-align: left; }
 .service-account-identity .connection-name { flex: 0 1 auto; }
 .connection-name:hover { color: var(--dk-accent-default); text-decoration: underline; text-underline-offset: 3px; }
-.service-account-status .status, .service-ref-status .status { font-size: var(--dk-text-sm); }
+.service-account-status .status { font-size: var(--dk-text-sm); }
 .service-account-actions { justify-content: flex-end; gap: var(--dk-gap-control); }
 /* Keep status and every action on the name line on desktop. The action
    track fits Test / Manage and grows for unfinished setup controls; phone
@@ -367,7 +365,6 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
 .connect-pending { color: var(--dk-info-text); }
 .connect-pending a { color: var(--dk-accent-default); font-weight: var(--dk-weight-semibold); text-underline-offset: 3px; }
 .brand-mark { flex: none; color: var(--dk-text-muted); }
-.provider-cell { display: inline-flex; align-items: center; gap: var(--dk-space-2); }
 .connections-footer { margin-top: var(--dk-gap-block); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); }
 .reuse-list { display: grid; gap: var(--dk-space-2); margin-top: var(--dk-space-3); }
 .reuse-account { display: grid; gap: var(--dk-space-1); width: 100%; padding: var(--dk-space-3) var(--dk-space-4); border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); text-align: left; cursor: pointer; }
@@ -500,9 +497,7 @@ tr.register-empty strong { color: var(--dk-text-primary); font-weight: var(--dk-
   .manage-advanced summary { min-height: var(--dk-size-touch); }
   .help-tip { flex: none; min-width: var(--dk-size-touch); }
 }
-.sub-head { font-size: var(--dk-text-lg); }
-.section-head h2.sub-head { font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
-td.mono, .mono-cell { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
+td.mono { font-family: var(--dk-font-mono); font-size: var(--dk-text-md); }
 .muted-cell { color: var(--dk-text-primary); }
 /* .cell-title stays a real table-cell — display:grid here would strip the td of
    its cell role, so its border paints at content height and rows split apart
@@ -617,19 +612,7 @@ dialog form { display: contents; }
 }
 /* A loading or failed dialog body: centered in the body, never a bare
    line in the corner; failure copy names the source and offers retry. */
-.dialog-state { display: grid; justify-items: center; align-content: center; gap: var(--dk-space-2); min-height: 12rem; text-align: center; color: var(--dk-text-muted); }
-.dialog-state strong { color: var(--dk-text-primary); font-size: var(--dk-text-lg); font-weight: var(--dk-weight-semibold); }
-.dialog-state p { max-width: 52ch; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dk-gap-block); }
 
-/* OAuth callout */
-.callout { border: 1px solid var(--dk-border-default); background: var(--dk-accent-soft); border-radius: var(--dk-radius-md); padding: var(--dk-space-3) var(--dk-space-4); display: grid; gap: var(--dk-space-2); }
-.callout-step { margin: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); }
-.callout-step a { color: var(--dk-accent-default); font-weight: var(--dk-weight-medium); text-underline-offset: 2px; }
-.copy-field { display: flex; align-items: center; gap: var(--dk-space-2); background: var(--dk-bg-surface); border: 1px solid var(--dk-border-strong); border-radius: var(--dk-radius-md); padding: var(--dk-space-1) var(--dk-space-1) var(--dk-space-1) var(--dk-space-3); }
-.copy-field code { flex: 1; min-width: 0; background: none; padding: 0; font-size: var(--dk-text-md); color: var(--dk-text-primary); overflow-wrap: anywhere; }
-.copy-field .icon-button { width: var(--dk-size-control-sm); height: var(--dk-size-control-sm); border-color: transparent; }
-.copy-field .icon-button:hover { border-color: var(--dk-border-strong); }
 
 /* run / workflow detail */
 .detail { gap: var(--dk-space-5); }
@@ -681,7 +664,6 @@ dialog form { display: contents; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--dk-accent-default); }
 label:not([class*="dk-"]):has(> input[type="checkbox"]) { display: flex; align-items: center; gap: var(--dk-space-2); }
 /* --- Emails: the trigger family's mailbox (layout in "Trigger family") ---- */
-.activity-to { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-sm); font-weight: var(--dk-weight-regular); color: var(--dk-text-muted); }
 .panel-note { margin: 0; padding: var(--dk-space-3) var(--dk-space-4) 0; font-size: var(--dk-text-sm); }
 .panel-note:empty, .panel-note[hidden] { display: none; }
 .panel-note .text-link { height: auto; font-size: inherit; }
@@ -1027,7 +1009,6 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
   .table-wrap td[data-label="Status"] > .mono, .table-wrap td[data-label="Status"] > .cell-note { grid-column: 2; }
   tr.register-empty td { display: block; }
 
-  .form-grid { grid-template-columns: 1fr; }
   .login-panel { width: min(400px, calc(100% - 2 * var(--dk-space-5))); }
 }
 
@@ -1072,10 +1053,7 @@ body[data-view="designer"] .page-header h1.renamable:hover .view-title-text {
 .tag-chip--more { color: var(--dk-text-muted); }
 .workflow-id { display: block; margin-top: var(--dk-space-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dk-text-xs); color: var(--dk-text-muted); }
 .workflow-label .workflow-id { font-weight: var(--dk-weight-regular); }
-.cell-tags { display: flex; flex-wrap: nowrap; gap: var(--dk-space-1); margin-top: var(--dk-space-1); overflow: hidden; }
 .tag-chip { display: inline-block; flex: none; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--dk-space-2); border-radius: var(--dk-radius-full); background: var(--dk-bg-hover); color: var(--dk-text-primary); font-size: var(--dk-text-xs); line-height: 1.6; white-space: nowrap; }
-/* The folder chip: dashed, so the flat folder reads as a container. */
-.folder-chip { font-weight: var(--dk-weight-semibold); }
 /* Apps: brand marks in small bordered tiles, the middle collapsed to +N. */
 .app-strip { display: inline-flex; align-items: center; gap: var(--dk-space-1); vertical-align: middle; }
 .app-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; box-sizing: border-box; border: 1px solid var(--dk-border-default); border-radius: var(--dk-radius-md); background: var(--dk-bg-surface); }

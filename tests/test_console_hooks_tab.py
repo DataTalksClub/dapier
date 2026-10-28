@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "src" / "web"
 HTML = (WEB / "index.html").read_text()
 HOOKS_JS = (WEB / "js" / "views" / "hooks.js").read_text()
-TRIGGERS_JS = (WEB / "js" / "views" / "triggers.js").read_text()
+OVERVIEW_JS = (WEB / "js" / "views" / "overview.js").read_text()
 CLI = (ROOT / "dapier_cli" / "commands" / "hooks.py").read_text()
 
 
@@ -21,8 +21,8 @@ def test_hooks_panel_has_deliveries_endpoints_and_dialogs():
 
 
 def test_hooks_view_owns_the_hook_actions():
-    assert "hook-triggers" not in TRIGGERS_JS
-    assert "renderHooks" in TRIGGERS_JS
+    assert "hook-triggers" not in OVERVIEW_JS
+    assert "renderHooks" in OVERVIEW_JS
 
 
 def test_every_hooks_tab_endpoint_has_a_cli_counterpart():

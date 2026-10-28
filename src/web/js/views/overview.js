@@ -18,7 +18,8 @@ import { renderRuns, openRun } from './runs.js';
 import { viewAsIdentities } from '../view-as.js';
 import { renderInbox } from './inbox.js';
 import { renderSchedules } from './schedules.js';
-import { renderTriggers } from './triggers.js';
+import { renderHooks } from './hooks.js';
+import { renderPolls } from './polls.js';
 import { workflowName, workflowLabelHtml, workflowFlowText, appStripHtml, triggerKindIcon } from '../workflow-names.js';
 import { loadCatalog, eventLabel, actionLabel } from '../catalog-labels.js';
 
@@ -536,7 +537,10 @@ export async function refresh() {
   renderInbox();
   renderReceivedEmail();
   renderSchedules();
-  renderTriggers();
+  // The Workflows trigger tabs: each fetches while on screen, otherwise
+  // repaints its cache.
+  renderHooks();
+  renderPolls();
   // Error history is independent of both startup and the other reads.
   api('/api/admin/errors/summary?days=7').then((data) => {
     if (sequence !== refreshSequence) return;

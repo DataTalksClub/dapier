@@ -148,12 +148,6 @@ export function triggerEventLabel(connector, event) {
   return `${connectorName(connector)}${words ? ` ${words}` : ''}`;
 }
 
-/* Escape, then mark separator characters as safe wrap points so long machine
-   values (execution IDs, scope URLs) break at ":", ".", "/", "_" — never mid-token. */
-export function wrapTokens(value) {
-  return escapeHtml(value).replace(/([:._/])/g, '$1<wbr>');
-}
-
 export function triggerLabel(workflow) {
   const trigger = workflow.trigger;
   if (!trigger || !trigger.connector) return 'No trigger yet';
@@ -172,13 +166,6 @@ export function formatTimestamp(value) {
   const date = toDate(value);
   return Number.isNaN(date.getTime()) ? String(value)
     : `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-export function formatDay(value) {
-  if (value == null || value === '') return null;
-  const date = toDate(value);
-  return Number.isNaN(date.getTime()) ? String(value)
-    : `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
 /* Step timing: sub-second stays in ms, everything else in seconds. */
@@ -277,10 +264,6 @@ export function dataBlock(value, { openRaw = false } = {}) {
     <details class="json-raw"${openRaw ? ' open' : ''}><summary>Show raw JSON</summary>${jsonBlock(value)}</details>`;
 }
 
-export function emptyRow(columns) {
-  return `<tr><td colspan="${columns}" style="color:var(--dk-text-muted)">No activity</td></tr>`;
-}
-
 export function configRows(config) {
   const entries = Object.entries(config).filter(([key]) => key !== 'id' && key !== 'type');
   if (!entries.length) return '<p class="detail-muted">No parameters.</p>';
@@ -288,11 +271,4 @@ export function configRows(config) {
     const text = typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value);
     return `<div><dt>${escapeHtml(key)}</dt><dd><pre>${escapeHtml(text)}</pre></dd></div>`;
   }).join('')}</dl>`;
-}
-
-export function detailRows(rows) {
-  const entries = rows.filter(([, value]) => value !== undefined && value !== null && value !== '');
-  if (!entries.length) return '<p class="detail-muted">No details recorded.</p>';
-  return `<dl class="detail-list">${entries.map(([label, value]) =>
-    `<div><dt>${escapeHtml(label)}</dt><dd><pre>${escapeHtml(String(value))}</pre></dd></div>`).join('')}</dl>`;
 }
