@@ -1,5 +1,5 @@
 """Webhook activity: what each hook starts, what it received, and a test
-request — the data behind the console's Hooks tab and ``dapier hooks
+request — the data behind the console's Hooks tab and ``dapier webhooks
 deliveries|delivery|test``.
 
 Nothing here stores anything new. Deliveries are the trigger inbox's

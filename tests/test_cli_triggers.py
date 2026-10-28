@@ -160,7 +160,7 @@ def test_main_dispatch_for_hook_schedule_poll(monkeypatch):
                         lambda api_url, kind=None, debug=False: seen.setdefault("calls", []).append(("hooks", kind)) or 0)
     assert main.main(["schedules", "save", "/tmp/schedule.json"]) == 0
     assert main.main(["polls", "delete", "inbox-watch"]) == 0
-    assert main.main(["hooks", "list"]) == 0
+    assert main.main(["webhooks", "list"]) == 0
     assert seen["calls"] == [("schedules", "/tmp/schedule.json"), ("polls", "inbox-watch"), ("hooks", None)]
 
 
@@ -196,6 +196,6 @@ def test_no_session_fails_through_the_shared_api_client(monkeypatch, capsys):
     from dapier_cli import api as cli_api
 
     monkeypatch.setattr(cli_api.config, "load_session", lambda: None)
-    assert main.main(["hooks", "list"]) == 3
+    assert main.main(["webhooks", "list"]) == 3
     out, _ = capsys.readouterr()
     assert "Not signed in" in out

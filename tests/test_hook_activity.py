@@ -322,7 +322,7 @@ def test_cli_hooks_activity_commands(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("dapier_cli.commands.hooks.api.call", fake_call)
     payload = tmp_path / "data.json"
     payload.write_text('{"order": 7}')
-    assert main.main(["hooks", "deliveries", "orders", "--limit", "5"]) == 0
+    assert main.main(["webhooks", "deliveries", "orders", "--limit", "5"]) == 0
     assert main.main(["webhooks", "delivery", "e-1"]) == 0
     assert main.main(["webhooks", "test", "orders", "--data", str(payload)]) == 0
     assert calls[0][:2] == ("GET", "/api/agent/hook-triggers/deliveries?limit=5&hook=orders")
@@ -331,7 +331,7 @@ def test_cli_hooks_activity_commands(monkeypatch, capsys, tmp_path):
     out = capsys.readouterr().out
     assert "[test] Ran order-sync" in out
     assert "user-agent: curl/8" in out and '"order": 7' in out
-    assert "response: 202" in out and "dapier hooks delivery e-1" in out
+    assert "response: 202" in out and "dapier webhooks delivery e-1" in out
 
 
 def test_cli_hooks_show_names_verification_and_workflows(monkeypatch, capsys):

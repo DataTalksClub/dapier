@@ -1,13 +1,13 @@
-"""The `dapier hooks` and `dapier webhooks` nouns (same commands)."""
+"""The `dapier webhooks` noun."""
 
 from .. import commands
 
-GROUPS = ("hooks", "webhooks",)
+GROUPS = ("webhooks",)
 
 
 def _activity_commands(group_sub):
-    """The delivery-log commands both nouns carry (the console Hooks tab's
-    activity view and Send test request)."""
+    """The delivery-log commands (the console Hooks tab's activity view and
+    Send test request)."""
     deliveries = group_sub.add_parser(
         "deliveries", help="Recent webhook deliveries with their outcome, newest first")
     deliveries.add_argument("name", nargs="?", default=None, help="Only this hook's deliveries")
@@ -29,26 +29,6 @@ def _activity_commands(group_sub):
 
 
 def register(sub):
-    hook_p = sub.add_parser(
-        "hooks", help="Moved to dapier webhooks",
-        description="Moved to dapier webhooks.")
-    hook_sub = hook_p.add_subparsers(dest="command", required=True)
-    hook_list_p = hook_sub.add_parser("list", help="List hook triggers")
-    hook_list_p.add_argument("--kind", default=None,
-                             choices=["webhook", "telegram", "youtube"])
-    hook_show_p = hook_sub.add_parser("show", help="Show one hook trigger, including its token")
-    hook_show_p.add_argument("name")
-    hook_save_p = hook_sub.add_parser("save", help="Create or update a hook trigger from a JSON file")
-    hook_save_p.add_argument("file", help="Path to the hook JSON, or - for stdin")
-    hook_save_p.add_argument("--sync-response", action="store_true",
-                             help="Webhook only: answer each delivery by running the flow "
-                                  "inline and replying with the outcome (response.mode sync) "
-                                  "instead of the 202 ack; must finish inside ~30s")
-    hook_del_p = hook_sub.add_parser("delete", help="Delete a hook trigger")
-    hook_del_p.add_argument("name")
-    hook_del_p.add_argument("--kind", default=None,
-                            choices=["webhook", "telegram", "youtube"])
-    _activity_commands(hook_sub)
     webhooks_p = sub.add_parser(
         "webhooks", help="Webhook, Telegram, and YouTube callbacks that start a flow")
     webhooks_sub = webhooks_p.add_subparsers(dest="command", required=True)

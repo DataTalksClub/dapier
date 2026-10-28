@@ -1,10 +1,10 @@
-"""CLI nouns: emails, webhooks, and workflows sample. triggers and hooks are aliases."""
+"""CLI nouns: emails, webhooks, and workflows sample. triggers is an alias."""
 import json
 
 from dapier_cli import commands, main
 
 
-def test_webhooks_list_and_hooks_list_call_the_hook_route(monkeypatch):
+def test_webhooks_list_calls_the_hook_route(monkeypatch):
     seen = []
 
     def fake_call(api_url, method, path, body=None, **kwargs):
@@ -13,7 +13,7 @@ def test_webhooks_list_and_hooks_list_call_the_hook_route(monkeypatch):
 
     monkeypatch.setattr(commands.api, "call", fake_call)
     assert main.main(["webhooks", "list"]) == 0
-    assert main.main(["hooks", "list", "--kind", "telegram"]) == 0
+    assert main.main(["webhooks", "list", "--kind", "telegram"]) == 0
     assert seen == [
         ("GET", "/api/agent/hook-triggers"),
         ("GET", "/api/agent/hook-triggers?kind=telegram"),
@@ -47,14 +47,14 @@ def test_workflows_sample_and_triggers_sample_share_flags_and_behavior(monkeypat
     assert workflows.resource == triggers.resource == "slack.channels"
 
 
-def test_help_moves_triggers_and_hooks_and_drops_agent_mail():
+def test_help_moves_triggers_and_drops_hooks_and_agent_mail():
     parser = main.build_parser()
     top = parser.format_help()
     assert "agent-mail" not in top
     choices = [action for action in parser._subparsers._actions
                if getattr(action, "choices", None) and "triggers" in action.choices][0].choices
     assert "Moved" in choices["triggers"].format_help()
-    assert "Moved" in choices["hooks"].format_help()
+    assert "hooks" not in choices
     webhooks_help = choices["webhooks"].format_help()
     assert "trigger" not in webhooks_help.lower()
     worker_help = choices["worker"].format_help()

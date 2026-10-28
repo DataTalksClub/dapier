@@ -1,5 +1,5 @@
 /* Hooks tab — a webhook console over the same operator endpoints the
-   `dapier hooks` CLI drives:
+   `dapier webhooks` CLI drives:
      GET  /api/admin/hook-triggers                 endpoints (+ workflows each starts)
      GET  /api/admin/hook-triggers/deliveries      recent deliveries + outcomes
      GET  /api/admin/hook-triggers/deliveries/<id> one delivery: headers, body, runs

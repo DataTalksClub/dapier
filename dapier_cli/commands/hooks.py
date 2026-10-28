@@ -43,7 +43,7 @@ def hooks_list(api_url, kind=None, debug=False):
     data = api.call(api_url, "GET", f"/api/agent/hook-triggers{query}", debug=debug)
     items = data.get("hooks", [])
     if not items:
-        print("No hook triggers yet. Create one with `dapier hooks save`.")
+        print("No hook triggers yet. Create one with `dapier webhooks save`.")
     for item in items:
         enabled = "yes" if item.get("enabled", True) else "no"
         print(f"{item.get('hook_id', ''):20} {item.get('kind', ''):9} "
@@ -127,7 +127,7 @@ def hooks_deliveries(api_url, name=None, limit=25, next_token=None, debug=False)
     rows = data.get("deliveries") or []
     if not rows:
         print("No deliveries yet" + (f" for '{name}'" if name else "") +
-              ". Send one with `dapier hooks test <name>`.")
+              ". Send one with `dapier webhooks test <name>`.")
         return 0
     print(f"{'RECEIVED':19} {'HOOK':18} {'SIZE':8} {'OUTCOME':40} DELIVERY ID")
     for row in rows:
@@ -193,6 +193,6 @@ def hooks_test(api_url, name, data_path=None, debug=False):
     print(f"  response: {response.get('status')} {json.dumps(response.get('body'), sort_keys=True, default=str)}")
     if data.get("delivery_id"):
         print(f"  delivery: {data['delivery_id']}")
-        print(f"  Follow it with `dapier hooks delivery {data['delivery_id']}`.")
+        print(f"  Follow it with `dapier webhooks delivery {data['delivery_id']}`.")
     status = response.get("status") or 0
     return 0 if 200 <= int(status) < 300 else 1

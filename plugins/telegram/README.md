@@ -41,7 +41,7 @@ Save it from the console's **Triggers** view (kind **Telegram**, the bot
 connection) or the CLI:
 
 ```sh
-uv run dapier hooks save telegram-hook.json
+uv run dapier webhooks save telegram-hook.json
 ```
 
 ```json

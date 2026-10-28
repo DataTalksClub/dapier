@@ -736,24 +736,24 @@ def test_main_hooks_parsing(monkeypatch):
     monkeypatch.setattr(commands, "hooks_save",
                         lambda api_url, path, debug=False, sync_response=False:
                         seen.update(file=path) or 0)
-    assert main.main(["hooks", "save", "/tmp/hook.json"]) == 0
+    assert main.main(["webhooks", "save", "/tmp/hook.json"]) == 0
     assert seen["file"] == "/tmp/hook.json"
 
     monkeypatch.setattr(commands, "hooks_list",
                         lambda api_url, kind=None, debug=False: seen.update(kind=kind) or 0)
-    assert main.main(["hooks", "list", "--kind", "telegram"]) == 0
+    assert main.main(["webhooks", "list", "--kind", "telegram"]) == 0
     assert seen["kind"] == "telegram"
     # The youtube hook kind filters like the others (its rows travel in the
     # same hook-triggers table).
-    assert main.main(["hooks", "list", "--kind", "youtube"]) == 0
+    assert main.main(["webhooks", "list", "--kind", "youtube"]) == 0
     assert seen["kind"] == "youtube"
 
     monkeypatch.setattr(commands, "hooks_delete",
                         lambda api_url, name, kind=None, debug=False:
                         seen.update(deleted=name, delete_kind=kind) or 0)
-    assert main.main(["hooks", "delete", "orders"]) == 0
+    assert main.main(["webhooks", "delete", "orders"]) == 0
     assert seen["deleted"] == "orders" and seen["delete_kind"] is None
-    assert main.main(["hooks", "delete", "orders", "--kind", "youtube"]) == 0
+    assert main.main(["webhooks", "delete", "orders", "--kind", "youtube"]) == 0
     assert seen["delete_kind"] == "youtube"
 
 
