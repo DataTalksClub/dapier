@@ -77,12 +77,6 @@ export interface TriggerSpec {
   filters: Record<string, Record<string, unknown>>;
 }
 
-/** A named action chain in the file's `flows:` block, bound via `flow:`. */
-export interface FlowSpec {
-  description?: string;
-  actions: Array<Record<string, unknown>>;
-}
-
 export interface Workflow {
   allow_email_overlap?: boolean;
   id: string;
@@ -90,10 +84,7 @@ export interface Workflow {
   /** Exactly one of trigger / triggers is set. */
   trigger?: TriggerSpec;
   triggers?: TriggerSpec[];
-  /** Inline actions, or a `flow` binding whose chain lives in `flows`. */
   actions?: Array<Record<string, unknown>>;
-  flow?: string;
-  flows?: Record<string, FlowSpec>;
   description?: string;
   /** Human name override; absent = the API's generated name shows. */
   name?: string;

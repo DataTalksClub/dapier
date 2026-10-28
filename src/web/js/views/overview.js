@@ -92,7 +92,6 @@ export function openWorkflow(id) {
     <section class="detail-block">
       <h3>Trigger${many ? 's' : ''}</h3>
       ${triggerBlocks(workflow)}
-      ${workflow.flow ? `<h4>Shared flow</h4><p class="detail-trigger">${escapeHtml(workflow.flow)}</p>` : ''}
     </section>
     <section class="detail-block">
       <h3>Actions</h3>

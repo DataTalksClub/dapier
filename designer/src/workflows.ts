@@ -421,7 +421,7 @@ function clipDetail(text: string, limit = 64): string {
 /** Top-level key order for workflow YAML dumps — the server's
     WORKFLOW_KEY_ORDER: identity, state, trigger, then the action graph.
     Keys outside the canon keep their relative order at the end. */
-const WORKFLOW_KEY_ORDER = ["id", "name", "enabled", "trigger", "triggers", "actions", "flows", "flow"];
+const WORKFLOW_KEY_ORDER = ["id", "name", "enabled", "trigger", "triggers", "actions"];
 
 export function orderedWorkflow(workflow: Workflow): Workflow {
   const source = workflow as unknown as Record<string, unknown>;
@@ -441,12 +441,8 @@ export function workflowTriggers(workflow: Workflow): TriggerSpec[] {
   return workflow.trigger ? [workflow.trigger] : [];
 }
 
-/** The chain a workflow runs: inline `actions`, or the bound flow's. */
+/** The chain a workflow runs: its inline `actions`. */
 export function workflowActions(workflow: Workflow): Array<Record<string, unknown>> {
-  if (workflow.flow && isRecord(workflow.flows)) {
-    const bound = workflow.flows[workflow.flow];
-    if (isRecord(bound) && Array.isArray(bound.actions)) return bound.actions;
-  }
   return Array.isArray(workflow.actions) ? workflow.actions : [];
 }
 
@@ -856,23 +852,7 @@ export function workflowFromShapes(
   };
   delete workflow.trigger;
   delete workflow.triggers;
-  if (base?.flow) {
-    // The chain lives in the shared `flows:` block; write it back there and
-    // keep every other flow (and the binding) exactly as they were. Never
-    // emit inline actions next to a flow binding — the engine rejects that.
-    const flows = isRecord(base.flows) ? base.flows : {};
-    const bound = isRecord(flows[base.flow]) ? flows[base.flow] : {};
-    workflow.flows = {
-      ...flows,
-      [base.flow]: {
-        ...bound,
-        actions: actions.map((action, index) => actionToYaml(action, index, problems, shapes))
-      }
-    };
-    workflow.flow = base.flow;
-  } else {
-    workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems, shapes));
-  }
+  workflow.actions = actions.map((action, index) => actionToYaml(action, index, problems, shapes));
   if (triggerNodes.length === 1) {
     workflow.trigger = triggerToYaml(triggerNodes[0].data!, problems);
   } else if (triggerNodes.length > 1) {

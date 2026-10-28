@@ -1357,7 +1357,7 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   const [view, setView] = useState<"canvas" | "yaml">("canvas");
   const [yamlText, setYamlText] = useState("");
   const [savedYaml, setSavedYaml] = useState("");
-  /** The workflow as last loaded or saved; carries `flows:`/`flow:` through canvas saves. */
+  /** The workflow as last loaded or saved; its other keys survive canvas saves. */
   const [base, setBase] = useState<Workflow | null>(null);
   /** The API's generated name for the open workflow ("<trigger> → <actions>",
       engine.naming) as of the last load or save; "" for a never-saved one.
