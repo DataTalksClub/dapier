@@ -12,8 +12,8 @@ the environment; keep it in a local and `del` it when done:
     del access_token
 
 Auth is the DTC session in ~/.config/dapier/session.json (via
-`dapier auth login`); the API base is $DAPIER_API_URL, then api_url in
-~/.config/dapier/config.json, then the production default.
+`dapier auth login`); the API base is $DAPIER_API_URL, then the
+production default.
 """
 
 import json
@@ -35,18 +35,11 @@ def _config_dir():
 
 
 def api_base_url(explicit=None):
-    """The Dapier API origin: explicit > $DAPIER_API_URL > config file > default."""
+    """The Dapier API origin: explicit > $DAPIER_API_URL > default."""
     if explicit:
         return explicit.rstrip("/")
     env = (os.environ.get("DAPIER_API_URL") or "").strip()
-    if env:
-        return env.rstrip("/")
-    try:
-        with open(os.path.join(_config_dir(), "config.json"), encoding="utf-8") as handle:
-            saved = (json.load(handle).get("api_url") or "").strip()
-    except (OSError, ValueError, AttributeError):
-        saved = ""
-    return (saved or DEFAULT_API_URL).rstrip("/")
+    return (env or DEFAULT_API_URL).rstrip("/")
 
 
 def _bearer():

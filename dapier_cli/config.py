@@ -23,10 +23,6 @@ def base_dir():
     return Path(root) / "dapier"
 
 
-def config_file():
-    return base_dir() / "config.json"
-
-
 def session_file():
     return base_dir() / "session.json"
 
@@ -36,12 +32,6 @@ def api_url(args_url=None):
         return args_url.rstrip("/")
     if os.environ.get("DAPIER_API_URL"):
         return os.environ["DAPIER_API_URL"].rstrip("/")
-    try:
-        stored = json.loads(config_file().read_text())
-        if isinstance(stored, dict) and stored.get("api_url"):
-            return str(stored["api_url"]).rstrip("/")
-    except (OSError, ValueError):
-        pass
     return DEFAULT_API_URL
 
 
@@ -51,10 +41,6 @@ def load_session():
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
-
-
-def save_api_url(url):
-    _write_private(config_file(), json.dumps({"api_url": url.rstrip("/")}) + "\n")
 
 
 def save_session(data):

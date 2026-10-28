@@ -52,19 +52,6 @@ def test_a_fresh_config_directory_is_created_owner_only(isolated_home):
     assert _modes(config.session_file()) == 0o600
 
 
-def test_api_url_writes_preserve_the_session_file(isolated_home):
-    config.save_session({"token": "synthetic-old"})
-    config.save_api_url("https://custom.example.test/")
-
-    assert json.loads(config.config_file().read_text()) == {
-        "api_url": "https://custom.example.test"}
-    assert config.load_session() == {"token": "synthetic-old"}
-    assert _modes(config.config_file()) == 0o600
-    assert _modes(config.base_dir()) == 0o700
-    assert sorted(entry.name for entry in config.base_dir().iterdir()) == \
-        ["config.json", "session.json"]
-
-
 def test_a_failed_replacement_leaves_the_original_intact(isolated_home, monkeypatch):
     directory = config.base_dir()
     directory.mkdir(parents=True)

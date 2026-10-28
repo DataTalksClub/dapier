@@ -88,10 +88,6 @@ class LoginError(Exception):
     pass
 
 
-class DeviceFlowUnavailable(Exception):
-    """The API predates device pairing; fall back to the browser flow."""
-
-
 def _shared_device_login():
     """The polling loop lives in DataTalksClub/auth."""
     import importlib
@@ -170,8 +166,6 @@ def _post_json(url, body, bearer=None, timeout=20):
             data = json.loads(exc.read() or b"{}")
         except ValueError:
             data = {}
-        if exc.code in (404, 503) and url.endswith("/device/start"):
-            raise DeviceFlowUnavailable from None
         return exc.code, data
 
 

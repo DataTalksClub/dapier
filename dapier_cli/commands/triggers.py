@@ -6,16 +6,7 @@ from urllib.parse import quote
 from .. import api
 from .shared import read_json_file
 
-__all__ = ["print_trigger", "triggers_list", "triggers_sample", "triggers_show", "triggers_workflow_sample"]
-
-
-def print_trigger(item):
-    for key in ("name", "address", "description", "enabled", "created_by",
-                "created_at", "updated_at"):
-        if item.get(key) not in (None, ""):
-            print(f"{key}: {item[key]}")
-    for index, action in enumerate(item.get("actions") or [], 1):
-        print(f"action[{index}]: {json.dumps(action, sort_keys=True)}")
+__all__ = ["triggers_list", "triggers_sample", "triggers_show", "triggers_workflow_sample"]
 
 
 def triggers_list(api_url, debug=False):

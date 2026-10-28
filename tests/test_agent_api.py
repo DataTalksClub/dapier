@@ -304,26 +304,25 @@ def test_operator_can_create_and_edit_oauth_connection_metadata(monkeypatch):
     scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
     created = agent_api.route(
         event({"connection_id": "youtube-team", "provider": "youtube",
-               "display_name": "Team YouTube", "scopes": scopes}),
+               "scopes": scopes}),
         "PUT", "/api/agent/connections",
     )
     assert created["statusCode"] == 200
     assert json.loads(created["body"])["status"] == "ready"
 
     edited = agent_api.route(
-        event({"display_name": "DTC YouTube", "scopes": scopes}),
+        event({"scopes": scopes}),
         "PUT", "/api/agent/connections/youtube-team",
     )
     assert edited["statusCode"] == 200
     view = json.loads(edited["body"])
-    # display_name is retired: older clients may still send it; it is ignored.
     assert "display_name" not in view
     assert "display_name" not in tables["connections"].items["youtube-team"]
     assert view["scopes"] == scopes
     assert tables["connections"].items["youtube-team"]["status"] == "ready"
 
 
-def test_edit_with_only_the_retired_display_name_changes_nothing(monkeypatch):
+def test_retired_display_name_is_rejected(monkeypatch):
     configure(monkeypatch, claims={"sub": "op-1", "email": "op@datatalks.club"})
     scopes = ["https://www.googleapis.com/auth/youtube.readonly"]
     agent_api.route(event({"connection_id": "youtube-team", "provider": "youtube",
@@ -331,6 +330,10 @@ def test_edit_with_only_the_retired_display_name_changes_nothing(monkeypatch):
     edited = agent_api.route(event({"display_name": "Renamed"}),
                              "PUT", "/api/agent/connections/youtube-team")
     assert edited["statusCode"] == 400
+    created = agent_api.route(event({"connection_id": "youtube-other", "provider": "youtube",
+                                     "display_name": "Other", "scopes": scopes}),
+                              "PUT", "/api/agent/connections")
+    assert created["statusCode"] == 400
 
 
 def test_operator_can_show_connection_without_agent_grant(monkeypatch):

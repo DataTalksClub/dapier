@@ -25,8 +25,6 @@ def isolated_home(monkeypatch, tmp_path):
 
 def test_api_url_precedence(isolated_home, monkeypatch):
     assert config.api_url() == "https://dapier.dtcdev.click"
-    config.save_api_url("https://custom.example.test/")
-    assert config.api_url() == "https://custom.example.test"
     monkeypatch.setenv("DAPIER_API_URL", "https://env.example.test")
     assert config.api_url() == "https://env.example.test"
     assert config.api_url("https://arg.example.test/") == "https://arg.example.test"
@@ -319,21 +317,6 @@ def test_api_call_sends_device_bearer(isolated_home, monkeypatch):
     monkeypatch.setattr(commands.api, "_request", fake_request)
     commands.api.call("https://api.example.test", "GET", "/api/agent/connections")
     assert seen["bearer"] == "idt"
-
-
-def test_login_falls_back_when_device_flow_unavailable(isolated_home, monkeypatch, capsys):
-    def unavailable(url, body, bearer=None, timeout=20):
-        raise auth.DeviceFlowUnavailable
-
-    monkeypatch.setattr(auth, "_post_json", unavailable)
-    monkeypatch.setattr(auth, "login", lambda api_url, timeout=180: {"email": "op@x"})
-
-    import argparse
-    code = cli_auth.run(argparse.Namespace(command="login", timeout=10, browser=False),
-                         "https://api.example.test")
-
-    assert code == 0
-    assert "falling back" in capsys.readouterr().out
 
 
 def test_logout_revokes_device_session(isolated_home, monkeypatch):

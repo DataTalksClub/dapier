@@ -27,8 +27,8 @@ directly.
 
 ## Config and auth
 
-- API base: `$DAPIER_API_URL` → `api_url` in `~/.config/dapier/config.json`
-  → default `https://dapier.dtcdev.click`.
+- API base: `--api-url` → `$DAPIER_API_URL` → default
+  `https://dapier.dtcdev.click`.
 - Session tokens: `~/.config/dapier/session.json` (DTC-issued; the file is
   owner-only). On 401s, re-authenticate with `uv run dapier auth --help`.
 - Headless consumers use operator-issued API tokens instead

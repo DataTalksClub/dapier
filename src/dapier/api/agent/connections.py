@@ -321,9 +321,7 @@ def create_connection(event):
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    # display_name is retired: connections are named by account + service.
-    # Older clients may still send it; it is accepted and ignored.
-    allowed = {"connection_id", "provider", "display_name", "scopes", "root_path", "url", "kind"}
+    allowed = {"connection_id", "provider", "scopes", "root_path", "url", "kind"}
     if not isinstance(body, dict) or "provider" not in body or set(body) - allowed:
         return _json_response(400, {"error": "Provide provider and supported connection fields"})
     try:
@@ -356,9 +354,7 @@ def update_connection_metadata(event, connection_id):
         body = json.loads(event.get("body") or "{}")
     except (ValueError, AttributeError, json.JSONDecodeError):
         return _json_response(400, {"error": "Invalid request"})
-    allowed = {"display_name", "scopes", "root_path", "url"}
-    if isinstance(body, dict):
-        body.pop("display_name", None)  # retired; accepted from older clients and ignored
+    allowed = {"scopes", "root_path", "url"}
     if not isinstance(body, dict) or not body or set(body) - allowed:
         return _json_response(400, {"error": "Provide supported connection fields"})
     if "scopes" in body and (

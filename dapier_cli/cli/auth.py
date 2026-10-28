@@ -23,11 +23,7 @@ def run(args, api_url, debug=None, child=None):
         if args.browser:
             session = auth.login(api_url, timeout=args.timeout)
         else:
-            try:
-                session = auth.login_device(api_url, timeout=args.timeout)
-            except auth.DeviceFlowUnavailable:
-                print("This API has no device pairing; falling back to the browser flow.")
-                session = auth.login(api_url, timeout=args.timeout)
+            session = auth.login_device(api_url, timeout=args.timeout)
         print(f"Signed in as {session.get('email') or session.get('subject')}.")
         return 0
     if args.command == "status":
