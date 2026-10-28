@@ -25,7 +25,6 @@ the earlier failure drops out of the failure views on the next read. Only a
 failed, so it proves nothing. Resolved runs keep their status and error and
 stay in history; they just stop counting as problems.
 """
-import base64
 import csv
 import io
 import json
@@ -38,6 +37,7 @@ import boto3
 from boto3.dynamodb.conditions import Attr, Key
 
 from ..auth import visibility
+from ..paging import decode_token, encode_token
 from ..engine.history import redact
 from botocore.exceptions import ClientError
 
@@ -363,20 +363,16 @@ def _sort_key(run):
 
 def _encode_token(run):
     """Opaque stateless page token: the last row's sort key."""
-    raw = json.dumps({"s": run.get("started_at") or "", "r": run.get("run_id") or ""},
-                     sort_keys=True).encode()
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    return encode_token({"s": run.get("started_at") or "",
+                         "r": run.get("run_id") or ""})
 
 
 def _decode_token(token):
     """The ``(started_at, run_id)`` sort key behind a page token, or None."""
-    text = str(token or "")
-    try:
-        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
-        key = (str(data.get("s") or ""), str(data.get("r") or ""))
-    except (ValueError, TypeError):
+    data = decode_token(token)
+    if not data:
         return None
-    return key or None
+    return (str(data.get("s") or ""), str(data.get("r") or "")) or None
 
 
 def _out_of_window(started, since=None, before=None):

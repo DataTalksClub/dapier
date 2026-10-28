@@ -6,7 +6,6 @@ codes, client secrets, and full authorization URLs must never reach this
 module; error text is scrubbed with :func:`oauth_providers.redact` anyway.
 """
 
-import base64
 import csv
 import io
 import json
@@ -17,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .connections.providers.oauth_providers import redact
+from .paging import decode_token, encode_token
 
 logger = logging.getLogger(__name__)
 
@@ -179,17 +179,15 @@ def _matches(item, *, connection_id=None, action=None, actor=None, agent=None,
 
 
 def _encode_token(item):
-    payload = json.dumps({"t": item.get("timestamp") or "",
-                          "i": item.get("audit_id") or ""})
-    return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    return encode_token({"t": item.get("timestamp") or "",
+                         "i": item.get("audit_id") or ""})
 
 
 def _decode_token(text):
-    try:
-        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
-        key = (str(data.get("t") or ""), str(data.get("i") or ""))
-    except (ValueError, TypeError):
+    data = decode_token(text)
+    if not data:
         return None
+    key = (str(data.get("t") or ""), str(data.get("i") or ""))
     return key if key != ("", "") else None
 
 

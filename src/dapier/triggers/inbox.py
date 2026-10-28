@@ -20,7 +20,6 @@ read/replay API raises :class:`InboxError` instead, so operators get a real
 message rather than an empty list.
 """
 
-import base64
 import json
 import logging
 import os
@@ -31,6 +30,7 @@ from email.utils import parseaddr
 
 from ..auth import visibility
 from ..clock import now_iso
+from ..paging import decode_token, encode_token
 from .dynamo import decode_numbers
 
 logger = logging.getLogger(__name__)
@@ -493,20 +493,16 @@ def _sort_key(event):
 
 def _encode_token(event):
     """Opaque stateless page token: the last row's sort key."""
-    raw = json.dumps({"r": event.get("received_at") or "",
-                      "i": event.get("inbox_id") or ""},
-                     sort_keys=True).encode()
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    return encode_token({"r": event.get("received_at") or "",
+                         "i": event.get("inbox_id") or ""})
 
 
 def _decode_token(token):
     """The ``(received_at, inbox_id)`` sort key behind a page token, or None."""
-    text = str(token or "")
-    try:
-        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
-        key = (str(data.get("r") or ""), str(data.get("i") or ""))
-    except (ValueError, TypeError):
+    data = decode_token(token)
+    if not data:
         return None
+    key = (str(data.get("r") or ""), str(data.get("i") or ""))
     return key if key != ("", "") else None
 
 

@@ -13,12 +13,11 @@ DynamoDB metadata item only:
 - ``version`` (bumped on every metadata edit), timestamps
 """
 
-import base64
-import json
 import re
 import secrets
 from datetime import datetime, timezone
 
+from ..paging import decode_token, encode_token
 from . import services as connection_services
 from .providers import oauth_providers, slack_tokens
 
@@ -428,18 +427,15 @@ def _sort_key(item):
 
 def _encode_token(item):
     """Opaque stateless page token: the last row's sort key."""
-    raw = json.dumps({"c": _sort_key(item)}, sort_keys=True).encode()
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    return encode_token({"c": _sort_key(item)})
 
 
 def _decode_token(token):
     """The connection id behind a page token, or None."""
-    text = str(token or "")
-    try:
-        data = json.loads(base64.urlsafe_b64decode(text + "=" * (-len(text) % 4)))
-        return str(data.get("c") or "") or None
-    except (ValueError, TypeError):
+    data = decode_token(token)
+    if not data:
         return None
+    return str(data.get("c") or "") or None
 
 
 def _scan_all(table):
