@@ -59,7 +59,7 @@ def _resource_entry(discovery):
 def _load(connection_id, connections_table):
     """``(connection, None)`` or ``(None, (404, payload))`` for the caller."""
     # Consult the table only when one is reachable: a real record wins over
-    # the pseudo accounts, but "aws"/"s3" have no record by design and
+    # the pseudo accounts, but "aws" has no record by design and
     # callers may run with no CONNECTIONS_TABLE at all.
     connection = None
     if connections_table is not None or os.environ.get("CONNECTIONS_TABLE"):
@@ -71,13 +71,13 @@ def _load(connection_id, connections_table):
     return connection, None
 
 
-# "s3"/"aws" name the stored AWS-keys credential, which has no connection
-# record but resolves the same bucket discovery and STS health check
-# (registry.PROVIDER_DISCOVERY_SOURCES). The synthetic record carries no
-# credential_id, so s3's key resolution falls back to the default "aws"
-# credential, and "openrouter" resolves the stored OpenRouter key behind the
-# decision step the same way.
-PSEUDO_CONNECTION_PROVIDERS = {"typefully": "typefully", "aws": "s3", "s3": "s3",
+# "aws" names the stored AWS credential, which has no connection record but
+# resolves the same bucket discovery and STS health check (the aws plugin's
+# manifest maps the provider to the "s3" discovery source). The synthetic
+# record carries no credential_id, so key resolution falls back to the
+# default "aws" credential, and "openrouter" resolves the stored OpenRouter
+# key behind the decision step the same way.
+PSEUDO_CONNECTION_PROVIDERS = {"typefully": "typefully", "aws": "aws",
                                "openrouter": "openrouter"}
 
 

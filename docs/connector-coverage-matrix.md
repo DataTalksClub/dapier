@@ -16,7 +16,7 @@ registry (`registry.ACTIONS / DISCOVERIES / CONNECTION_TESTS`,
 | dropbox | ✅ (`dropbox.py`) | dropbox | |
 | slack | ✅ (`slack.py`) | slack | token provider |
 | telegram | ✅ (`telegram.py`) | telegram | token provider |
-| aws | ✅ (`s3.py`, key `aws`, alias `s3`→`aws`) | s3 | credential, not a connection record — pseudo-connection |
+| aws | ✅ (`s3.py`, key `aws`) | s3 | credential, not a connection record — pseudo-connection |
 
 `PROVIDER_DISCOVERY_SOURCES` covers every provider; every discovery
 connector resolves from at least one provider key. Test endpoint

@@ -310,12 +310,13 @@ def test_google_connection_test_refreshes_and_verifies(monkeypatch):
     assert verdict["identity"] == {"id": "op@x", "name": "Operator"}
 
 
-def test_s3_alias_resolves_the_aws_sts_check(monkeypatch):
+def test_aws_sts_check_resolves_under_its_own_name(monkeypatch):
     import boto3
 
     from src.dapier.connectors import registry
 
-    assert registry.connection_test_for("s3") is registry.CONNECTION_TESTS["aws"]
+    assert registry.connection_test_for("aws") is registry.CONNECTION_TESTS["aws"]
+    assert registry.connection_test_for("s3") is None
 
     class FakeSts:
         def get_caller_identity(self):

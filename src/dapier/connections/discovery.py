@@ -50,7 +50,6 @@ PROVIDER_LABELS = {
     "slack": "Slack",
     "telegram": "Telegram",
     "aws": "AWS",
-    "s3": "S3",
 }
 
 

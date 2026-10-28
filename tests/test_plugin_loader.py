@@ -147,13 +147,13 @@ def test_real_tree_loads_every_plugin():
     assert registry.PROVIDER_DISCOVERY_SOURCES["slack"] == ("slack",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["telegram"] == ("telegram",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["dropbox"] == ("dropbox",)
-    assert registry.PROVIDER_DISCOVERY_SOURCES["s3"] == ("s3",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["aws"] == ("s3",)
+    assert "s3" not in registry.PROVIDER_DISCOVERY_SOURCES
     assert registry.PROVIDER_DISCOVERY_SOURCES["zoom"] == ("zoom",)
     assert registry.PROVIDER_DISCOVERY_SOURCES["google"] == (
         "google-sheets", "google-drive", "google-calendar", "gmail")
     assert registry.PROVIDER_DISCOVERY_SOURCES["youtube"] == ("youtube",)
-    assert registry.CONNECTION_TEST_ALIASES["s3"] == "aws"
+    assert registry.CONNECTION_TEST_ALIASES == {}
 
     # actions: at least one per action-carrying plugin
     for action in ("slack", "telegram_send",

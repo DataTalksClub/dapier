@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+The provider list collapses to `aws` alone: the `s3` provider alias, the
+`s3`→`aws` test alias, and the `s3` pseudo-connection id are gone (use
+`aws` for `connections discover|test`). `s3` survives only as the service
+surface name — the discovery source (`s3.buckets`, `s3.objects`), the
+trigger chip, and the `s3` / `s3.updates` / `s3.deletions` poll sources —
+matching every other plugin's provider-vs-source split (provider `google`,
+sources `google-drive`, `google-sheets`, ...). No stored data used the
+alias: no live poll, trigger, or connection referenced `s3` as a provider.
+
 ## 1.0.0 — 2026-10-03
 
 First release as a plugin. No behavior change: the upload/find/list/read/

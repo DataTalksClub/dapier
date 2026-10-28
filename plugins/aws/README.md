@@ -17,8 +17,10 @@ Zoom app must subscribe to the transcript-ready event.
 
 S3 actions use the configured `aws` credential. Operators can select an IAM
 role that Dapier assumes with its Lambda execution identity, or retain a legacy
-access key pair. The names `aws` and `s3` are pseudo connections backed by the
-same provider configuration; there is no OAuth client.
+access key pair. `aws` is a pseudo connection backed by that credential;
+there is no OAuth client. The provider name is `aws` — `s3` is only the
+discovery-source/trigger name (like `google-drive` under provider `google`),
+not a second provider or connection name.
 
 ## Configure an IAM role
 

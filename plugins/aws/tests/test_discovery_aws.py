@@ -1,10 +1,11 @@
-"""Discovery through the aws/s3 pseudo-connection.
+"""Discovery through the aws pseudo-connection.
 
-The stored AWS-keys credential has no connection record, but its bucket
+The stored AWS credential has no connection record, but its bucket
 listing and STS health check resolve through the synthetic "aws" connection
 (api.discovery._load), so the designer's bucket picker and
 ``dapier connections discover|test aws`` reach the same surface as every
-other provider.
+other provider. The provider is "aws"; "s3" is only the discovery source
+name (like "google-drive" under provider "google"), not an alias.
 """
 import json
 
@@ -61,15 +62,13 @@ def aws_keys(monkeypatch):
 def test_pseudo_connection_serves_the_bucket_catalog():
     status, payload = discovery_api.resources("aws")
     assert status == 200
-    assert payload["provider"] == "s3"
+    assert payload["provider"] == "aws"
     assert "buckets" in [resource["name"] for resource in payload["resources"]]
 
 
-def test_s3_is_an_alias_of_aws(monkeypatch):
-    aws_keys(monkeypatch)
-    status, payload = discovery_api.discover("s3", "buckets", {})
-    assert status == 200
-    assert [item["name"] for item in payload["items"]] == ["bucket-a", "bucket-b"]
+def test_the_retired_s3_name_is_no_longer_a_connection():
+    assert discovery_api.resources("s3")[0] == 404
+    assert discovery_api.discover("s3", "buckets", {})[0] == 404
 
 
 def test_pseudo_connection_lists_buckets(monkeypatch):

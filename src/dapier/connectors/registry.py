@@ -147,14 +147,14 @@ CONNECTION_TESTS: dict = {}
 # A connection's provider key and the discovery sources it can reach, fed
 # from the plugins' manifests by the loader (src/dapier/plugins): one
 # Google OAuth connection (provider "google") backs the Sheets, Drive,
-# Calendar and Gmail resources, "youtube" its own; "s3"/"aws" name the
-# stored AWS-keys credential, which has no connection record but resolves
-# the same bucket listing.
+# Calendar and Gmail resources, "youtube" its own; "aws" names the stored
+# AWS credential, which has no connection record but reaches the "s3"
+# discovery source's bucket listing.
 PROVIDER_DISCOVERY_SOURCES = {}
 
-# Providers whose health check is registered under another key. Now empty:
-# the s3→aws alias moved into the aws plugin's manifest, and plugins feed
-# this map through the loader.
+# Providers whose health check is registered under another key. Empty: the
+# s3→aws alias is retired and every provider's check is registered under
+# the provider's own name; plugins feed this map through the loader.
 CONNECTION_TEST_ALIASES = {}
 
 
