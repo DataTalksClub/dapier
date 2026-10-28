@@ -1,14 +1,16 @@
 """Daily DynamoDB snapshot to S3.
 
 BackupFunction (template.yaml) invokes handler() on a daily schedule. Every
-table whose name reaches the function through the ``*_TABLE`` Globals is
-scanned fully and written to
+Dapier-owned table whose name reaches the function through the ``*_TABLE``
+Globals is scanned fully and written to
 
     s3://<BackupBucket>/backups/<YYYY-MM-DD>/<table>.json.gz
 
 as gzip-compressed NDJSON (one JSON item per line), followed by a
-manifest.json summarising the day. The bucket's lifecycle rule expires
-every object after 30 days, giving a rolling month of daily snapshots.
+manifest.json summarising the day. The external ``TEAM_SECRETS_TABLE`` is
+owned by another service and is excluded from these snapshots. The bucket's
+lifecycle rule expires every object after 30 days, giving a rolling month of
+daily snapshots.
 
 A failed run also emails the operator through the AWS mail
 service SES with the function's IAM role: report failures, stay silent on
@@ -160,7 +162,8 @@ def handler(event, context):
     bucket = os.environ["BACKUP_BUCKET"]
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     names = sorted(
-        {value for key, value in os.environ.items() if key.endswith("_TABLE") and value}
+        {value for key, value in os.environ.items()
+         if key.endswith("_TABLE") and key != "TEAM_SECRETS_TABLE" and value}
     )
     dynamodb, s3 = _dynamodb(), _s3()
     results, errors = {}, {}

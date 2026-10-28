@@ -252,3 +252,33 @@ def test_daily_claim_is_atomic_and_duplicate_is_skipped(monkeypatch):
     assert backup._claim_email("2026-10-13") is False
     assert calls[0]["ConditionExpression"] == "attribute_not_exists(execution_id)"
     assert calls[0]["Item"]["execution_id"] == "backup-failure-notice:2026-10-13"
+
+
+def test_backup_excludes_external_team_secrets_table(env, monkeypatch):
+    # The shared secret-store configuration is inherited from Globals, but
+    # BackupFunction may only scan Dapier-owned tables. A scan of this external
+    # table would fail IAM authorization and mark every daily backup failed.
+    monkeypatch.setenv("TEAM_SECRETS_TABLE", "dataops-v1-secrets")
+    monkeypatch.setenv("FUTURE_TABLE", "dapier-FutureTable-x")
+    scanned = []
+
+    class RecordingDynamo(FakeDynamo):
+        def paginate(self, TableName=None, **kwargs):
+            scanned.append(TableName)
+            return super().paginate(TableName=TableName, **kwargs)
+
+    tables = {
+        "dapier-ConnectionsTable-x": [],
+        "dapier-CredentialsTable-x": [],
+        "dapier-FutureTable-x": [],
+    }
+    fake_s3 = FakeS3()
+    monkeypatch.setattr(backup, "_dynamodb", lambda: RecordingDynamo(tables))
+    monkeypatch.setattr(backup, "_s3", lambda: fake_s3)
+
+    manifest = backup.handler({}, {})
+
+    assert scanned == sorted(tables)
+    assert set(manifest["tables"]) == set(tables)
+    assert len(fake_s3.objects) == len(tables) + 1
+    assert all("dataops-v1-secrets" not in key for key in fake_s3.objects)
