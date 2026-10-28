@@ -2124,11 +2124,11 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
   useEffect(() => {
     refreshList()
       .then((workflows) => {
-        // Console deep link: /workflows/<id> (or legacy ?workflow=<source>)
-        // opens that workflow; the console passes the ref through as-is.
+        // Console deep link: /workflows/<id> opens that workflow; the
+        // console passes the id through as ?workflow=<id>.
         const requested = new URLSearchParams(window.location.search).get("workflow");
         const match = requested
-          ? workflows.find((summary) => summary.source === requested || summary.id === requested)
+          ? workflows.find((summary) => summary.id === requested)
           : null;
         if (match) return openWorkflow(match);
         // The embedded view has no sidebar, so a blank console canvas starts

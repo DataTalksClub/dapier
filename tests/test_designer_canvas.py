@@ -41,7 +41,7 @@ def test_canvas_boxes_keep_neutral_1px_perimeters_and_real_tokens(theme):
             page = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme=theme,
                                        bypass_csp=True).new_page()
             page.route("**/api/**", designer_fixture.route)
-            page.goto(origin + f"/designer/app?embed=1&theme={theme}&workflow=invoice-triage.yaml",
+            page.goto(origin + f"/designer/app?embed=1&theme={theme}&workflow=invoice-triage",
                       wait_until="domcontentloaded")
             page.locator("svg[viewBox] text", has_text="Union").first.wait_for(timeout=15_000)
             unselected = page.evaluate(PROBE)
@@ -84,7 +84,7 @@ def test_standalone_designer_sits_in_the_kit_topbar_shell():
         try:
             page = browser.new_context(viewport={"width": 1280, "height": 800}, bypass_csp=True).new_page()
             page.route("**/api/**", designer_fixture.route)
-            page.goto(origin + "/designer/app?workflow=invoice-triage.yaml", wait_until="domcontentloaded")
+            page.goto(origin + "/designer/app?workflow=invoice-triage", wait_until="domcontentloaded")
             bar = page.locator(".dk-shell--topbar .dk-shell__bar")
             bar.wait_for(timeout=15_000)
             assert page.locator('.dk-shell__nav [aria-current="page"]').inner_text() == "Designer"
@@ -100,7 +100,7 @@ def test_standalone_designer_sits_in_the_kit_topbar_shell():
             assert menu.is_hidden()
             assert page.evaluate("document.activeElement.id") == "account-button"
             # Framed by the console, the console's shell is the chrome.
-            page.goto(origin + "/designer/app?embed=1&workflow=invoice-triage.yaml", wait_until="domcontentloaded")
+            page.goto(origin + "/designer/app?embed=1&workflow=invoice-triage", wait_until="domcontentloaded")
             page.locator("svg text", has_text="Union").first.wait_for(timeout=15_000)
             assert page.locator(".dk-shell").count() == 0
         finally:

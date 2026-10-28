@@ -581,11 +581,8 @@ Resources:
         ConsoleAssets:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/assets/{proxy+}', Method: GET}
-        DesignerView:
-          Type: HttpApi
-          Properties: {ApiId: !Ref Api, Path: /designer, Method: GET}
         # The designer app shell under /designer/app, framed by the console's
-        # /designer view; the router._static allowlist decides what is served.
+        # designer view (/workflows/<id>); the router._static allowlist decides what is served.
         DesignerEmbed:
           Type: HttpApi
           Properties: {ApiId: !Ref Api, Path: '/designer/{proxy+}', Method: GET}

@@ -189,9 +189,10 @@ def test_designer_is_reached_from_the_workflows_view_not_the_sidebar():
     assert "[data-new-workflow]" in ingress._static("/assets/js/main.js")["body"]
     assert 'href="/designer"' not in re.search(r"<nav.*?</nav>", index, re.S).group(0)
 
-    # The workflow dialog deep-links the designer with the workflow source.
+    # The workflow dialog deep-links the designer at /workflows/<id>; the
+    # retired bare /designer page is no longer served.
     assert 'id="workflow-edit"' in index
-    assert ingress._static("/designer")["statusCode"] == 200
+    assert ingress._static("/designer") is None
 
 
 def test_workflow_deep_links_serve_the_console():
@@ -204,16 +205,16 @@ def test_workflow_deep_links_serve_the_console():
 
 
 def test_designer_serves_the_console_with_the_embedded_canvas():
-    # /designer is a console view: the workflows dialog's Edit-in-designer and
+    # The designer is a console view at /workflows/<id>: Edit-in-designer and
     # the New-workflow button open the canvas inside the console, not on a
     # standalone page with a second sidebar.
-    body = ingress._static("/designer")["body"]
+    body = ingress._static("/workflows/new")["body"]
     assert "forbidden-view" in body
     designer_view = re.search(r'data-page="designer".*?</section>', body, re.S).group(0)
     frame = re.search(r'<iframe id="designer-frame"', designer_view)
     assert frame, "the designer view must host the designer iframe"
     # The console page itself still refuses to be framed by anyone else.
-    assert "frame-ancestors 'none'" in ingress._static("/designer")["headers"]["content-security-policy"]
+    assert "frame-ancestors 'none'" in ingress._static("/workflows/new")["headers"]["content-security-policy"]
 
 
 def test_designer_app_shell_is_framable_by_the_console():
@@ -221,7 +222,7 @@ def test_designer_app_shell_is_framable_by_the_console():
     assert response["statusCode"] == 200
     assert "designer-root" in response["body"]
     csp = response["headers"]["content-security-policy"]
-    # The console's /designer view embeds this page (frame-ancestors), and the
+    # The console's designer view embeds this page (frame-ancestors), and the
     # canvas positions nodes with inline style attributes (unsafe-inline).
     assert "frame-ancestors 'self'" in csp
     assert "style-src 'self' 'unsafe-inline'" in csp
@@ -288,7 +289,7 @@ def test_every_nav_link_has_an_api_gateway_route():
         return (path, "GET") in routes or any(path.startswith(prefix) for prefix in proxy_prefixes)
 
     assets = set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', index["body"]))
-    assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer")["body"]))
+    assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/workflows/new")["body"]))
     assets |= set(re.findall(r'(?:src|href)="(/assets/[^"]+)"', ingress._static("/designer/app")["body"]))
     assets |= {"/assets/js/main.js", "/assets/js/views/tokens.js", "/assets/js/views/designer.js", "/assets/vendor/dakit.css", "/assets/vendor/dialogs.js", "/assets/vendor/tabs.js", "/assets/vendor/collection.js", "/assets/fonts/inter-var.woff2"}
     assert len(assets) >= 8, assets

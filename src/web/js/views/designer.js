@@ -27,9 +27,9 @@ function workflowUrl(ref) {
   return ref ? `/workflows/${encodeURIComponent(ref)}` : '/workflows/new';
 }
 
-function frameSrc(source) {
+function frameSrc(ref) {
   const params = new URLSearchParams({ embed: '1' });
-  if (source) params.set('workflow', source);
+  if (ref) params.set('workflow', ref);
   return `/designer/app?${params}`;
 }
 
@@ -70,17 +70,15 @@ function applyMeta() {
 function syncHead(ref) {
   /* Runs after setView, which resets the h1 to the plain view name. A live
      iframe that already holds this exact file wins — the console's workflow
-     list can be stale right after a rename. The ref is a workflow id (the
-     URL form) or, for legacy /designer?workflow= links, a source file. */
-  if (meta && ((meta.source ?? null) === (ref ?? null) || (meta.id ?? null) === (ref ?? null))) {
+     list can be stale right after a rename. The ref is a workflow id. */
+  if (meta && (meta.id ?? null) === (ref ?? null)) {
     applyMeta();
     return;
   }
   const workflow = ref
-    ? (state.data?.workflows || []).find((item) => item.id === ref || item.source === ref)
+    ? (state.data?.workflows || []).find((item) => item.id === ref)
     : null;
-  const id = workflow ? workflow.id : ref ? ref.replace(/\.yaml$/, '') : '';
-  paintTitle(workflow ? workflowName(workflow) : id || 'New workflow');
+  paintTitle(workflow ? workflowName(workflow) : ref || 'New workflow');
   $('#view-title').title = '';
   $('#view-title').classList.remove('renamable');
 }
@@ -192,8 +190,7 @@ window.addEventListener('message', (event) => {
   postConnectionsToDesigner();
 });
 
-/* Opens the designer for `source` (a workflow filename, or null for a new
-   workflow) and leaves /designer?workflow=<source> as the shareable URL. */
+/* Asks a dirty designer whether the operator may leave it. */
 export async function confirmDesignerLeave() {
   if (state.view !== 'designer' || !meta?.dirty) return true;
   const frame = $('#designer-frame').contentWindow;
@@ -220,8 +217,8 @@ export async function confirmDesignerLeave() {
 
 setViewGuard((next) => next === 'designer' ? Promise.resolve(true) : confirmDesignerLeave());
 
-/* Opens the workflow `ref` (an id, a legacy source filename, or null for a
-   new workflow) and leaves /workflows/<ref> as the shareable URL. */
+/* Opens the workflow `ref` (an id, or null for a new workflow) and leaves
+   /workflows/<ref> as the shareable URL. */
 export async function openDesigner(ref, push = true) {
   const frame = $('#designer-frame');
   const src = frameSrc(ref);
@@ -239,10 +236,10 @@ export async function openDesigner(ref, push = true) {
 }
 
 /* Re-syncs the frame after a full-page load of, or popstate to,
-   /workflows/<id> (or the legacy /designer?workflow=<source> links). */
+   /workflows/<id>. */
 export function designerFromLocation() {
   const match = window.location.pathname.match(/^\/workflows\/(.+)$/);
-  const ref = match ? decodeURIComponent(match[1]) : new URLSearchParams(window.location.search).get('workflow');
+  const ref = match ? decodeURIComponent(match[1]) : null;
   return openDesigner(ref === 'new' ? null : ref, false).then((opened) => {
     if (!opened) history.pushState(null, '', workflowUrl(savedId()));
     return opened;

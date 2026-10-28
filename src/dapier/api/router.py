@@ -32,15 +32,15 @@ def _response(status, body, content_type="application/json", headers=None):
     }
 
 
-CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/agents", "/workers", "/credentials", "/tokens", "/runs", "/schedules", "/audit", "/costs", "/designer")
-# The designer app shell, framed by the console's /designer view.
+CONSOLE_VIEWS = ("/", "/workflows", "/connections", "/emails", "/agents", "/workers", "/credentials", "/tokens", "/runs", "/schedules", "/audit", "/costs")
+# The designer app shell, framed by the console's designer view (/workflows/<id>).
 DESIGNER_APP_VIEW = "/designer/app"
 
 
 def _static(path):
     # The designer canvas positions nodes with inline style attributes, which
     # CSP only allows with an explicit style-src exception on its page, and
-    # the console's /designer view embeds it, so it opts into frame-ancestors
+    # the console's designer view embeds it, so it opts into frame-ancestors
     # 'self' while every other page refuses all framing.
     email_frame = path == "/assets/email-message.html"
     embed = path == DESIGNER_APP_VIEW
