@@ -37,6 +37,7 @@ import boto3
 from boto3.dynamodb.conditions import Attr, Key
 
 from ..auth import visibility
+from ..clock import parse_ts
 from ..paging import decode_token, encode_token
 from ..engine.history import redact
 from botocore.exceptions import ClientError
@@ -338,24 +339,6 @@ def _step_view(item):
     return redact(view)
 
 
-def _parse_ts(value):
-    """An aware UTC datetime for an ISO date/datetime, else None.
-
-    Accepts date-only ("2026-09-25") and full timestamps; a trailing Z and
-    a missing offset are read as UTC. Unparseable input returns None so the
-    caller can fall back to string comparison.
-    """
-    if not value:
-        return None
-    try:
-        moment = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=timezone.utc)
-    return moment.astimezone(timezone.utc)
-
-
 def _sort_key(run):
     """Newest-first ordering with a run-id tiebreak, so paging is stable."""
     return (run.get("started_at") or "", run.get("run_id") or "")
@@ -384,7 +367,7 @@ def _out_of_window(started, since=None, before=None):
     """
     if not since and not before:
         return False
-    moment, since_at, before_at = _parse_ts(started), _parse_ts(since), _parse_ts(before)
+    moment, since_at, before_at = parse_ts(started), parse_ts(since), parse_ts(before)
     if moment is None or (since_at is None and since) or (before_at is None and before):
         if since and started < since:
             return True

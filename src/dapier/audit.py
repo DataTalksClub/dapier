@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .connections.providers.oauth_providers import redact
+from .clock import parse_ts
 from .paging import decode_token, encode_token
 
 logger = logging.getLogger(__name__)
@@ -112,19 +113,6 @@ def _public(item):
     return {key: item[key] for key in AUDIT_FIELDS if item.get(key) is not None}
 
 
-def _parse_ts(value):
-    """An aware UTC datetime for an ISO date/datetime, else None."""
-    if not value:
-        return None
-    try:
-        moment = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=timezone.utc)
-    return moment.astimezone(timezone.utc)
-
-
 def _sort_key(item):
     # Timestamps carry second precision (record() floors to int(time.time())),
     # so rows tie often; audit_id's trailing uuid breaks the tie.
@@ -157,7 +145,7 @@ def _matches(item, *, connection_id=None, action=None, actor=None, agent=None,
             return False
     if since or before:
         stamp = str(item.get("timestamp") or "")
-        moment, since_at, before_at = _parse_ts(stamp), _parse_ts(since), _parse_ts(before)
+        moment, since_at, before_at = parse_ts(stamp), parse_ts(since), parse_ts(before)
         if moment is None or (since_at is None and since) or (before_at is None and before):
             if since and stamp < since:
                 return False
