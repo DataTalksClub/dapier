@@ -312,12 +312,11 @@ def _validate_steps(steps, where="actions"):
                     raise WorkflowError(
                         f"step '{label}': path '{branch_label}' actions must be a list of steps")
                 _validate_steps(actions, where=f"{label}.{branch_label}")
-            for fallback_key in ("default", "else"):
-                default_steps = step.get(fallback_key)
-                if default_steps is not None:
-                    if not isinstance(default_steps, list):
-                        raise WorkflowError(f"step '{label}': paths {fallback_key} must be a list of steps")
-                    _validate_steps(default_steps, where=f"{label}.default")
+            default_steps = step.get("default")
+            if default_steps is not None:
+                if not isinstance(default_steps, list):
+                    raise WorkflowError(f"step '{label}': paths default must be a list of steps")
+                _validate_steps(default_steps, where=f"{label}.default")
         if kind == "union":
             _validate_union(step, label)
         if kind == "agent":
@@ -394,9 +393,8 @@ def _validate_decision(step, label):
     LLM answers). A switch needs a non-empty, unique ``choices`` list — the
     options the typed decision answer is picked from — and every case's
     ``choice`` must be one of them, at most once per case, with optional
-    ``actions``; ``default_actions`` (or ``default`` / ``else``) covers an
-    unusable or off-list reply. Branches recurse as step chains, like
-    condition's then/else.
+    ``actions``; ``default_actions`` covers an unusable or off-list reply.
+    Branches recurse as step chains, like condition's then/else.
     """
     from ...engine import logic_pkg as logic
 
@@ -433,13 +431,12 @@ def _validate_decision(step, label):
                         raise WorkflowError(
                             f"step '{label}': case '{choice}' actions must be a list of steps")
                     _validate_steps(actions, where=f"{label}.{choice}")
-        for fallback_key in ("default_actions", "default", "else"):
-            default_steps = step.get(fallback_key)
-            if default_steps is not None:
-                if not isinstance(default_steps, list):
-                    raise WorkflowError(
-                        f"step '{label}': decision {fallback_key} must be a list of steps")
-                _validate_steps(default_steps, where=f"{label}.default")
+        default_steps = step.get("default_actions")
+        if default_steps is not None:
+            if not isinstance(default_steps, list):
+                raise WorkflowError(
+                    f"step '{label}': decision default_actions must be a list of steps")
+            _validate_steps(default_steps, where=f"{label}.default")
     else:
         for branch in ("then", "else"):
             value = step.get(branch)

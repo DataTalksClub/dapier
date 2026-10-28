@@ -1555,13 +1555,10 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
         } else {
           nextFields.else = serializedSteps;
           delete nextRaw.else;
-          delete nextRaw.default_actions;
         }
       } else if (isDefaultBranch) {
         nextFields.default_actions = serializedSteps;
         delete nextRaw.default_actions;
-        delete nextRaw.else;
-        delete nextRaw.default;
       } else if (
         nextRaw.branches &&
         typeof nextRaw.branches === "object" &&
@@ -1611,7 +1608,6 @@ export function App({ config = localConfig }: { config?: DesignerConfig }) {
       if (isDefaultBranch) {
         nextFields.default = serializedSteps;
         delete nextRaw.default;
-        delete nextRaw.else;
       } else {
         let rawPaths: Array<Record<string, unknown>> = [];
         if ((nextFields.paths ?? "").trim()) {

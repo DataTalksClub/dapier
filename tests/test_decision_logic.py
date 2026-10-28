@@ -232,6 +232,13 @@ class SwitchTests(unittest.TestCase):
         with pytest.raises(ValueError, match="not one of"):
             run_decision(step, "webinar")
 
+    def test_default_and_else_aliases_no_longer_run_the_fallback(self):
+        for alias in ("default", "else"):
+            step = {k: v for k, v in SWITCH_STEP.items() if k != "default_actions"}
+            step[alias] = [{"id": "fallback", "type": "agent", "prompt": "z"}]
+            with pytest.raises(ValueError, match="not one of"):
+                run_decision(step, "webinar")
+
     def test_missing_answer_runs_default(self):
         stop, output, status, ran, _ = run_decision(SWITCH_STEP, None)
         assert ran == ["fallback"]

@@ -20257,7 +20257,7 @@
       const mode = decisionMode(fields, raw);
       if (mode === "if") {
         const thenSteps = parseYamlStepObjects(fields.then ?? fields.then_actions, raw.then ?? raw.then_actions);
-        const elseSteps = parseYamlStepObjects(fields.else ?? fields.default_actions, raw.else ?? raw.default_actions);
+        const elseSteps = parseYamlStepObjects(fields.else, raw.else);
         return [
           { key: "then", label: "then", steps: thenSteps },
           { key: "else", label: "else", steps: elseSteps, isDefault: true }
@@ -20307,9 +20307,9 @@
           };
         });
       }
-      const defaultSource = raw.default_actions ?? raw.default ?? raw.else;
+      const defaultSource = raw.default_actions;
       const defaultSteps = parseYamlStepObjects(fields.default_actions, defaultSource);
-      const hasDefaultDefined = defaultSteps.length > 0 || (fields.default_actions ?? "").trim() !== "" || raw.default_actions !== void 0 || raw.default !== void 0 || raw.else !== void 0;
+      const hasDefaultDefined = defaultSteps.length > 0 || (fields.default_actions ?? "").trim() !== "" || raw.default_actions !== void 0;
       if (hasDefaultDefined) {
         branches.push({ key: "else", label: "else", steps: defaultSteps, isDefault: true });
       }
@@ -20330,7 +20330,7 @@
         const steps = Array.isArray(p.actions) ? p.actions.filter(isRecord) : Array.isArray(p.then) ? p.then.filter(isRecord) : [];
         return { key, label, when, steps };
       });
-      const defaultSource = raw.default ?? raw.else;
+      const defaultSource = raw.default;
       const defaultSteps = parseYamlStepObjects(fields.default, defaultSource);
       branches.push({ key: "else", label: "else", steps: defaultSteps, isDefault: true });
       return branches;
@@ -20707,9 +20707,8 @@
             });
           }
           const defaultSteps = serializeBranchChildren("default");
-          const defaultKey = data.raw?.else !== void 0 && data.raw?.default_actions === void 0 ? "else" : data.raw?.default !== void 0 && data.raw?.default_actions === void 0 ? "default" : "default_actions";
-          if (defaultSteps.length > 0 || (data.fields?.default_actions ?? "").trim() !== "" || Array.isArray(data.raw?.[defaultKey])) {
-            merged[defaultKey] = defaultSteps;
+          if (defaultSteps.length > 0 || (data.fields?.default_actions ?? "").trim() !== "" || Array.isArray(data.raw?.default_actions)) {
+            merged.default_actions = defaultSteps;
           } else {
             delete merged.default_actions;
           }
@@ -20728,9 +20727,8 @@
           return pathEntry;
         });
         const defaultSteps = serializeBranchChildren("default");
-        const defaultKey = data.raw?.else !== void 0 && data.raw?.default === void 0 ? "else" : "default";
-        if (defaultSteps.length > 0 || (data.fields?.default ?? "").trim() !== "" || Array.isArray(data.raw?.[defaultKey])) {
-          merged[defaultKey] = defaultSteps;
+        if (defaultSteps.length > 0 || (data.fields?.default ?? "").trim() !== "" || Array.isArray(data.raw?.default)) {
+          merged.default = defaultSteps;
         } else {
           delete merged.default;
         }
@@ -20783,14 +20781,6 @@
     for (const field of [...meta.fields, ...errorHandlingFields]) {
       const holder = field.group ? action[field.group] : action;
       let value = isRecord(holder) ? holder[field.key] : void 0;
-      if (value === void 0 && !field.group) {
-        if (type2 === "paths" && field.key === "default" && Array.isArray(action.else)) {
-          value = action.else;
-        } else if (type2 === "decision" && field.key === "default_actions") {
-          if (Array.isArray(action.default)) value = action.default;
-          else if (Array.isArray(action.else) && (action.mode ?? "switch") === "switch") value = action.else;
-        }
-      }
       if (field.type === "json") {
         if (value !== void 0) fields[field.key] = typeof value === "string" ? value : JSON.stringify(value, null, 2);
         continue;
@@ -24238,13 +24228,10 @@
           } else {
             nextFields.else = serializedSteps;
             delete nextRaw.else;
-            delete nextRaw.default_actions;
           }
         } else if (isDefaultBranch) {
           nextFields.default_actions = serializedSteps;
           delete nextRaw.default_actions;
-          delete nextRaw.else;
-          delete nextRaw.default;
         } else if (nextRaw.branches && typeof nextRaw.branches === "object" && !Array.isArray(nextRaw.branches) && !(nextFields.cases ?? "").trim()) {
           const parsedMap = { ...nextRaw.branches };
           const existingEntry = parsedMap[branchKey];
@@ -24288,7 +24275,6 @@
         if (isDefaultBranch) {
           nextFields.default = serializedSteps;
           delete nextRaw.default;
-          delete nextRaw.else;
         } else {
           let rawPaths = [];
           if ((nextFields.paths ?? "").trim()) {

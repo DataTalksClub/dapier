@@ -85,13 +85,13 @@ def _run_paths(workflow_id, action_id, step, event, run_action, *,
 
     Branches are evaluated in order against the same scope filters read, and
     the first match wins — later predicates are not evaluated. With no match
-    the optional ``default`` (or ``else``) steps run. A filter inside a branch
+    the optional ``default`` steps run. A filter inside a branch
     stops the chain quietly, exactly like condition branches.
     """
     branches = step.get("paths")
     if not isinstance(branches, list) or not branches:
         raise ValueError(f"paths '{step.get('id', '')}' needs a non-empty list of paths")
-    default_steps = step.get("default") if step.get("default") is not None else step.get("else")
+    default_steps = step.get("default")
     if default_steps is not None and not isinstance(default_steps, list):
         raise ValueError(f"paths '{action_id}' default must be a list of steps")
     data = {**_predicate_scope(event, scope), "steps": step_outputs or {}}
@@ -185,11 +185,8 @@ def _decision_plan(step, action_id):
 
 
 def _decision_fallback_steps(step):
-    """Fallback step list for a switch decision (default_actions / default / else)."""
-    for fallback_key in ("default_actions", "default", "else"):
-        if step.get(fallback_key) is not None:
-            return step.get(fallback_key)
-    return None
+    """Fallback step list for a switch decision (``default_actions``)."""
+    return step.get("default_actions")
 
 
 def _decision_branch(workflow_id, action_id, step, event, run_action, *,
@@ -197,7 +194,8 @@ def _decision_branch(workflow_id, action_id, step, event, run_action, *,
                      step_outputs, mode, choice, model, usage, note=None,
                      extra=None):
     """Run the branch a decision picked: ``then``/``else`` for an if, the
-    matching case's ``actions`` (or ``default_actions`` / ``default`` / ``else``)
+    matching case's ``actions`` (``default_actions`` covers an unusable or
+    off-list reply)
     for a switch. The branch id nests under the step like a condition's or a
     path's, and the output carries the choice and the branch so later steps
     can template ``{steps.<id>.choice}`` and react without re-asking the model."""
@@ -249,7 +247,7 @@ def _run_decision(workflow_id, action_id, step, event, run_action, *,
     offers ``choices`` (a case may carry a ``description:`` that becomes
     that option's criterion) and runs the matching case's ``actions``.
     A response with no usable choice — or one outside ``choices`` — runs
-    ``default_actions`` (or ``default`` / ``else``) when the step has one and
+    ``default_actions`` when the step has one and
     fails the step otherwise, so on_fail/on_error policies apply. ``system``,
     when set, is the question's instructions.
     """

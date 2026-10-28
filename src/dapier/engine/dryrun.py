@@ -498,7 +498,7 @@ def _evaluate_logic_step(step, step_type, envelope, context,
             if not isinstance(branches, list) or not branches:
                 raise ValueError(f"paths '{step.get('id', '')}' needs a non-empty list of paths")
             matched = None
-            default_steps = step.get("default") if step.get("default") is not None else step.get("else")
+            default_steps = step.get("default")
             body = default_steps or []
             for branch in branches:
                 rules = logic.predicate_rules(branch)
@@ -540,10 +540,10 @@ def _evaluate_logic_step(step, step_type, envelope, context,
                             raise ValueError(
                                 f"decision '{step.get('id', '')}': case '{choice}' "
                                 "actions must be a list of steps")
-                for fallback_key in ("default_actions", "default", "else"):
-                    if step.get(fallback_key) is not None and not isinstance(step.get(fallback_key), list):
-                        raise ValueError(
-                            f"decision '{step.get('id', '')}' {fallback_key} must be a list of steps")
+                default_actions = step.get("default_actions")
+                if default_actions is not None and not isinstance(default_actions, list):
+                    raise ValueError(
+                        f"decision '{step.get('id', '')}' default_actions must be a list of steps")
             else:
                 for branch in ("then", "else"):
                     if step.get(branch) is not None and not isinstance(step[branch], list):
@@ -709,7 +709,7 @@ def _iter_steps(steps, prefix=""):
                     label = str(branch.get("label") or "").strip() or "path"
                     if isinstance(branch.get("actions"), list):
                         yield from _iter_steps(branch["actions"], f"{action_id}.{label}")
-            default_steps = step.get("default") if step.get("default") is not None else step.get("else")
+            default_steps = step.get("default")
             if isinstance(default_steps, list):
                 yield from _iter_steps(default_steps, f"{action_id}.default")
         elif kind == "decision":
@@ -718,10 +718,8 @@ def _iter_steps(steps, prefix=""):
                     if isinstance(case, dict) and isinstance(case.get("actions"), list):
                         label = str(case.get("choice") or "").strip() or "case"
                         yield from _iter_steps(case["actions"], f"{action_id}.{label}")
-                for fallback_key in ("default_actions", "default", "else"):
-                    if isinstance(step.get(fallback_key), list):
-                        yield from _iter_steps(step[fallback_key], f"{action_id}.default")
-                        break
+                if isinstance(step.get("default_actions"), list):
+                    yield from _iter_steps(step["default_actions"], f"{action_id}.default")
             else:
                 for branch in ("then", "else"):
                     if isinstance(step.get(branch), list):

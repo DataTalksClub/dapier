@@ -196,7 +196,7 @@ export function extractNodeBranches(data: NodeData): NodeBranch[] {
     const mode = decisionMode(fields, raw);
     if (mode === "if") {
       const thenSteps = parseYamlStepObjects(fields.then ?? fields.then_actions, raw.then ?? raw.then_actions);
-      const elseSteps = parseYamlStepObjects(fields.else ?? fields.default_actions, raw.else ?? raw.default_actions);
+      const elseSteps = parseYamlStepObjects(fields.else, raw.else);
       return [
         { key: "then", label: "then", steps: thenSteps },
         { key: "else", label: "else", steps: elseSteps, isDefault: true }
@@ -256,14 +256,12 @@ export function extractNodeBranches(data: NodeData): NodeBranch[] {
         };
       });
     }
-    const defaultSource = raw.default_actions ?? raw.default ?? raw.else;
+    const defaultSource = raw.default_actions;
     const defaultSteps = parseYamlStepObjects(fields.default_actions, defaultSource);
     const hasDefaultDefined =
       defaultSteps.length > 0 ||
       (fields.default_actions ?? "").trim() !== "" ||
-      raw.default_actions !== undefined ||
-      raw.default !== undefined ||
-      raw.else !== undefined;
+      raw.default_actions !== undefined;
     if (hasDefaultDefined) {
       branches.push({ key: "else", label: "else", steps: defaultSteps, isDefault: true });
     }
@@ -291,7 +289,7 @@ export function extractNodeBranches(data: NodeData): NodeBranch[] {
           : [];
       return { key, label, when, steps };
     });
-    const defaultSource = raw.default ?? raw.else;
+    const defaultSource = raw.default;
     const defaultSteps = parseYamlStepObjects(fields.default, defaultSource);
     branches.push({ key: "else", label: "else", steps: defaultSteps, isDefault: true });
     return branches;
@@ -774,18 +772,12 @@ function actionToYaml(
           });
         }
         const defaultSteps = serializeBranchChildren("default");
-        const defaultKey =
-          data.raw?.else !== undefined && data.raw?.default_actions === undefined
-            ? "else"
-            : data.raw?.default !== undefined && data.raw?.default_actions === undefined
-              ? "default"
-              : "default_actions";
         if (
           defaultSteps.length > 0 ||
           (data.fields?.default_actions ?? "").trim() !== "" ||
-          Array.isArray(data.raw?.[defaultKey])
+          Array.isArray(data.raw?.default_actions)
         ) {
-          merged[defaultKey] = defaultSteps;
+          merged.default_actions = defaultSteps;
         } else {
           delete merged.default_actions;
         }
@@ -804,13 +796,12 @@ function actionToYaml(
         return pathEntry;
       });
       const defaultSteps = serializeBranchChildren("default");
-      const defaultKey = data.raw?.else !== undefined && data.raw?.default === undefined ? "else" : "default";
       if (
         defaultSteps.length > 0 ||
         (data.fields?.default ?? "").trim() !== "" ||
-        Array.isArray(data.raw?.[defaultKey])
+        Array.isArray(data.raw?.default)
       ) {
-        merged[defaultKey] = defaultSteps;
+        merged.default = defaultSteps;
       } else {
         delete merged.default;
       }
@@ -882,16 +873,6 @@ function actionFields(type: ActionType, action: Record<string, unknown>): Record
   for (const field of [...meta.fields, ...errorHandlingFields]) {
     const holder = field.group ? action[field.group] : action;
     let value = isRecord(holder) ? holder[field.key] : undefined;
-    // Normalize fallback aliases onto the catalog field key (`else` on paths -> `default`,
-    // `else`/`default` on decision[switch] -> `default_actions`).
-    if (value === undefined && !field.group) {
-      if (type === "paths" && field.key === "default" && Array.isArray(action.else)) {
-        value = action.else;
-      } else if (type === "decision" && field.key === "default_actions") {
-        if (Array.isArray(action.default)) value = action.default;
-        else if (Array.isArray(action.else) && (action.mode ?? "switch") === "switch") value = action.else;
-      }
-    }
     if (field.type === "json") {
       if (value !== undefined) fields[field.key] = typeof value === "string" ? value : JSON.stringify(value, null, 2);
       continue;

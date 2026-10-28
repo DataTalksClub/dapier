@@ -22,21 +22,17 @@ first-class `union` step for explicit branch convergence:
 | Step `type` | Role | How branches are defined | Branch labels |
 |---|---|---|---|
 | `condition` | Deterministic `if / else` split | `when:` rule map (or `field` / `operator` / `value`), `then:` steps, optional `else:` steps | `then`, `else` |
-| `paths` | Deterministic multi-way `switch` (first matching path wins) | `paths: [{label, when\|field+operator+value, actions}]`, optional `default:` (alias `else:`) steps | `<label>`, …, `else` (`default`) |
-| `decision` | LLM decision block (`~typesafe/jev-latest` via OpenRouter `/api/alpha/decisions`) | `mode: switch`: `prompt`, `choices: [...]`, `cases: [{choice, description, actions}]`, optional `default_actions:` (alias `else:`). `mode: if`: `prompt`, `then:`, `else:` | `<choice>`, …, `else` (or `then`, `else` in `if` mode) |
+| `paths` | Deterministic multi-way `switch` (first matching path wins) | `paths: [{label, when\|field+operator+value, actions}]`, optional `default:` steps | `<label>`, …, `else` (`default`) |
+| `decision` | LLM decision block (`~typesafe/jev-latest` via OpenRouter `/api/alpha/decisions`) | `mode: switch`: `prompt`, `choices: [...]`, `cases: [{choice, description, actions}]`, optional `default_actions:`. `mode: if`: `prompt`, `then:`, `else:` | `<choice>`, …, `else` (or `then`, `else` in `if` mode) |
 | `filter` | Inline guard / early stop | `when:` rule map (or `field` / `operator` / `value`) | Continues on pass; halts chain as `filtered` on fail |
 | `union` | Explicit branch convergence & output coalescing | Optional `from:` branching step ID and `fields:` coalescing map | Merges surviving branches back into a single step output |
 
-### Alias normalization (`else` / `default` / `default_actions`)
-
-In the designer UI and run view, the fallback branch on multi-way steps
-(`paths` and `decision` in `switch` mode) is consistently presented as
-**`else`** (matching `condition` and `decision` in `if` mode). In YAML:
-
-- `paths` accepts either `default:` (canonical) or `else:` for its fallback
-  step list.
-- `decision` (`mode: switch`) accepts `default_actions:` (canonical),
-  `default:`, or `else:` for its fallback step list.
+The fallback branch on multi-way steps (`paths` and `decision` in `switch`
+mode) is presented as **`else`** in the designer UI and run view (matching
+`condition` and `decision` in `if` mode). In YAML each step type has one
+fallback spelling: `default:` on `paths`, `default_actions:` on `decision`
+(`mode: switch`) — the former `else:`/`default:` aliases are gone (the
+designer and engine read and write only the canonical keys).
 
 ---
 

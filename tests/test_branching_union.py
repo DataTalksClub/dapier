@@ -81,7 +81,7 @@ def test_condition_attaches_unified_branch_summary_and_supports_dotted_when():
     assert route_out["outputs"] == {"make-document": {"url": "https://example.test/inv.pdf"}}
 
 
-def test_paths_supports_else_alias_and_unified_branch_summary():
+def test_paths_default_branch_runs_and_else_alias_is_dead():
     step_outputs = {}
 
     def runner(action, event, workflow_id, steps=None):
@@ -98,7 +98,8 @@ def test_paths_supports_else_alias_and_unified_branch_summary():
                     "actions": [{"id": "inv-step", "type": "webhook", "url": "https://example.test"}],
                 }
             ],
-            "else": [{"id": "fallback-step", "type": "webhook", "url": "https://example.test"}],
+            "default": [{"id": "fallback-step", "type": "webhook", "url": "https://example.test"}],
+            "else": [{"id": "legacy-alias-step", "type": "webhook", "url": "https://example.test"}],
         }
     ]
     logic.run_chain("wf-1", chain, {**EVENT, "data": {"route": "other"}}, runner,
