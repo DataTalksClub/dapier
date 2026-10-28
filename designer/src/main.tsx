@@ -5,17 +5,13 @@ import "./styles.css";
 // Standalone entry: served by server.mjs at / for local workflow editing.
 // Dark mode follows the shared "dakit-theme" key — index.html applies it
 // pre-paint, and a storage event lands here when another tab toggles, so an
-// open designer re-skins without a reload. The pre-dakit "dapier-theme" key
-// is still honored until the next toggle.
+// open designer re-skins without a reload.
 const THEME_KEY = "dakit-theme";
-const LEGACY_THEME_KEY = "dapier-theme";
 
 function storedTheme() {
   try {
     const theme = localStorage.getItem(THEME_KEY);
-    if (theme === "dark" || theme === "light") return theme;
-    const legacy = localStorage.getItem(LEGACY_THEME_KEY);
-    return legacy === "dark" || legacy === "light" ? legacy : null;
+    return theme === "dark" || theme === "light" ? theme : null;
   } catch { /* private mode */ return null; }
 }
 
@@ -33,7 +29,7 @@ function applyStoredTheme() {
 }
 applyStoredTheme();
 window.addEventListener("storage", (event) => {
-  if (event.key === THEME_KEY || event.key === LEGACY_THEME_KEY || event.key === null) applyStoredTheme();
+  if (event.key === THEME_KEY || event.key === null) applyStoredTheme();
 });
 
 createRoot(document.getElementById("root")!).render(<App />);
