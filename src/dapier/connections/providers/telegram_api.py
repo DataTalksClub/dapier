@@ -29,11 +29,11 @@ def validate_token(token):
 
 
 def _default_transport(method, url, *, headers=None, body=None, timeout=10):
-    import urllib.request
+    # Resolved at call time like dropbox_api's read, so tests patching
+    # either this seam or the engine's default transport keep working.
+    from ....engine.actions import base
 
-    request = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.status, response.read()
+    return base._default_transport(method, url, headers=headers, body=body, timeout=timeout)
 
 
 def call(token, method, payload=None, *, transport=None, timeout=10):

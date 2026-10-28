@@ -17,9 +17,7 @@ the network without sockets or moto.
 """
 
 import json
-import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -95,9 +93,11 @@ class Resource:
 
 
 def _default_transport(method, url, *, headers, body, timeout=15):
-    request = urllib.request.Request(url, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.status, response.read()
+    # Resolved at call time like dropbox_api's read, so tests patching
+    # either this seam or the engine's default transport keep working.
+    from ..engine.actions import base
+
+    return base._default_transport(method, url, headers=headers, body=body, timeout=timeout)
 
 
 def _error_detail(status, raw):

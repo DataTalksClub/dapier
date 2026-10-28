@@ -22,7 +22,6 @@ import json
 import logging
 import os
 import time
-import urllib.request
 from datetime import datetime, timezone
 
 import boto3
@@ -53,9 +52,11 @@ def _now_iso():
 
 
 def _default_transport(method, url, *, headers, body, timeout=15):
-    request = urllib.request.Request(url, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.status, response.read()
+    # Resolved at call time so tests patching either this seam or the
+    # engine's default transport keep working.
+    from ...engine.actions import base
+
+    return base._default_transport(method, url, headers=headers, body=body, timeout=timeout)
 
 
 def _call(url, payload, access_token, transport):

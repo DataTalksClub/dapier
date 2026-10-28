@@ -71,8 +71,8 @@ def is_document_attachment(attachment):
     content_type = str((attachment or {}).get("content_type") or "")
     return content_type.split(";")[0].strip().lower() not in BOILERPLATE_CONTENT_TYPES
 
-def _default_transport(method, url, *, headers, body, timeout=15):
-    request = urllib.request.Request(url, data=body, headers=headers, method=method)
+def _default_transport(method, url, *, headers=None, body=None, timeout=15):
+    request = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.status, response.read()
 
