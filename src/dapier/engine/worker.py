@@ -4,9 +4,9 @@ import math
 import os
 import time
 import uuid
-from datetime import datetime, timezone
 from decimal import Decimal
 
+from ..clock import now_iso
 from ..connectors.ingress import normalize_event, processing_id
 from ..triggers import failure_counts, inbox
 from . import _run_connector, usage
@@ -160,10 +160,6 @@ def _run_id(workflow_id, event):
     return f"{workflow_id}:{event.get('id', '')}"
 
 
-def _now_iso():
-    return datetime.now(timezone.utc).isoformat()
-
-
 # The trigger envelope every step records as its ``input``: capped higher
 # than step outputs so an ordinary webhook or email event (hook bodies run
 # to 200 KB, email bodies to 60 KB apiece) still replays from run history —
@@ -221,7 +217,7 @@ def _is_pending(workflow_id, action_id, event, action_type=None, retry_attempt=N
         "event_type": event.get("event"),
         "correlation_id": event.get("correlation_id") or event.get("id"),
         "status": "processing",
-        "started_at": _now_iso(),
+        "started_at": now_iso(),
         "lease_until": now + 300,
         "expires_at": now + 90 * 86400,
         # Step telemetry for the run view: the action type and the event data
@@ -277,7 +273,7 @@ def _mark_completed(workflow_id, action_id, event, output=None, duration_ms=None
     names = {"#status": "status"}
     values = {
         ":status": status,
-        ":finished": _now_iso(),
+        ":finished": now_iso(),
         ":expires": int(time.time()) + 90 * 86400,
     }
     if output is not None:
@@ -314,7 +310,7 @@ def _release_action(workflow_id, action_id, event, exc=None, duration_ms=None):
     names = {"#status": "status", "#error": "error"}
     values = {
         ":failed": "failed",
-        ":finished": _now_iso(),
+        ":finished": now_iso(),
         ":error": message[:500],
         ":lease": now - 1,
         ":expires": now + 90 * 86400,
@@ -478,7 +474,7 @@ def _cancel_paused_step(workflow_id, action_id, event):
                 ExpressionAttributeValues={
                     ":status": "cancelled",
                     ":delayed": "delayed",
-                    ":finished": _now_iso(),
+                    ":finished": now_iso(),
                     ":expires": int(time.time()) + 90 * 86400,
                 },
             )
@@ -525,7 +521,7 @@ def _close_paused_step(workflow_id, action_id, event, *, count_usage=False):
             ExpressionAttributeNames={"#status": "status"},
             ExpressionAttributeValues={
                 ":status": "completed",
-                ":finished": _now_iso(),
+                ":finished": now_iso(),
                 ":expires": int(time.time()) + 90 * 86400,
             },
         )
@@ -571,8 +567,8 @@ def _mark_reused(workflow_id, event, *, action_id, action_type=None, output=None
         # never be taken over — a live case pinned this replay in LeaseBusy
         # until the record dead-lettered.
         "lease_until": now,
-        "started_at": _now_iso(),
-        "finished_at": _now_iso(),
+        "started_at": now_iso(),
+        "finished_at": now_iso(),
         "expires_at": now + 90 * 86400,
         "input": _stored(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
     }
@@ -691,7 +687,7 @@ def _schedule_event(payload):
     names the trigger and the fire's id and time are minted here.
     """
     schedule_id = payload["schedule_id"]
-    fired_at = datetime.now(timezone.utc).isoformat()
+    fired_at = now_iso()
     return {
         "schema_version": "1.0",
         "id": f"{schedule_id}-{uuid.uuid4()}",

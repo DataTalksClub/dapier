@@ -22,10 +22,10 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
 
 import boto3
 
+from ...clock import now_iso
 from ...connections import tokens
 from ...connections import records as connections
 
@@ -45,10 +45,6 @@ class ResolverError(Exception):
 
 class CursorReset(ResolverError):
     """Dropbox rejected the stored cursor; a fresh listing is required."""
-
-
-def _now_iso():
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _default_transport(method, url, *, headers, body, timeout=15):
@@ -224,7 +220,7 @@ def resolve_account(account_id, *, correlation_id, occurred_at=None,
         account_id,
     )
     publish = publish or _publish
-    occurred_at = occurred_at or _now_iso()
+    occurred_at = occurred_at or now_iso()
 
     def emit(event_type, data, *, event_id):
         publish(event_type, data, event_id=event_id, occurred_at=occurred_at,

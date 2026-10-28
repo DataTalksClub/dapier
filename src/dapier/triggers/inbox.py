@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from email.utils import parseaddr
 
 from ..auth import visibility
+from ..clock import now_iso
 from .dynamo import decode_numbers
 
 logger = logging.getLogger(__name__)
@@ -80,10 +81,6 @@ _BODY_TEXT = 60_000
 
 class InboxError(Exception):
     """The inbox is not configured, or the event cannot be replayed."""
-
-
-def _now_iso():
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _trim(value, limit=6000):
@@ -314,7 +311,7 @@ def record(event, *, table_ref=None):
         "event": event.get("event"),
         "source": event.get("source"),
         "occurred_at": event.get("occurred_at"),
-        "received_at": _now_iso(),
+        "received_at": now_iso(),
         "status": RECEIVED,
         "data": _trim_event_data(event.get("data") or {}),
         "matched": [],
@@ -356,7 +353,7 @@ def ignore(inbox_id, *, error=None, table_ref=None):
         values = {
             ":status": IGNORED,
             ":matched": [],
-            ":at": _now_iso(),
+            ":at": now_iso(),
         }
         sets = "#status = :status, matched = :matched, processed_at = :at"
         if error:
@@ -400,7 +397,7 @@ def complete(inbox_id, matched, *, error=None, table_ref=None):
         status, values = UNMATCHED, {":status": UNMATCHED, ":matched": []}
         sets = "#status = :status, matched = :matched, processed_at = :at"
         names = {"#status": "status"}
-    values[":at"] = _now_iso()
+    values[":at"] = now_iso()
     try:
         table = table_ref if table_ref is not None else _table()
         table.update_item(
@@ -737,7 +734,7 @@ def replay_event(item):
         "connector": item.get("connector"),
         "event": item.get("event"),
         "source": item.get("source"),
-        "occurred_at": _now_iso(),
+        "occurred_at": now_iso(),
         "data": data if isinstance(data, dict) else {},
     }
     if event["connector"] == "email" and event["event"] == "message.received":

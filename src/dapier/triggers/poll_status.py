@@ -25,6 +25,8 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 
+from ..clock import now_iso
+
 logger = logging.getLogger(__name__)
 
 TABLE_ENV = "CURSORS_TABLE"
@@ -59,10 +61,6 @@ def _table(table_ref=None):
     return boto3.resource("dynamodb").Table(name)
 
 
-def _now_iso(now=None):
-    return (now or datetime.now(timezone.utc)).isoformat()
-
-
 def record(poll_id, *, found=0, error=None, reason="schedule", table_ref=None, now=None):
     """Record one check. ``error`` marks it failed; ``found`` counts the new
     items the check started workflows for (they still count on a check that
@@ -71,7 +69,7 @@ def record(poll_id, *, found=0, error=None, reason="schedule", table_ref=None, n
         table = _table(table_ref)
         if table is None:
             return None
-        at = _now_iso(now)
+        at = now_iso(now)
         sets = ["last_checked_at = :at", "last_reason = :reason",
                 "last_found = :found", "updated_at = :at"]
         values = {":at": at, ":reason": str(reason or "schedule"), ":found": int(found or 0)}

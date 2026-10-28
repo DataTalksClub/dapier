@@ -8,9 +8,10 @@ API layer), unknown connector/resource or nothing discoverable raises
 ``(status, payload)`` wrapper both ``/api/agent`` and ``/api/admin`` share,
 so the console and the CLI cannot drift.
 """
+from ...clock import now_iso
 from .base import (DEFAULT_LIMIT, KINDS, MAX_LIMIT, DiscoveryNotFound,
                    DiscoveryUpstream, TRIGGER_DISCOVERIES,
-                   trigger_discovery_catalog, _now_iso)
+                   trigger_discovery_catalog)
 
 
 def _coerce_limit(limit):
@@ -56,7 +57,7 @@ def _sample_response(entry, result, connection_id):
         "sample": result["sample"],
         "source": result.get("source"),
         "connection_id": connection_id,
-        "fetched_at": _now_iso(),
+        "fetched_at": now_iso(),
     }
 
 

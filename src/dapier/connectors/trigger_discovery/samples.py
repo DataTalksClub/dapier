@@ -8,7 +8,8 @@ recorded — or never flows inbound, like schedule).
 """
 import uuid
 
-from .base import DEFAULT_LIMIT, _now_iso
+from ...clock import now_iso
+from .base import DEFAULT_LIMIT
 
 
 def _through_package(name):
@@ -33,7 +34,7 @@ def as_sample(envelope):
     if not sample["id"]:
         sample["id"] = f"discover-{uuid.uuid4().hex[:12]}"
     if not sample["occurred_at"]:
-        sample["occurred_at"] = _now_iso()
+        sample["occurred_at"] = now_iso()
     return sample
 
 
@@ -45,7 +46,7 @@ def synthetic_sample(connector, event, data):
         "data": data,
         "id": f"discover-{uuid.uuid4().hex[:12]}",
         "source": connector,
-        "occurred_at": _now_iso(),
+        "occurred_at": now_iso(),
     }
 
 

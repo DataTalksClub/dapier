@@ -39,9 +39,10 @@ import os
 import re
 import secrets
 import time
-from datetime import datetime, timezone
 
 from boto3.dynamodb.types import TypeSerializer
+
+from ..clock import now_iso
 from botocore.exceptions import ParamValidationError
 
 PREFIX = "dapd_"
@@ -104,10 +105,6 @@ def table():
     return boto3.resource("dynamodb").Table(os.environ["DEVICE_SESSIONS_TABLE"])
 
 
-def _now_iso():
-    return datetime.now(timezone.utc).isoformat()
-
-
 def _hash(secret):
     return hashlib.sha256(secret.encode()).hexdigest()
 
@@ -160,7 +157,7 @@ def start(table_ref=None, label="Dapier CLI", request_ip=""):
         "status": "pending",
         "label": sanitize_label(label),
         "request_ip": str(request_ip or ""),
-        "created_at": _now_iso(),
+        "created_at": now_iso(),
         "attempts": 0,
         "ttl": ttl,
     }
@@ -304,7 +301,7 @@ def decide(user_code, approve, subject, email, table_ref=None, now=None):
     else:
         names["#d"] = "decided_at"
         values[":denied"] = "denied"
-        values[":decided"] = _now_iso()
+        values[":decided"] = now_iso()
         update = "SET #st = :denied, #d = :decided, #a = if_not_exists(#a, :zero) + :one"
     try:
         store.update_item(
@@ -422,7 +419,7 @@ def poll(device_code, table_ref=None):
                     "kind": "session",
                     "subject": str(pairing.get("subject", "")),
                     "email": str(pairing.get("email", "")),
-                    "created_at": _now_iso(),
+                    "created_at": now_iso(),
                     "ttl": expires_at,
                 },
                 "ConditionExpression": "attribute_not_exists(#pk)",
@@ -471,7 +468,7 @@ def _session_item(subject, email):
         "kind": "session",
         "subject": str(subject),
         "email": str(email or ""),
-        "created_at": _now_iso(),
+        "created_at": now_iso(),
         "ttl": int(time.time()) + SESSION_TTL_SECONDS,
     }
     return token, item
@@ -523,7 +520,7 @@ def refresh(bearer, table_ref=None):
             ExpressionAttributeNames={"#pk": "pk", "#t": "ttl", "#r": "rotated_at"},
             ExpressionAttributeValues={
                 ":grace": int(time.time()) + ROTATION_GRACE_SECONDS,
-                ":now": _now_iso(),
+                ":now": now_iso(),
             },
         )
     except Exception:

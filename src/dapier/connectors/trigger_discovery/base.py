@@ -5,7 +5,6 @@ entries here, the catalog reads them back, and the other modules in this
 package (samples, options, dispatch) share these primitives.
 """
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 KINDS = ("sample", "options")
 DEFAULT_LIMIT = 5
@@ -70,5 +69,3 @@ def trigger_discovery_catalog():
     }
 
 
-def _now_iso():
-    return datetime.now(timezone.utc).isoformat()
