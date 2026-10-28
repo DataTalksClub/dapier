@@ -343,12 +343,10 @@ class SlackTelegramFormatTests(unittest.TestCase):
 
 
 class TelegramToSlackFlowTests(unittest.TestCase):
-    """The Telegram-to-Slack action chain runs as a designer workflow —
-    migrated verbatim from the hook action chain it once was."""
+    """The Telegram-to-Slack action chain of the telegram-crosspost workflow."""
 
-    actions = yaml.safe_load((Path(__file__).resolve().parents[3] /
-                              "migrations/legacy-workflows/telegram-slack.yaml").read_text())[
-        "flows"]["telegram-to-slack"]["actions"]
+    actions = yaml.safe_load((Path(__file__).resolve().parent /
+                              "fixtures/telegram-crosspost-actions.yaml").read_text())
 
     WORKFLOW = {"id": "telegram-crosspost", "enabled": True, "actions": actions,
                 "triggers": [
