@@ -559,7 +559,7 @@ def test_cli_tags_replace_clear_add_remove(isolated_home, monkeypatch, capsys):
     assert len(seen) == 3
 
 
-def test_cli_bulk_enable_disable_by_tag_and_all(isolated_home, monkeypatch, capsys):
+def test_cli_bulk_on_off_by_tag_and_all(isolated_home, monkeypatch, capsys):
     seen = []
 
     def fake_call(api_url, method, path, body=None, **kwargs):
@@ -571,14 +571,14 @@ def test_cli_bulk_enable_disable_by_tag_and_all(isolated_home, monkeypatch, caps
 
     monkeypatch.setattr(cli_commands.api, "call", fake_call)
 
-    assert cli_main.main(["workflows", "disable", "--tag", "billing"]) == 0
+    assert cli_main.main(["workflows", "off", "--tag", "billing"]) == 0
     assert seen[-1] == ("POST", "/api/agent/designer/workflows/bulk",
                         {"action": "disable", "tag": "billing"})
     out = capsys.readouterr().out
     assert "2 of 2" in out and "tag:billing" in out
     assert "broken" in out  # per-workflow failures are printed, never silent
 
-    assert cli_main.main(["workflows", "enable", "--all"]) == 0
+    assert cli_main.main(["workflows", "on", "--all"]) == 0
     assert seen[-1][2] == {"action": "enable", "all": True}
 
     # Explicit files still go through the ids scope.
@@ -586,7 +586,7 @@ def test_cli_bulk_enable_disable_by_tag_and_all(isolated_home, monkeypatch, caps
     assert seen[-1][2] == {"ids": ["a.yaml", "b.yaml"], "action": "enable"}
 
     # Neither files nor a scope: refused loudly, no call.
-    assert cli_main.main(["workflows", "enable"]) == 2
+    assert cli_main.main(["workflows", "on"]) == 2
     assert len(seen) == 3
 
 

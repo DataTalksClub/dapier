@@ -259,7 +259,7 @@ def workflows_set_enabled(api_url, files, enabled, debug=False):
 
 
 def workflows_bulk_enabled(api_url, enabled, tag=None, all_workflows=False, debug=False):
-    """Bulk enable/disable by scope (`workflows enable|disable --tag x|--all`):
+    """Bulk enable/disable by scope (`workflows on|off --tag x|--all`):
     every workflow carrying a tag, or all of them, through the same bulk
     endpoint the explicit file list uses. Failures print per workflow —
     nothing fails silently."""

@@ -158,7 +158,7 @@ def api_bulk(body, operator=None, visible=None):
     Exactly one scope: ``ids`` (explicit file names — `workflows on|off
     a.yaml b.yaml`, the console's shown-rows bulk buttons), ``tag`` (every
     workflow carrying it), ``search`` (the list's ?q= text), or ``all: true``
-    (`workflows enable --all`). Each target goes through the same api_toggle
+    (`workflows on --all`). Each target goes through the same api_toggle
     semantics — live immediately, committed YAML best-effort — and answers on
     its own: an unknown file, an invalid name, or a publish hiccup fails that
     id without stopping the batch, and the response reports it. Returns 200

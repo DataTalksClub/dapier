@@ -300,12 +300,11 @@ def test_cli_on_and_off_use_the_bulk_endpoint(monkeypatch, capsys):
     from dapier_cli.cli import workflows as cli_workflows
     from dapier_cli.main import build_parser
     parser = build_parser()
-    for command in ("on", "off", "enable", "disable"):
+    for command in ("on", "off"):
         args = parser.parse_args(["workflows", command, "test-flow.yaml"])
         assert (args.group, args.command, args.file) == ("workflows", command, ["test-flow.yaml"])
         assert cli_workflows.run(args, "https://api.test", False) == 0
-    assert [body["action"] for _, _, body in calls[2:]] == [
-        "enable", "disable", "enable", "disable"]
+    assert [body["action"] for _, _, body in calls[2:]] == ["enable", "disable"]
 
 
 def test_cli_bulk_reports_per_workflow_failures(monkeypatch, capsys):

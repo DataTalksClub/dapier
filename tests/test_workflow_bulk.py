@@ -283,7 +283,7 @@ def test_cli_enable_and_disable_accept_multiple_ids(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert out.count("is Off — live now.") == 2
 
-    assert cli_main.main(["workflows", "enable", "flow-a.yaml", "flow-b.yaml"]) == 0
+    assert cli_main.main(["workflows", "on", "flow-a.yaml", "flow-b.yaml"]) == 0
     assert calls[-1][2]["action"] == "enable"
     out = capsys.readouterr().out
     assert out.count("is On — live now.") == 2

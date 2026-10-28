@@ -49,10 +49,6 @@ def register(sub):
     add_bulk_toggle_flags(wf_on_p)
     wf_off_p = wf_sub.add_parser("off", help="Turn workflows off (live immediately)")
     add_bulk_toggle_flags(wf_off_p)
-    wf_enable_p = wf_sub.add_parser("enable", help="Alias for workflows on")
-    add_bulk_toggle_flags(wf_enable_p)
-    wf_disable_p = wf_sub.add_parser("disable", help="Alias for workflows off")
-    add_bulk_toggle_flags(wf_disable_p)
     wf_dup_p = wf_sub.add_parser("duplicate", help="Copy a workflow under a new id and publish the copy live")
     wf_dup_p.add_argument("file", help="Workflow id, file (my-flow.yaml), or exact name")
     wf_dup_p.add_argument("--name", default=None,
@@ -155,7 +151,7 @@ def register(sub):
 
 # Commands whose `file` argument names a stored workflow (not a local YAML
 # path): each also accepts the bare id or the exact workflow name.
-_WORKFLOW_REF_COMMANDS = ("show", "export", "on", "off", "enable", "disable", "duplicate",
+_WORKFLOW_REF_COMMANDS = ("show", "export", "on", "off", "duplicate",
                           "versions", "diff", "rollback", "publish", "discard",
                           "draft-diff", "delete", "tags", "folder")
 
@@ -197,8 +193,8 @@ def run(args, api_url, debug, child=None):
         return commands.workflows_export_all_bundle(api_url, out=args.out, debug=debug)
     if args.command == "save":
         return commands.workflows_save(api_url, args.file, args.rename_from, debug)
-    if args.command in ("on", "off", "enable", "disable"):
-        enabled = args.command in ("on", "enable")
+    if args.command in ("on", "off"):
+        enabled = args.command == "on"
         if getattr(args, "tag", None) or getattr(args, "all", False):
             return commands.workflows_bulk_enabled(api_url, enabled, tag=args.tag,
                                                    all_workflows=args.all, debug=debug)
