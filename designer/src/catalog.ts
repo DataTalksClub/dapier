@@ -259,9 +259,8 @@ export const actionCatalog: ActionEntry[] = [
     type: "slack",
     label: "Slack",
     icon: SlackLogo,
-    description: "Post a templated message to a Slack channel through a stored credential or Slack connection. Output: {ok, channel, ts}.",
+    description: "Post a templated message to a Slack channel through a Slack connection. Output: {ok, channel, ts}.",
     fields: [
-      { key: "credential_id", label: "Credential ID" },
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", placeholder: "#alerts", required: true,
         discover: { resource: "channels" } },
@@ -287,8 +286,7 @@ export const actionCatalog: ActionEntry[] = [
     description: "Look up one workspace user by email (users.lookupByEmail). Output: {found, user}.",
     fields: [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", required: true, provider: "slack" },
-      { key: "email", label: "Email", placeholder: "person@example.com", required: true, discover: { resource: "users", value: "{email}" } },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "email", label: "Email", placeholder: "person@example.com", required: true, discover: { resource: "users", value: "{email}" } }
     ]
   },
   {
@@ -303,8 +301,7 @@ export const actionCatalog: ActionEntry[] = [
         placeholder: "channels only: create the channel when none matches" },
       { key: "is_private", label: "Private channel", type: "boolean", default: "false",
         placeholder: "only used when Create if missing is on" },
-      { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" }
     ]
   },
   {
@@ -317,8 +314,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
       { key: "ts", label: "Message ts", required: true, placeholder: "{ts}",
         discover: { resource: "messages", params: { channel: "channel" } } },
-      { key: "text", label: "New text", type: "textarea", required: true, placeholder: "{text} (updated by the workflow)" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "text", label: "New text", type: "textarea", required: true, placeholder: "{text} (updated by the workflow)" }
     ]
   },
   {
@@ -331,8 +327,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
       { key: "timestamp", label: "Message ts", required: true, placeholder: "{ts}",
         discover: { resource: "messages", params: { channel: "channel" } } },
-      { key: "reaction", label: "Reaction", required: true, placeholder: "tada" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "reaction", label: "Reaction", required: true, placeholder: "tada" }
     ]
   },
   {
@@ -348,8 +343,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "thread_ts", label: "Thread ts", placeholder: "{ts} — schedules the reply into one thread",
         discover: { resource: "messages", params: { channel: "channel" } } },
       { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
-      { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
     ]
   },
   {
@@ -360,8 +354,7 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "text", label: "Reminder text", type: "textarea", required: true, placeholder: "Rotate the {customer} API key" },
-      { key: "time", label: "When", placeholder: "in 20 minutes / tomorrow 9am / 1759400000" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "time", label: "When", placeholder: "in 20 minutes / tomorrow 9am / 1759400000" }
     ]
   },
   {
@@ -374,8 +367,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "user_id", label: "User ID", required: true, placeholder: "{steps.find.output.user.id}", discover: { resource: "users", value: "{id}" } },
       { key: "text", label: "Text template", type: "textarea", placeholder: "{title}\n{url}" },
       { key: "unfurl_links", label: "Unfurl links", type: "boolean", default: "true" },
-      { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "unfurl_media", label: "Unfurl media", type: "boolean", default: "true" }
     ]
   },
   {
@@ -386,8 +378,7 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "name", label: "Channel name", required: true, placeholder: "alerts-{customer}" },
-      { key: "is_private", label: "Private channel", type: "boolean", default: "false" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "is_private", label: "Private channel", type: "boolean", default: "false" }
     ]
   },
   {
@@ -398,8 +389,7 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
-      { key: "topic", label: "Topic", type: "textarea", required: true },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "topic", label: "Topic", type: "textarea", required: true }
     ]
   },
   {
@@ -410,8 +400,7 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
-      { key: "purpose", label: "Purpose", type: "textarea", required: true },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "purpose", label: "Purpose", type: "textarea", required: true }
     ]
   },
   {
@@ -423,8 +412,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", required: true, placeholder: "{channel_id} or #channel", discover: { resource: "channels" } },
       { key: "users", label: "Users", required: true, placeholder: "{steps.find.output.user.id} (comma-separated ids)",
-        discover: { resource: "users" } },
-      { key: "credential_id", label: "Credential ID" }
+        discover: { resource: "users" } }
     ]
   },
   {
@@ -436,8 +424,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "channel", label: "Channel", required: true, placeholder: "{channel_id}", discover: { resource: "channels" } },
       { key: "timestamp", label: "Message ts", required: true, placeholder: "{ts}",
-        discover: { resource: "messages", params: { channel: "channel" } } },
-      { key: "credential_id", label: "Credential ID" }
+        discover: { resource: "messages", params: { channel: "channel" } } }
     ]
   },
   {
@@ -448,8 +435,7 @@ export const actionCatalog: ActionEntry[] = [
     fields: [
       { key: "connection_id", label: "Slack connection", placeholder: "resolves the credential", provider: "slack" },
       { key: "query", label: "Query", required: true, placeholder: "deploy postmortem" },
-      { key: "count", label: "Max results", type: "number", placeholder: "20" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "count", label: "Max results", type: "number", placeholder: "20" }
     ]
   },
   {
@@ -467,8 +453,7 @@ export const actionCatalog: ActionEntry[] = [
       { key: "initial_comment", label: "Comment", type: "textarea", placeholder: "posted with the file" },
       { key: "thread_ts", label: "Thread ts", placeholder: "{ts} — replies to that message instead of posting top-level",
         discover: { resource: "messages", params: { channel: "channel" } } },
-      { key: "content_type", label: "Content type", placeholder: "guessed from the file name" },
-      { key: "credential_id", label: "Credential ID" }
+      { key: "content_type", label: "Content type", placeholder: "guessed from the file name" }
     ]
   },
   {

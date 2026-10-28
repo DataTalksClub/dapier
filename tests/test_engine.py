@@ -73,22 +73,6 @@ class MatchTests(unittest.TestCase):
 class SlackTests(unittest.TestCase):
     @patch("src.dapier.engine.actions.base._json_request")
     @patch("src.dapier.connections.credentials.get_credential")
-    def test_reads_bot_token_from_dynamodb_credential(self, get_credential, json_request):
-        get_credential.return_value = {"token": "xoxb-private"}
-        json_request.return_value = {"ok": True}
-
-        run_slack(
-            {"credential_id": "slack", "channel": "C123", "text": "{title}: {url}"},
-            {"data": {"title": "Published", "url": "https://example.test/video"}},
-        )
-
-        get_credential.assert_called_once_with("slack")
-        self.assertEqual(json_request.call_args.args[1]["channel"], "C123")
-        self.assertEqual(json_request.call_args.args[1]["text"], "Published: https://example.test/video")
-        self.assertEqual(json_request.call_args.kwargs["headers"], {"authorization": "Bearer xoxb-private"})
-
-    @patch("src.dapier.engine.actions.base._json_request")
-    @patch("src.dapier.connections.credentials.get_credential")
     def test_resolves_credential_through_connection_id(self, get_credential, json_request):
         get_credential.return_value = {"token": "xoxb-private"}
         json_request.return_value = {"ok": True}
@@ -619,14 +603,15 @@ class EmailSendTests(unittest.TestCase):
 
 
 class SlackOutputTests(unittest.TestCase):
+    @patch("plugins.slack.runners.slack._connection_credential_id", return_value="slack")
     @patch("src.dapier.engine.actions.base._json_request")
     @patch("src.dapier.connections.credentials.get_credential")
-    def test_slack_reports_channel_and_ts(self, get_credential, json_request):
+    def test_slack_reports_channel_and_ts(self, get_credential, json_request, _credential_id):
         get_credential.return_value = {"token": "xoxb-private"}
         json_request.return_value = {"ok": True, "channel": "C123", "ts": "1700.1"}
 
         output = run_slack(
-            {"credential_id": "slack", "channel": "C123", "text": "hello"},
+            {"connection_id": "slack", "channel": "C123", "text": "hello"},
             {"data": {}},
         )
 

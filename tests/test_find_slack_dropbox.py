@@ -6,6 +6,7 @@ Unit tests drive the registered run callables with a fake transport; the
 connection/credential lookups are patched, matching the sibling find tests
 (test_find_s3_drive.py, test_sheets_find_row.py).
 """
+import pytest
 import json
 import unittest
 from unittest.mock import patch
@@ -15,6 +16,14 @@ import plugins.slack.plugin as slack_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
 from plugins.dropbox.runners.dropbox import run_dropbox_find
 from plugins.slack.runners.slack import run_slack_find, run_slack_find_user
+
+
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
 
 
 class FakeTransport:
@@ -48,7 +57,7 @@ def run_dropbox(transport, action, event=None):
 
 
 def run_slack(transport, action, event=None):
-    action = {"type": "slack_find", "credential_id": "slack",
+    action = {"type": "slack_find", "connection_id": "slack",
               "find": "user", "query": "person@example.com", **action}
     with patch("src.dapier.connections.credentials.get_credential",
                return_value={"token": "xoxb-test"}):
@@ -123,7 +132,7 @@ class SlackFindTests(unittest.TestCase):
         with patch("src.dapier.connections.credentials.get_credential",
                    return_value={"token": "xoxb-test"}):
             output = run_slack_find_user(
-                {"type": "slack_find_user", "credential_id": "slack",
+                {"type": "slack_find_user", "connection_id": "slack",
                  "email": "{handle}"},
                 {"data": {"handle": "z@example.com"}}, transport=transport)
 

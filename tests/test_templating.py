@@ -18,6 +18,14 @@ from src.dapier.engine.actions.templating import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
+
+
 EVENT = {
     "id": "evt-1",
     "connector": "email",
@@ -318,7 +326,7 @@ class ExecuteMappingTests(unittest.TestCase):
         "trigger": {"connector": "email", "event": "message.received", "filters": {}},
         "actions": [
             {"id": "fetch", "type": "webhook", "url": "https://example.test/fetch"},
-            {"id": "notify", "type": "slack", "credential_id": "slack", "channel": "C1",
+            {"id": "notify", "type": "slack", "connection_id": "slack", "channel": "C1",
              "text": "{steps.fetch.output.url | upper} ({steps.fetch.status})"},
         ],
     }
@@ -378,7 +386,7 @@ class RunnerMappingTests(unittest.TestCase):
     def test_slack_renders_formatter_chain(self):
         with patch("src.dapier.engine.actions.base._json_request") as json_request, \
              patch("src.dapier.connections.credentials.get_credential", return_value={"token": "t"}):
-            run_slack({"credential_id": "s", "channel": "C1", "text": "{subject | trim | upper}"},
+            run_slack({"connection_id": "s", "channel": "C1", "text": "{subject | trim | upper}"},
                       {"data": {"subject": " hi "}})
         self.assertEqual(json_request.call_args.args[1]["text"], "HI")
 
@@ -419,7 +427,7 @@ class SaveValidationTests(unittest.TestCase):
 
         with pytest.raises(email_triggers.TriggerError, match="unknown formatter 'nope'"):
             email_triggers.validate_actions(
-                [{"type": "slack", "credential_id": "s", "channel": "C1",
+                [{"type": "slack", "connection_id": "s", "channel": "C1",
                   "text": "{subject | nope}"}],
             )
 

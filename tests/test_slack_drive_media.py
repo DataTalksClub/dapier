@@ -26,6 +26,14 @@ from plugins.google.runners.drive import run_drive_read_file
 from plugins.slack.runners.slack import run_slack_upload_file
 from plugins.zoom.runners import run_zoom_find_meeting
 
+
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
+
 SLACK_TOKEN = {"token": "xoxb-test"}
 GOOGLE_CONNECTION = {"connection_id": "gdrive", "provider": "google",
                      "status": "connected", "credential_id": "oauth#gdrive"}
@@ -84,7 +92,7 @@ def run_slack(action, transport, *, steps=None):
     with mock.patch.object(credentials_module, "get_credential",
                            return_value=dict(SLACK_TOKEN)):
         return run_slack_upload_file(
-            {"type": "slack_upload_file", "credential_id": "slack", **action},
+            {"type": "slack_upload_file", "connection_id": "slack", **action},
             EVENT, transport=transport, steps=steps)
 
 
@@ -223,7 +231,7 @@ def test_slack_upload_file_dispatches_through_the_registry():
                            return_value=dict(SLACK_TOKEN)), \
          mock.patch.object(base, "_default_transport", transport):
         output = registry.ACTIONS["slack_upload_file"].run(
-            {"type": "slack_upload_file", "credential_id": "slack",
+            {"type": "slack_upload_file", "connection_id": "slack",
              "channel": "#alerts", "filename": "report.txt",
              "content": "hello"}, EVENT, "wf-1")
 
@@ -273,7 +281,7 @@ def test_a_drive_read_stages_bytes_that_the_slack_upload_sends():
          mock.patch.object(base, "_s3_body",
                            lambda ref: s3.objects[(ref["bucket"], ref["key"])][0]):
         sent = run_slack_upload_file(
-            {"type": "slack_upload_file", "credential_id": "slack",
+            {"type": "slack_upload_file", "connection_id": "slack",
              "channel": "#alerts", "filename": "{title}.pdf", "id": "send",
              "source_s3": {"bucket": "{steps.read.output.bucket}",
                            "key": "{steps.read.output.key}"}},
@@ -292,7 +300,7 @@ def test_the_media_chain_validates_against_the_registry():
          "name": "{title}"},
         {"type": "drive_read_file", "connection_id": "google",
          "file_id": "{steps.find.output.file.id}", "id": "read"},
-        {"type": "slack_upload_file", "credential_id": "slack",
+        {"type": "slack_upload_file", "connection_id": "slack",
          "channel": "#alerts", "filename": "{steps.read.output.filename}",
          "source_s3": {"bucket": "{steps.read.output.bucket}",
                        "key": "{steps.read.output.key}"},
@@ -304,7 +312,7 @@ def test_the_media_chain_validates_against_the_registry():
         ({"connection_id", "file_id"}, {"export_as"})
     assert specs["slack_upload_file"] == \
         ({"channel", "filename"},
-         {"connection_id", "credential_id", "source_url", "source_s3",
+         {"connection_id", "source_url", "source_s3",
           "content", "title", "initial_comment", "thread_ts", "content_type"})
 
     with pytest.raises(registry.ActionError, match="filename"):

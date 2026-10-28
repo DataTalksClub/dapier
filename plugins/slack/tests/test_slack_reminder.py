@@ -4,6 +4,7 @@ Unit tests drive the registered run callable with a fake transport; the
 credential lookup is patched, matching the sibling Slack tests
 (test_slack_actions.py, test_find_slack_dropbox.py).
 """
+import pytest
 import json
 import unittest
 from unittest.mock import patch
@@ -11,6 +12,14 @@ from unittest.mock import patch
 import plugins.slack.plugin as slack_connector  # noqa: F401 (registers)
 from src.dapier.connectors import registry
 from plugins.slack.runners.slack import run_slack_add_reminder
+
+
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
 
 
 class FakeTransport:
@@ -29,7 +38,7 @@ class FakeTransport:
 
 
 def run_reminder(transport, action, event=None):
-    action = {"type": "slack_add_reminder", "credential_id": "slack",
+    action = {"type": "slack_add_reminder", "connection_id": "slack",
               "text": "Rotate the {customer} key", **action}
     with patch("src.dapier.connections.credentials.get_credential",
                return_value={"token": "xoxb-test"}):
@@ -84,10 +93,10 @@ class SlackAddReminderTests(unittest.TestCase):
         required, optional = registry.action_specs()["slack_add_reminder"]
         self.assertEqual(required, frozenset({"text"}))
         self.assertEqual(optional,
-                         frozenset({"time", "connection_id", "credential_id"}))
+                         frozenset({"time", "connection_id"}))
         entry = registry.ACTIONS["slack_add_reminder"]
         self.assertEqual([field["key"] for field in entry.fields],
-                         ["connection_id", "text", "time", "credential_id"])
+                         ["connection_id", "text", "time"])
 
 
 if __name__ == "__main__":

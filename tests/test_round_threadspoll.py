@@ -11,6 +11,7 @@ the step-output shape. The registry half checks the new types' field specs
 and that validate_action_chain accepts a valid chain and rejects unknown
 keys.
 """
+import pytest
 import json
 import unittest
 from datetime import datetime, timezone
@@ -25,6 +26,14 @@ from plugins.slack.runners.slack import (
 from plugins.telegram.runners.telegram import run_telegram_send_poll
 
 import src.dapier.connectors  # noqa: F401  (import = registration)
+
+
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
 
 
 SLACK_TOKEN = "xoxb-test"
@@ -75,7 +84,7 @@ def json_body(payload):
 
 
 def run_post(json_request, action, event=None):
-    action = {"type": "slack", "credential_id": "slack", "channel": "C1", **action}
+    action = {"type": "slack", "connection_id": "slack", "channel": "C1", **action}
     with patch("src.dapier.connections.credentials.get_credential",
                return_value={"token": SLACK_TOKEN}), \
          patch("src.dapier.engine.actions.base._json_request",
@@ -124,7 +133,7 @@ class SlackThreadTsTests(unittest.TestCase):
 
 
 def run_schedule(transport, action, event=None, steps=None):
-    action = {"type": "slack_schedule_message", "credential_id": "slack",
+    action = {"type": "slack_schedule_message", "connection_id": "slack",
               "channel": "{channel_id}", "text": "{text}", **action}
     with patch("src.dapier.connections.credentials.get_credential",
                return_value={"token": SLACK_TOKEN}):
@@ -390,7 +399,7 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("thread_ts", slack_optional)
         self.assertEqual(specs["slack_schedule_message"],
                          ({"channel", "text", "post_at"},
-                          {"connection_id", "credential_id", "thread_ts",
+                          {"connection_id", "thread_ts",
                            "unfurl_links", "unfurl_media"}))
         self.assertEqual(specs["telegram_send_poll"],
                          ({"connection_id", "question", "options"},
@@ -454,7 +463,7 @@ class RegistryTests(unittest.TestCase):
              patch("src.dapier.connections.providers.telegram_api._default_transport",
                    transport):
             scheduled = registry.run_action(
-                {"type": "slack_schedule_message", "credential_id": "slack",
+                {"type": "slack_schedule_message", "connection_id": "slack",
                  "channel": "C1", "text": "standup in 5", "post_at": ISO_POST_AT},
                 SLACK_EVENT, "wf-1")
             poll = registry.run_action(

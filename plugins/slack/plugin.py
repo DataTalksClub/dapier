@@ -1,4 +1,4 @@
-"""Slack connector: post and manage messages through a stored credential or
+"""Slack connector: post and manage messages through a Slack
 connection (send — top-level or threaded, scheduled, DM, update, react,
 create-channel, topic, purpose, file upload), plus channel/user discovery,
 the auth.test health check, the Events-API trigger samples (one per declared
@@ -68,11 +68,10 @@ register(Action(
     icon="slack",
     run=lambda action, event, workflow_id, steps=None: run_slack(action, event, steps=steps),
     required=frozenset({"channel"}),
-    optional=frozenset({"credential_id", "connection_id", "text", "unfurl_links",
+    optional=frozenset({"connection_id", "text", "unfurl_links",
                         "unfurl_media", "timeout_seconds", "telegram_format",
                         "source_link", "thread_ts", "username", "link_names", "reply_broadcast"}),
     fields=(
-        {"key": "credential_id", "label": "Credential ID"},
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential"},
         {"key": "channel", "label": "Channel", "placeholder": "#alerts", "required": True,
          "discover": {"resource": "slack.channels"}},
@@ -104,7 +103,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_find(action, event, steps=steps),
     required=frozenset({"query"}),
     optional=frozenset({"find", "create_if_missing", "is_private",
-                        "connection_id", "credential_id", "timeout_seconds"}),
+                        "connection_id", "timeout_seconds"}),
     description=("Looks up one workspace user (by email) or channel (by name). "
                  "Output: {found: true, user: {id, name, real_name, email, tz}} or "
                  "{found: true, channel: {id, name, is_private}}; a miss is "
@@ -125,7 +124,6 @@ register(Action(
          "default": "false",
          "help": "Only used when Create if missing is on"},
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -139,7 +137,7 @@ register(Action(
                  "a miss is {found: false, user: null}."),
     run=lambda action, event, workflow_id, steps=None: run_slack_find_user(action, event, steps=steps),
     required=frozenset({"connection_id", "email"}),
-    optional=frozenset({"credential_id"}),
+    optional=frozenset(),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "required": True},
@@ -147,7 +145,6 @@ register(Action(
          "placeholder": "person@example.com",
          "discover": {"resource": "slack.users"},
          "help": "Rendered from the event; the workspace user with this address"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -162,7 +159,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_update_message(
         action, event, steps=steps),
     required=frozenset({"channel", "ts", "text"}),
-    optional=frozenset({"connection_id", "credential_id"}),
+    optional=frozenset({"connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -175,7 +172,6 @@ register(Action(
                       "params": {"channel": "channel"}}},
         {"key": "text", "label": "New text", "type": "textarea", "required": True,
          "placeholder": "{text} (edited: updated by the workflow)"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -190,7 +186,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_add_reaction(
         action, event, steps=steps),
     required=frozenset({"channel", "timestamp", "reaction"}),
-    optional=frozenset({"connection_id", "credential_id"}),
+    optional=frozenset({"connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -203,7 +199,6 @@ register(Action(
                       "params": {"channel": "channel"}}},
         {"key": "reaction", "label": "Reaction", "required": True,
          "placeholder": "tada", "help": "Emoji name without colons"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -219,7 +214,7 @@ register(Action(
                  "channel, ts}."),
     run=lambda action, event, workflow_id, steps=None: run_slack_dm(action, event, steps=steps),
     required=frozenset({"user_id"}),
-    optional=frozenset({"connection_id", "credential_id", "text", "unfurl_links",
+    optional=frozenset({"connection_id", "text", "unfurl_links",
                         "unfurl_media", "timeout_seconds"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
@@ -231,7 +226,6 @@ register(Action(
         {"key": "text", "label": "Text template", "type": "textarea", "placeholder": "{title}\n{url}"},
         {"key": "unfurl_links", "label": "Unfurl links", "type": "boolean", "default": "true"},
         {"key": "unfurl_media", "label": "Unfurl media", "type": "boolean", "default": "true"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -249,7 +243,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_create_channel(
         action, event, steps=steps),
     required=frozenset({"name"}),
-    optional=frozenset({"connection_id", "credential_id", "is_private"}),
+    optional=frozenset({"connection_id", "is_private"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -257,7 +251,6 @@ register(Action(
          "placeholder": "alerts-{customer}",
          "help": "Rendered from the event, then normalized for Slack"},
         {"key": "is_private", "label": "Private channel", "type": "boolean"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -271,7 +264,7 @@ register(Action(
                  "carries {channel_id}. Output: {ok: true, channel, topic}."),
     run=lambda action, event, workflow_id, steps=None: run_slack_set_topic(action, event, steps=steps),
     required=frozenset({"channel", "topic"}),
-    optional=frozenset({"connection_id", "credential_id"}),
+    optional=frozenset({"connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -279,7 +272,6 @@ register(Action(
          "placeholder": "{channel_id} or #channel",
          "discover": {"resource": "slack.channels"}},
         {"key": "topic", "label": "Topic", "type": "textarea", "required": True},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -294,7 +286,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_set_purpose(
         action, event, steps=steps),
     required=frozenset({"channel", "purpose"}),
-    optional=frozenset({"connection_id", "credential_id"}),
+    optional=frozenset({"connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -302,7 +294,6 @@ register(Action(
          "placeholder": "{channel_id} or #channel",
          "discover": {"resource": "slack.channels"}},
         {"key": "purpose", "label": "Purpose", "type": "textarea", "required": True},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -320,7 +311,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_invite_to_channel(
         action, event, steps=steps),
     required=frozenset({"channel", "users"}),
-    optional=frozenset({"connection_id", "credential_id"}),
+    optional=frozenset({"connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -333,7 +324,6 @@ register(Action(
          "help": "Comma-separated member ids — the picker serves one, more "
                  "can be appended; chain slack_find_user to target the "
                  "person an event names"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -349,7 +339,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_pin_message(
         action, event, steps=steps),
     required=frozenset({"channel", "timestamp"}),
-    optional=frozenset({"connection_id", "credential_id"}),
+    optional=frozenset({"connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -360,7 +350,6 @@ register(Action(
          "placeholder": "{ts}", "help": "The timestamp id of the message to pin",
          "discover": {"resource": "slack.messages",
                       "params": {"channel": "channel"}}},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -378,7 +367,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_find_message(
         action, event, steps=steps),
     required=frozenset({"query"}),
-    optional=frozenset({"count", "connection_id", "credential_id"}),
+    optional=frozenset({"count", "connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -387,7 +376,6 @@ register(Action(
          "help": "Rendered from the event; searches like Slack's search box"},
         {"key": "count", "label": "Max results", "type": "number",
          "help": "1-100, default 20"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -406,7 +394,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_upload_file(
         action, event, steps=steps),
     required=frozenset({"channel", "filename"}),
-    optional=frozenset({"connection_id", "credential_id", "source_url",
+    optional=frozenset({"connection_id", "source_url",
                         "source_s3", "content", "title", "initial_comment",
                         "thread_ts", "content_type"}),
     fields=(
@@ -434,7 +422,6 @@ register(Action(
                       "params": {"channel": "channel"}}},
         {"key": "content_type", "label": "Content type",
          "placeholder": "guessed from the file name"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -451,7 +438,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_schedule_message(
         action, event, steps=steps),
     required=frozenset({"channel", "text", "post_at"}),
-    optional=frozenset({"connection_id", "credential_id", "thread_ts",
+    optional=frozenset({"connection_id", "thread_ts",
                         "unfurl_links", "unfurl_media"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
@@ -472,7 +459,6 @@ register(Action(
          "help": "Schedules the message as a reply in that thread"},
         {"key": "unfurl_links", "label": "Unfurl links", "type": "boolean", "default": "true"},
         {"key": "unfurl_media", "label": "Unfurl media", "type": "boolean", "default": "true"},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -490,7 +476,7 @@ register(Action(
     run=lambda action, event, workflow_id, steps=None: run_slack_add_reminder(
         action, event, steps=steps),
     required=frozenset({"text"}),
-    optional=frozenset({"time", "connection_id", "credential_id"}),
+    optional=frozenset({"time", "connection_id"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential",
          "provider": "slack"},
@@ -500,7 +486,6 @@ register(Action(
          "placeholder": "in 20 minutes / tomorrow 9am / 1759400000",
          "help": ("Natural language or epoch seconds; renders from the "
                   "event. Empty = Slack's default (20 minutes)")},
-        {"key": "credential_id", "label": "Credential ID"},
     ),
 ))
 
@@ -658,11 +643,9 @@ register_trigger_discovery(TriggerDiscovery(
 
 
 def _fetch_channel_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
-    """Channel options via the registry listing; falls back to the stored
-    shared ``slack`` credential when no connection is connected yet."""
+    """Channel options via the registry listing."""
     return trigger_discovery.options_from_registry(
         "slack.channels", connection_id, limit, provider="slack",
-        credential_fallback="slack",
         option_of=lambda item: {"value": item.get("id"),
                                 "label": f"#{item.get('name') or item.get('id')}"})
 
@@ -681,12 +664,10 @@ def _person_option(item):
 
 
 def _fetch_user_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
-    """User options via the registry listing; falls back to the stored shared
-    ``slack`` credential like the channel options. The value is the member
-    id the find-user action stores, labeled with name and handle."""
+    """User options via the registry listing. The value is the member id the
+    find-user action stores, labeled with name and handle."""
     return trigger_discovery.options_from_registry(
         "slack.users", connection_id, limit, provider="slack",
-        credential_fallback="slack",
         option_of=_person_option)
 
 
@@ -701,7 +682,6 @@ def _fetch_message_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
     value is the message ts, labeled with its text."""
     return trigger_discovery.options_from_registry(
         "slack.messages", connection_id, limit, provider="slack",
-        credential_fallback="slack",
         params=trigger_discovery.listing_params(event, ("channel",)),
         option_of=lambda item: {"value": item.get("ts") or item.get("id"),
                                 "label": item.get("name") or item.get("id")})

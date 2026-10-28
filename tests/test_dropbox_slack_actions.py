@@ -7,6 +7,7 @@ Unit tests drive the registered run callables with a fake transport; the
 connection/credential lookups are patched, matching the sibling action
 tests (test_find_slack_dropbox.py, test_action_breadth.py).
 """
+import pytest
 import json
 import unittest
 from unittest.mock import patch
@@ -25,6 +26,14 @@ from plugins.slack.runners.slack import (
     run_slack_set_purpose,
     run_slack_set_topic,
 )
+
+
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
 
 
 class FakeTransport:
@@ -159,7 +168,7 @@ SLACK_TOKEN = {"token": "xoxb-test"}
 
 class SlackDmTests(unittest.TestCase):
     def run_dm(self, transport, action, event=None):
-        action = {"credential_id": "slack", **action}
+        action = {"connection_id": "slack", **action}
         with patch("src.dapier.connections.credentials.get_credential",
                    return_value=SLACK_TOKEN):
             return run_slack_dm(action, event or {"data": {}},
@@ -204,7 +213,7 @@ class SlackDmTests(unittest.TestCase):
 
 class SlackCreateChannelTests(unittest.TestCase):
     def run_create(self, transport, action, event=None):
-        action = {"credential_id": "slack", **action}
+        action = {"connection_id": "slack", **action}
         with patch("src.dapier.connections.credentials.get_credential",
                    return_value=SLACK_TOKEN):
             return run_slack_create_channel(action, event or {"data": {}},
@@ -246,7 +255,7 @@ class SlackCreateChannelTests(unittest.TestCase):
 
 class SlackSetTopicPurposeTests(unittest.TestCase):
     def run_set(self, runner, transport, action, event=None):
-        action = {"credential_id": "slack", **action}
+        action = {"connection_id": "slack", **action}
         with patch("src.dapier.connections.credentials.get_credential",
                    return_value=SLACK_TOKEN):
             return runner(action, event or {"data": {}}, transport=transport)

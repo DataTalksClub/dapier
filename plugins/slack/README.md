@@ -112,7 +112,7 @@ that relied on mentions firing `message.received` should re-filter on
 
 ## Actions
 
-All Slack actions take `connection_id` (or a bare `credential_id`) and
+All Slack actions take `connection_id` and
 render text fields from the event. Channel and message fields of the
 maintenance actions prefill from a Slack trigger envelope: `{channel_id}`
 and `{ts}`.

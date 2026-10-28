@@ -258,7 +258,7 @@ class RegistryTests(unittest.TestCase):
                           frozenset({"value_input_option"})))
         self.assertEqual(specs["slack_find_user"],
                          (frozenset({"connection_id", "email"}),
-                          frozenset({"credential_id"})))
+                          frozenset()))
 
     def test_chain_validation_accepts_find_then_update(self):
         validate_action_chain([
@@ -300,7 +300,7 @@ class RegistryTests(unittest.TestCase):
                                    "column", "value", "limit"}),
             ("sheets_update_row", {"connection_id", "spreadsheet_id", "worksheet",
                                    "row", "values", "value_input_option"}),
-            ("slack_find_user", {"connection_id", "email", "credential_id"}),
+            ("slack_find_user", {"connection_id", "email"}),
         ):
             self.assertIn(action_type, entries)
             self.assertEqual(

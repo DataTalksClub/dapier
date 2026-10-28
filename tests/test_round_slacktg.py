@@ -384,11 +384,11 @@ def test_pin_message_requires_a_message_id(monkeypatch):
 
 ROUND_ACTION_SPECS = {
     "slack_invite_to_channel": ({"channel", "users"},
-                                {"connection_id", "credential_id"}),
+                                {"connection_id"}),
     "slack_pin_message": ({"channel", "timestamp"},
-                          {"connection_id", "credential_id"}),
+                          {"connection_id"}),
     "slack_find_message": ({"query"},
-                           {"count", "connection_id", "credential_id"}),
+                           {"count", "connection_id"}),
     "telegram_edit_message": ({"connection_id", "message_id", "text"},
                               {"chat_id", "timeout_seconds"}),
     "telegram_pin_message": ({"connection_id", "message_id"},

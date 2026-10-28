@@ -6,6 +6,7 @@ Unit tests drive the registered runner with a URL-routed fake transport
 and the credential lookup patched, matching the sibling slack action tests
 (test_slack_actions.py).
 """
+import pytest
 import json
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,14 @@ from unittest.mock import patch
 from src.dapier.connectors import registry
 import plugins.slack.plugin as slack_connector  # noqa: F401 (registers)
 from plugins.slack.runners.slack import run_slack_upload_file
+
+
+@pytest.fixture(autouse=True)
+def _slack_connection_credential(monkeypatch):
+    """Slack connection "slack" stores its token under credential "slack"."""
+    from plugins.slack.runners import slack as slack_runner
+
+    monkeypatch.setattr(slack_runner, "_connection_credential_id", lambda connection_id: connection_id)
 
 GET_URL_URL = "https://slack.com/api/files.getUploadURLExternal"
 COMPLETE_URL = "https://slack.com/api/files.completeUploadExternal"
@@ -45,7 +54,7 @@ def json_body(payload):
 
 
 def run_upload(transport, action, event=None):
-    action = {"type": "slack_upload_file", "credential_id": "slack",
+    action = {"type": "slack_upload_file", "connection_id": "slack",
               "channel": "#reports", "filename": "report.pdf",
               "content": "hello world", **action}
     with patch("src.dapier.connections.credentials.get_credential",

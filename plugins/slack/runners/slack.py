@@ -35,17 +35,22 @@ _CHANNEL_PAGES = 3
 _CHANNEL_NAME_BAD_CHARS = re.compile(r"[^a-z0-9_-]")
 
 
-def _token_for(action):
-    credential_id = action.get("credential_id")
-    if action.get("connection_id"):
-        import boto3
+def _connection_credential_id(connection_id):
+    """The credential id the named Slack connection stores its token under."""
+    import boto3
 
-        item = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).get_item(
-            Key={"connection_id": action["connection_id"]},
-        ).get("Item") or {}
-        credential_id = item.get("credential_id") or credential_id
+    item = boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).get_item(
+        Key={"connection_id": connection_id},
+    ).get("Item") or {}
+    return item.get("credential_id")
+
+
+def _token_for(action):
+    if not action.get("connection_id"):
+        raise ValueError("Slack action needs a connection_id")
+    credential_id = _connection_credential_id(action["connection_id"])
     if not credential_id:
-        raise ValueError("Slack action needs a connection_id or credential_id")
+        raise ValueError(f"Slack connection {action['connection_id']!r} has no credential")
     secret = credentials.get_credential(credential_id)
     token = (secret.get("token") or secret.get("access_token")
              or secret.get("bot_token")
