@@ -63,3 +63,12 @@ def header(event, name):
         (str(value) for key, value in (event.get("headers") or {}).items() if key.lower() == expected),
         "",
     )
+
+def bearer_token(event):
+    """The request's bearer token, or "" when absent or not a bearer header
+    (matched case-insensitively — API Gateway keeps whatever case the client
+    sent)."""
+    scheme, _, token = header(event, "authorization").partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return ""
+    return token.strip()

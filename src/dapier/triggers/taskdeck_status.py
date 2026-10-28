@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 from dapier_cli import __version__
 
+from ..http import bearer_token
 from . import schedule_triggers
 
 CONTRACT_VERSION = 1
@@ -219,22 +220,10 @@ def _authorised(event):
         return False
     if not expected:
         return False
-    supplied = _bearer(event)
+    supplied = bearer_token(event)
     if not supplied:
         return False
     return hmac.compare_digest(supplied.encode(), expected.encode())
-
-
-def _bearer(event):
-    """The request's bearer token, matched case-insensitively (API Gateway
-    keeps whatever case the client sent)."""
-    headers = event.get("headers") or {}
-    value = next(
-        (str(item) for key, item in headers.items() if key.lower() == "authorization"), "")
-    scheme, _, token = value.partition(" ")
-    if scheme.lower() != "bearer":
-        return ""
-    return token.strip()
 
 
 def api_status(event, *, table_ref=None, now=None, workflows=None):

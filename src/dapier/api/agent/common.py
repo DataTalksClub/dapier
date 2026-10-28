@@ -31,6 +31,7 @@ class _LateBinding:
 
 from ...auth import actors, api_tokens, authz, device_sessions, visibility
 from ...auth.dtc_auth import auth_config
+from ...http import bearer_token as _bearer
 from .. import designer_store
 
 audit = _LateBinding("audit")
@@ -89,17 +90,6 @@ def _check_rate_key(key, limit, *, window=RATE_WINDOW_SECONDS, now=None):
 
 def _client_ip(event):
     return (event.get("requestContext", {}).get("http", {}) or {}).get("sourceIp", "")
-
-
-def _bearer(event):
-    headers = event.get("headers") or {}
-    value = next(
-        (str(v) for k, v in headers.items() if k.lower() == "authorization"), "",
-    )
-    scheme, _, token = value.partition(" ")
-    if scheme.lower() != "bearer" or not token.strip():
-        return ""
-    return token.strip()
 
 
 def authenticate(event):
