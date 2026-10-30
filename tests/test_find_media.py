@@ -342,10 +342,12 @@ def test_zoom_find_recording_by_meeting_id():
          {"id": 9001, "topic": "Standup", "start_time": "2026-09-28T09:00:00Z",
           "duration": 30,
           "recording_files": [
-              {"id": "f-1", "file_type": "MP4", "file_size": 1024,
+              {"id": "f-1", "file_type": "MP4", "recording_type": "shared_screen_with_speaker_view",
+               "status": "completed", "file_size": 1024,
                "play_url": "https://zoom.us/rec/play/f-1",
                "download_url": "https://zoom.us/rec/download/f-1",
-               "recording_start": "2026-09-28T09:00:00Z"}]}))
+               "recording_start": "2026-09-28T09:00:00Z",
+               "recording_end": "2026-09-28T09:30:00Z"}]}))
 
     output = run_zoom_recording({"meeting_id": "9001"}, transport)
 
@@ -353,9 +355,30 @@ def test_zoom_find_recording_by_meeting_id():
     assert output["count"] == 1
     assert output["recording"]["id"] == "9001"
     assert output["recording"]["files"][0]["download_url"] == "https://zoom.us/rec/download/f-1"
+    assert output["recording"]["files"][0]["status"] == "completed"
+    assert output["recording"]["files"][0]["recording_type"] == "shared_screen_with_speaker_view"
+    assert output["recording"]["files"][0]["recording_end"] == "2026-09-28T09:30:00Z"
     call = transport.calls[0]
     assert call["url"] == "https://api.zoom.us/v2/meetings/9001/recordings"
     assert call["headers"]["authorization"] == "Bearer tok"
+
+
+def test_zoom_find_recording_follows_next_page_token():
+    transport = FakeTransport(
+        ("next_page_token=p2", 200, {"meetings": [
+            {"id": 9005, "topic": "Older", "recording_files": [
+                {"id": "vtt-5", "file_type": "TRANSCRIPT", "status": "completed"}]}]}),
+        ("users/me/recordings", 200, {"next_page_token": "p2", "meetings": [
+            {"id": 9004, "topic": "Newest", "recording_files": [
+                {"id": "f-4", "file_type": "MP4", "status": "completed"}]}]}),
+    )
+
+    output = run_zoom_recording({}, transport)
+
+    assert output["count"] == 2
+    assert [r["id"] for r in output["recordings"]] == ["9004", "9005"]
+    assert output["recordings"][1]["files"][0]["status"] == "completed"
+    assert len(transport.calls) == 2
 
 
 def test_zoom_find_recording_unknown_meeting_is_a_verdict():

@@ -183,14 +183,20 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
     try:
         message = json.loads(body)
     except (ValueError, UnicodeDecodeError):
+        if refuse:
+            refuse("invalid JSON")
         return 400, {"error": "invalid JSON"}
     if not isinstance(message, dict):
+        if refuse:
+            refuse("invalid Zoom event")
         return 400, {"error": "invalid Zoom event"}
     event = message.get("event")
     if event == "endpoint.url_validation":
         challenge = message.get("payload")
         plain = challenge.get("plainToken") if isinstance(challenge, dict) else None
         if not isinstance(plain, str) or not plain or len(plain) > 512:
+            if refuse:
+                refuse("invalid validation token", message)
             return 400, {"error": "invalid validation token"}
         if connection.get("status") != records.STATUS_CONNECTED:
             updated = dict(connection)
@@ -212,6 +218,8 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
             return 200, {"accepted": False}
         account_id = data.get("account_id")
         if not account_id or not data.get("meeting_uuid") or not message.get("event_ts"):
+            if refuse:
+                refuse("incomplete Zoom recording event", message)
             return 400, {"error": "incomplete Zoom recording event"}
         # recording.completed keeps its original dedup identity (no event
         # name); the newer events name themselves so one meeting can complete
@@ -226,6 +234,8 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
         if (data is None or not account_id or not data.get("meeting_uuid")
                 or not data.get("meeting_id") or not data.get("registrant_id")
                 or not message.get("event_ts")):
+            if refuse:
+                refuse("incomplete Zoom registration event", message)
             return 400, {"error": "incomplete Zoom registration event"}
         # Per-registrant identity: two sign-ups for one meeting or webinar at
         # the same event_ts are distinct deliveries.
@@ -238,6 +248,8 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
         account_id = (data or {}).get("account_id")
         if (data is None or not account_id or not data.get("uuid")
                 or not data.get("id") or not message.get("event_ts")):
+            if refuse:
+                refuse("incomplete Zoom meeting event", message)
             return 400, {"error": "incomplete Zoom meeting event"}
         identity = f"{connection_id}:{event}:{data.get('uuid')}:{message.get('event_ts')}"
     try:

@@ -102,10 +102,13 @@ def _recording_view(meeting):
         files.append({
             "id": item.get("id"),
             "file_type": item.get("file_type"),
+            "recording_type": item.get("recording_type"),
+            "status": item.get("status"),
             "file_size": item.get("file_size"),
             "play_url": item.get("play_url"),
             "download_url": item.get("download_url"),
             "recording_start": item.get("recording_start"),
+            "recording_end": item.get("recording_end"),
         })
     return {
         "id": str(meeting.get("id")),

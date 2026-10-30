@@ -475,3 +475,27 @@ def test_zoom_handle_reports_unconfigured_and_binding_refusals(monkeypatch):
     assert status == 403
     assert refusals[-1][0] == "Zoom account does not match connection"
     assert refusals[-1][1]["event"] == "recording.completed"
+
+    # Malformed and incomplete signed deliveries also record refusals so no
+    # 400 rejection from a known Zoom connection is invisible in the inbox.
+    bad_json_stamp = str(int(time.time()))
+    bad_json_sig = hmac.new(
+        b"zoom-secret-123456", b"v0:" + bad_json_stamp.encode() + b":not-json",
+        hashlib.sha256).hexdigest()
+    assert zoom_webhooks.handle(
+        "zoom",
+        {"X-Zm-Request-Timestamp": bad_json_stamp, "X-Zm-Signature": f"v0={bad_json_sig}"},
+        b"not-json", connections_table=table,
+        publish=lambda *a, **k: None, refuse=refuse) == (400, {"error": "invalid JSON"})
+    assert refusals[-1] == ("invalid JSON", None)
+
+    inc_body, inc_headers = signed({
+        "event": "recording.transcript_completed",
+        "payload": {"account_id": "account-1", "object": {
+            "id": 123, "uuid": "u",
+            "recording_files": [{"id": "vtt", "file_type": "TRANSCRIPT"}]}}})
+    assert zoom_webhooks.handle(
+        "zoom", inc_headers, inc_body, connections_table=table,
+        publish=lambda *a, **k: None, refuse=refuse) == (400, {"error": "incomplete Zoom recording event"})
+    assert refusals[-1][0] == "incomplete Zoom recording event"
+    assert refusals[-1][1]["event"] == "recording.transcript_completed"

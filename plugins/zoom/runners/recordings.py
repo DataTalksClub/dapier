@@ -51,18 +51,26 @@ def _find_recording_by_topic(action, event, steps, access_token, *, transport=No
     if mode not in MATCH_MODES:
         raise ValueError("match must be one of: contains, exact")
     since = (datetime.now(timezone.utc) - timedelta(days=30)).date().isoformat()
-    status, data = _get_json(
-        access_token,
-        "/users/me/recordings?" + urllib.parse.urlencode({"from": since, "per_page": 300}),
-        transport=transport,
-    )
-    if status >= 300:
-        _raise_zoom_error("zoom recording list", status, data)
-    recordings = [
-        _recording_view(meeting)
-        for meeting in data.get("meetings") or []
-        if isinstance(meeting, dict) and meeting.get("id")
-    ]
+    meetings = []
+    params = {"from": since, "per_page": 300}
+    for _page in range(3):
+        status, data = _get_json(
+            access_token,
+            "/users/me/recordings?" + urllib.parse.urlencode(params),
+            transport=transport,
+        )
+        if status >= 300:
+            _raise_zoom_error("zoom recording list", status, data)
+        page = [
+            meeting for meeting in data.get("meetings") or []
+            if isinstance(meeting, dict) and meeting.get("id")
+        ]
+        meetings.extend(page)
+        next_page = data.get("next_page_token")
+        if not page or not next_page:
+            break
+        params = {**params, "next_page_token": next_page}
+    recordings = [_recording_view(meeting) for meeting in meetings]
     topic = render(str(action.get("topic") or ""), event, steps).strip()
     if topic:
         recordings = [r for r in recordings if _topic_matches(r.get("topic"), topic.lower(), mode)]
