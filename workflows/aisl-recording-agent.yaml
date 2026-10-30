@@ -1,7 +1,7 @@
 # Zoom recording router: a Zoom cloud recording.transcript_completed webhook fires a
 # decision step (one typed call to OpenRouter's decisions endpoint, keyed by
 # the stored openrouter credential) that classifies the
-# recording after its transcript is archived and runs the matching agent in its own
+# recording after its transcript is archived and runs the matching Hub session in its own
 # workspace: one-on-one calls land in the zoom-calls repo, AI Shipping Labs
 # sessions go through the platform's recording pipeline.
 # Reference copy of the live workflow (save/publish via `dapier workflows`).
@@ -70,11 +70,12 @@ actions:
           mentoring session, interview, coaching call, or personal sync).
         actions:
           - id: process-call
-            type: agent
-            engine: claude
+            type: hub_session
+            workspace: zoom-calls
             notify_to: alexey@datatalks.club
             notify_from: agents@dtcdev.click
-            prompt: |
+            title: "Zoom 1x1 recording: {topic | truncate:50}"
+            text: |
               You are the one-on-one Zoom recording processor. A Zoom cloud
               recording transcript is ready. Work autonomously and finish with a
               report; do not ask questions.
@@ -114,17 +115,20 @@ actions:
 
               4. Report, in this order: the transcript and summary paths, the
               commit, and any blocker. Do not delete or cancel anything.
+            acceptance_criteria: |
+              Download or reuse the transcript and saved meeting chat in /home/alexey/git/zoom-calls, write the summary following the repository template with exact chat resource URLs, commit and push to origin/master, and report transcript path, summary path, commit SHA, and any blocker.
       - choice: ai-shipping-labs
         description: >
           An AI Shipping Labs session: cohort lecture, workshop, guest talk,
           office hours, or any call linked to an AI Shipping Labs event.
         actions:
           - id: process-recording
-            type: agent
-            engine: claude
+            type: hub_session
+            workspace: ai-shipping-labs
             notify_to: alexey@datatalks.club
             notify_from: agents@dtcdev.click
-            prompt: |
+            title: "AISL recording: {topic | truncate:50}"
+            text: |
               You are the AI Shipping Labs recording processor. A Zoom cloud
               recording transcript is ready. Work autonomously and finish with a
               report; do not ask questions.
@@ -183,6 +187,8 @@ actions:
               7. Report, in this order: event slug and title, recording upload
               status, transcript status, recap URL, event page URL, and any
               blocker.
+            acceptance_criteria: |
+              Match the single AI Shipping Labs event for zoom_meeting_id {meeting_id}, ensure recording upload and transcript sync via the production API, produce and save the recap through the event's source of truth, verify the recap URL and event page recording card, and report event slug/title, upload status, transcript status, recap URL, event page URL, and any blocker.
 trigger:
   connector: zoom
   event: recording.transcript_completed

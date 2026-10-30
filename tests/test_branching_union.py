@@ -307,6 +307,12 @@ def test_aisl_recording_agent_workflow_file_is_valid():
     assert "otherwise" in decision["choices"]
     otherwise = next(case for case in decision["cases"] if case["choice"] == "otherwise")
     assert otherwise["actions"] == []
+    one_on_one = next(case for case in decision["cases"] if case["choice"] == "one-on-one")
+    assert one_on_one["actions"][0]["type"] == "hub_session"
+    assert one_on_one["actions"][0]["workspace"] == "zoom-calls"
+    aisl = next(case for case in decision["cases"] if case["choice"] == "ai-shipping-labs")
+    assert aisl["actions"][0]["type"] == "hub_session"
+    assert aisl["actions"][0]["workspace"] == "ai-shipping-labs"
     descriptions = {case["choice"]: case.get("description") for case in decision["cases"]}
     assert descriptions["one-on-one"] and "one other person" in descriptions["one-on-one"]
     assert descriptions["ai-shipping-labs"] and "AI Shipping Labs" in descriptions["ai-shipping-labs"]

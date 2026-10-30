@@ -215,18 +215,20 @@ actions:
         description: a recorded call between two people
         actions:
           - id: process-call
-            type: agent
-            engine: claude
-            workspace: /home/alexey/git/zoom-calls
-            prompt: "Process this one-on-one recording: {topic} ..."
+            type: hub_session
+            workspace: zoom-calls
+            title: "Zoom 1x1 recording: {topic}"
+            text: "Process this one-on-one recording: {topic} ..."
+            acceptance_criteria: "Save transcript and summary in zoom-calls and push to origin/master."
       - choice: ai-shipping-labs
         description: an AI Shipping Labs session — cohort lecture, workshop, or guest talk
         actions:
           - id: process-aisl
-            type: agent
-            engine: claude
-            workspace: /home/alexey/git/ai-shipping-labs
-            prompt: "Process this AI Shipping Labs recording ..."
+            type: hub_session
+            workspace: ai-shipping-labs
+            title: "AISL recording: {topic}"
+            text: "Process this AI Shipping Labs recording ..."
+            acceptance_criteria: "Sync recording/transcript and publish event recap."
     default_actions:
       - id: ask-operator
         type: email_send

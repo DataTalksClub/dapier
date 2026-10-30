@@ -19736,7 +19736,7 @@
           key: "cases",
           label: "Cases (YAML, switch)",
           type: "yaml",
-          placeholder: "- choice: one-on-one\n  description: a recorded call between two people\n  actions:\n    - id: process-call\n      type: agent\n      workspace: /home/alexey/git/zoom-calls\n- choice: ai-shipping-labs\n  actions: []"
+          placeholder: "- choice: one-on-one\n  description: a recorded call between two people\n  actions:\n    - id: process-call\n      type: hub_session\n      workspace: zoom-calls\n- choice: ai-shipping-labs\n  actions: []"
         },
         {
           key: "default_actions",

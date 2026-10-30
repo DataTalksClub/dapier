@@ -1,0 +1,22 @@
+# Webhook agent-redo relay: launches a headless Hub session in workspace
+# dapier-agents and emails the completion report to {body.notify_to}.
+# {body.prompt} is truncated to 1800 characters (at most 7200 UTF-8 bytes) to fit Hub's 8000-byte intake text limit.
+id: agent-relay
+enabled: true
+trigger:
+  connector: webhook
+  event: request.received
+  filters:
+    hook:
+      equals: agent-redo
+actions:
+  - id: run
+    type: hub_session
+    workspace: dapier-agents
+    project: dapier-agents
+    attachments: "off"
+    notify_from: agents@dtcdev.click
+    notify_to: '{body.notify_to}'
+    title: "Agent relay task"
+    text: '{body.prompt | truncate:1800}'
+    acceptance_criteria: "Complete the requested task in the instructions, verify the result, and report the deliverables, commit/evidence links, and any blocker."

@@ -274,3 +274,65 @@ def test_cli_can_save_hub_session_through_shared_workflow_api(monkeypatch, tmp_p
     monkeypatch.setattr(commands.api, "call", call)
     assert main.main(["workflows", "save", str(path)]) == 0
     assert calls == [("PUT", "/api/agent/designer/workflows")]
+
+
+def test_migrated_repo_workflows_use_hub_session_and_fit_hub_limits(monkeypatch):
+    import json
+    from pathlib import Path
+    from plugins.hub import attachments as hub_attachments
+    from plugins.hub.session import build_request
+    from src.dapier.api.designer_store.validation import parse_workflow
+
+    repo_root = Path(__file__).resolve().parents[3]
+    root = repo_root / "workflows"
+    email_wf = parse_workflow((root / "email-trigger-agents.yaml").read_text(encoding="utf-8"))
+    assert email_wf["actions"][0]["type"] == "hub_session"
+    assert email_wf["actions"][0]["workspace"] == "dapier-agents"
+    monkeypatch.setattr(
+        hub_attachments,
+        "links",
+        lambda action, event: [
+            {"filename": f"att-{idx}.pdf", "download_url": f"https://s3.eu-west-1.amazonaws.com/b/k/{idx}?X-Amz-Security-Token={'T' * 950}"}
+            for idx in range(2)
+        ] if hub_attachments.enabled(action.get("attachments", "on")) else [],
+    )
+    req = build_request(
+        email_wf["actions"][0],
+        {
+            "id": "evt-email",
+            "data": {
+                "subject": "🚀" * 300,
+                "body": {"text": {"value": "Я" * 20000}},
+            },
+        },
+        email_wf["id"],
+    )
+    assert req["session"]["workspace"] == "dapier-agents"
+    assert len(req["create"]["title"].encode("utf-8")) <= 240
+    assert len(req["create"]["text"].encode("utf-8")) <= 8000
+    assert len(req["session"]["brief"].encode("utf-8")) < 8192
+    assert "att-1.pdf" in req["create"]["text"]
+
+    docs_wf = json.loads((repo_root / "docs" / "agents-workflow.json").read_text(encoding="utf-8"))
+    assert docs_wf["actions"] == email_wf["actions"]
+
+    relay_wf = parse_workflow((root / "agent-relay.yaml").read_text(encoding="utf-8"))
+    assert relay_wf["actions"][0]["type"] == "hub_session"
+    assert relay_wf["actions"][0]["workspace"] == "dapier-agents"
+    relay_req = build_request(
+        relay_wf["actions"][0],
+        {"id": "evt-relay", "data": {"body": {"prompt": "🚀" * 5000, "notify_to": "dev@dtcdev.click"}}},
+        relay_wf["id"],
+    )
+    assert relay_req["completion"]["notify_to"] == "dev@dtcdev.click"
+    assert len(relay_req["create"]["text"].encode("utf-8")) <= 8000
+
+    aisl_wf = parse_workflow((root / "aisl-recording-agent.yaml").read_text(encoding="utf-8"))
+    cases = {c["choice"]: c["actions"][0] for c in aisl_wf["actions"][1]["cases"] if c["actions"]}
+    assert cases["one-on-one"]["type"] == "hub_session"
+    assert cases["one-on-one"]["workspace"] == "zoom-calls"
+    assert cases["ai-shipping-labs"]["type"] == "hub_session"
+    assert cases["ai-shipping-labs"]["workspace"] == "ai-shipping-labs"
+    for yaml_path in root.glob("*.yaml"):
+        assert "type: agent" not in yaml_path.read_text(encoding="utf-8")
+    assert '"type": "agent"' not in (repo_root / "docs" / "agents-workflow.json").read_text(encoding="utf-8")
