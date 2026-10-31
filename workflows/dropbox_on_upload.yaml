@@ -1,29 +1,23 @@
-# Migration draft; save through dapier workflows save. No cutover is authorized.
 id: dropbox_on_upload
-enabled: false
+enabled: true
 actions:
 - id: processing-date
   type: date_time
   timezone: UTC
   format: '%Y-%m-%d'
-- id: rename-file
-  type: dropbox_move
-  connection_id: dropbox
-  from_path: '{path}'
-  to_path: /_dtc_paperwork/invoices-landing/{steps.processing-date.output.formatted}-{path|split:/:-1}
-  autorename: false
 - id: move-file
   type: dropbox_move
   connection_id: dropbox
-  from_path: '{steps.rename-file.output.item.path}'
-  to_path: /_dtc_paperwork/invoices/{steps.processing-date.output.formatted}-{path|split:/:-1}
+  from_path: '{path}'
+  # Prefix the processing date unless the name already starts with YYYY-MM-DD-.
+  to_path: /_dtc_paperwork/invoices/{steps.processing-date.output.formatted}-{path|split:/:-1|regex_extract:^(?:[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-)?(.+)$}
   autorename: false
 - id: intake-invoice
   type: dataops
   connection_id: dataops
   auth_secret_id: dapier.dataops
   dropbox_connection_id: dropbox
-  path: '{steps.move-file.output.item.path}'
+  path: '{steps.move-file.output.moved}'
 trigger:
   connector: dropbox
   event: file.created
