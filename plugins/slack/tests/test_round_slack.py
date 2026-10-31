@@ -235,6 +235,27 @@ def test_poll_fetch_failure_is_a_runtime_error(monkeypatch):
     assert "slack poll failed" in str(excinfo.value)
 
 
+def test_poll_token_reads_the_oauth_access_token_shape(monkeypatch):
+    # OAuth connections store access_token (no pasted token); the poll source
+    # must resolve it exactly like the actions' runner does.
+    configure_connections(monkeypatch, [SLACK_CONNECTION],
+                          credentials=lambda key: {"access_token": "xoxp-oauth"})
+    transport = _history_transport(HISTORY)
+    item = {"poll_id": "p", "connection_id": "slack-conn", "channel_id": "C1"}
+    poll_sources.resolve("slack.messages").fetch(
+        item, "1758900012.000200", transport=transport)
+    assert transport.calls[0]["headers"]["authorization"] == "Bearer xoxp-oauth"
+
+
+def test_poll_token_still_needs_a_stored_token(monkeypatch):
+    configure_connections(monkeypatch, [SLACK_CONNECTION],
+                          credentials=lambda key: {})
+    item = {"poll_id": "p", "connection_id": "slack-conn", "channel_id": "C1"}
+    with pytest.raises(RuntimeError) as excinfo:
+        poll_sources.resolve("slack.messages").fetch(item, None)
+    assert "no stored bot token" in str(excinfo.value)
+
+
 def test_poll_fetch_needs_its_connection_and_channel():
     with pytest.raises(RuntimeError) as excinfo:
         poll_sources.resolve("slack.messages").fetch({"poll_id": "p"}, None)

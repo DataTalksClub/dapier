@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1 — 2026-10-31
+
+The `slack.messages` poll source now resolves the stored OAuth user token
+(`access_token`) as well as a pasted bot token, exactly like the actions'
+runner — an OAuth-only connection no longer fails the poll with "has no
+stored bot token". The Events-API intake URL (`/hooks/slack/{connection_id}`)
+became reachable: API Gateway now routes POSTs to it (intake 9d9e0a43).
+
 ## 1.1.0 — 2026-10-22
 
 Slack connects through OAuth user-scope consent (`dapier connections

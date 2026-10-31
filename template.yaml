@@ -638,6 +638,12 @@ Resources:
             ApiId: !Ref Api
             Path: '/hooks/zoom/{proxy+}'
             Method: POST
+        SlackEventsHook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: '/hooks/slack/{proxy+}'
+            Method: POST
         WebhookTriggerHook:
           Type: HttpApi
           Properties:
