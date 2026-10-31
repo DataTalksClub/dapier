@@ -78,7 +78,7 @@ class EventQueueAlarmTests(unittest.TestCase):
         for name, props in self.alarms.items():
             self.assertTrue(props["AlarmDescription"], name)
             self.assertIn(props["Namespace"], ("AWS/SQS", "AWS/Lambda", "Dapier/Triggers"), name)
-            quiet = props["MetricName"] == "EmailEventsReceived"
+            quiet = props["MetricName"] in ("EmailEventsReceived", "PollsUnhealthy")
             self.assertEqual("breaching" if quiet else "notBreaching",
                              props["TreatMissingData"], name)
 

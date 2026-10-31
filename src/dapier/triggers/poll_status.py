@@ -163,3 +163,35 @@ def health(item, status, *, now=None):
     if interval and checked and now - checked > timedelta(seconds=interval * LATE_INTERVALS):
         return LATE
     return OK
+
+
+UNHEALTHY_METRIC = "PollsUnhealthy"
+
+
+def unhealthy(items, statuses, *, now=None):
+    """``{poll_id: health}`` for enabled polls that are failing or late —
+    the ones that stopped checking (or keep erroring) without anyone
+    being told."""
+    found = {}
+    for item in items:
+        state = health(item, statuses.get(item.get("poll_id")) or {}, now=now)
+        if state in (FAILING, LATE):
+            found[item.get("poll_id")] = state
+    return found
+
+
+def heartbeat(event, context):
+    """Every few minutes: publish how many enabled polls are failing or
+    late as ``Dapier/Triggers PollsUnhealthy`` (an alarm mails the operator
+    when it stays above zero). Dense zeros keep the alarm able to clear."""
+    import boto3
+    from . import poll_triggers
+
+    items = poll_triggers.load_items()
+    bad = unhealthy(items, {item["poll_id"]: get(item["poll_id"]) for item in items})
+    for poll_id, state in sorted(bad.items()):
+        logger.warning("poll unhealthy", extra={"poll_id": poll_id, "health": state})
+    boto3.client("cloudwatch").put_metric_data(
+        Namespace="Dapier/Triggers", MetricData=[{
+            "MetricName": UNHEALTHY_METRIC, "Value": len(bad), "Unit": "Count"}])
+    return {"unhealthy": bad}

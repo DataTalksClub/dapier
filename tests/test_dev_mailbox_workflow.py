@@ -490,3 +490,35 @@ def test_empty_bearer_header_fails_before_transport(token):
     with pytest.raises(ValueError, match="bearer auth needs"):
         run_http_request({"url": "https://example.invalid/hook", "auth_type": "bearer",
                           "auth_token": token}, {}, transport=transport)
+
+
+def _orin_gmail_event(sender, poll="orin-gmail"):
+    return {"connector": "gmail", "event": "message.received",
+            "data": {"poll": poll, "from": sender, "id": "m1",
+                     "to": "orin@datatalks.club", "subject": "Slack moderation: ban request",
+                     "snippet": "s", "text": "body", "date": "d"}}
+
+
+@pytest.mark.parametrize("sender,expected", [
+    ("Alerts <alerts@dtcdev.click>", True),
+    ("Mod <slack-moderation@dtcdev.click>", True),
+    ("Stranger <x@example.test>", False),
+    ("Orin <orin@datatalks.club>", False),
+])
+def test_orin_gmail_trigger_sender_allowlist(sender, expected):
+    _, wf = _load("orin-mailbox")
+    assert matching.matches(wf, _orin_gmail_event(sender)) is expected
+
+
+def test_orin_gmail_trigger_scoped_to_poll():
+    _, wf = _load("orin-mailbox")
+    assert not matching.matches(wf, _orin_gmail_event("alerts@dtcdev.click", poll="other"))
+
+
+def test_orin_gmail_payload_uses_gmail_id_as_message_id():
+    _, wf = _load("orin-mailbox")
+    code = next(a for a in wf["actions"] if a["id"] == "format-email")["code"]
+    event = _orin_gmail_event("alerts@dtcdev.click")
+    result = run_code({"code": code}, event)["result"]
+    assert result["message_id"] == "m1" and result["from"] == "alerts@dtcdev.click"
+    assert result["to"] == "orin@datatalks.club"

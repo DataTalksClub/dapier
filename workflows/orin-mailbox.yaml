@@ -1,6 +1,6 @@
 id: orin-mailbox
 enabled: true
-description: Orin mailbox orin@dtcdev.click -> Orin Grok bot webhook
+description: Orin mailboxes orin@dtcdev.click and orin@datatalks.club (Gmail poll orin-gmail) -> Orin Grok bot webhook
 triggers:
   - connector: email
     event: message.received
@@ -12,6 +12,22 @@ triggers:
     filters:
       hook:
         equals: orin
+  - connector: gmail
+    event: message.received
+    filters:
+      poll:
+        equals: orin-gmail
+      from:
+        contains: alerts@dtcdev.click
+        does_not_contain: orin@datatalks.club
+  - connector: gmail
+    event: message.received
+    filters:
+      poll:
+        equals: orin-gmail
+      from:
+        contains: slack-moderation@dtcdev.click
+        does_not_contain: orin@datatalks.club
 actions:
   - id: get-url
     type: storage_get
@@ -62,7 +78,7 @@ actions:
 
       subject = input.get("subject") or hook_body.get("subject") or ""
       date = input.get("date") or hook_body.get("date") or ""
-      message_id = input.get("message_id") or hook_body.get("message_id") or ""
+      message_id = input.get("message_id") or input.get("id") or hook_body.get("message_id") or ""
 
       body = input.get("body") or {}
       text = ""
