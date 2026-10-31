@@ -215,3 +215,19 @@ file, try the other one.
   Report what the operator needs to do (see the Calendar scope gap above).
 - Report counts and the minimum content needed. Mail, calendar, and Drive
   content is private.
+
+## Writing to Google Docs: `dapier gdocs`
+
+The Drive connections carry the `documents` scope, so Docs text can be read and
+written with the CLI (token minted in-process, never printed):
+
+```
+dapier gdocs get <doc-url-or-id>                       # title, revision, plain text
+dapier gdocs append <doc> --file text.txt              # or --text "..." or stdin
+dapier gdocs replace <doc> --find "PLACEHOLDER" --text "new"
+```
+
+Default `--as "drive datatalks"` (alexey@datatalks.club); personal docs:
+`--as "drive alexey.s.grigoriev"`. The account must have edit access to the
+doc. Write only when the user asked for that write. Drive files themselves
+(create/share/move) are not covered.

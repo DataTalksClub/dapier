@@ -8,10 +8,10 @@ commands.<handler>.
 import argparse
 
 from . import access, audit, auth, connections, emails, hooks, ops, \
-    polls, runs, schedules, storage, typefully, slack, workflows
+    polls, runs, schedules, storage, typefully, slack, workflows, gdocs
 
 MODULES = (auth, connections, access, ops, runs, audit, storage,
-           workflows, hooks, schedules, polls, emails, typefully, slack)
+           workflows, hooks, schedules, polls, emails, typefully, slack, gdocs)
 
 
 def build_parser():
