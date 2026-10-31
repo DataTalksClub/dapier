@@ -26,8 +26,9 @@ triggers:
       poll:
         equals: orin-gmail
       from:
-        contains: slack-moderation@dtcdev.click
-        does_not_contain: orin@datatalks.club
+        contains: alexey@datatalks.club
+      subject:
+        prefix: "[Automated] Slack ban request: "
 actions:
   - id: get-url
     type: storage_get

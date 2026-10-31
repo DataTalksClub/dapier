@@ -492,16 +492,16 @@ def test_empty_bearer_header_fails_before_transport(token):
                           "auth_token": token}, {}, transport=transport)
 
 
-def _orin_gmail_event(sender, poll="orin-gmail"):
+def _orin_gmail_event(sender, poll="orin-gmail", subject="Slack moderation: ban request"):
     return {"connector": "gmail", "event": "message.received",
             "data": {"poll": poll, "from": sender, "id": "m1",
-                     "to": "orin@datatalks.club", "subject": "Slack moderation: ban request",
+                     "to": "orin@datatalks.club", "subject": subject,
                      "snippet": "s", "text": "body", "date": "d"}}
 
 
 @pytest.mark.parametrize("sender,expected", [
     ("Alerts <alerts@dtcdev.click>", True),
-    ("Mod <slack-moderation@dtcdev.click>", True),
+    ("Mod <slack-moderation@dtcdev.click>", False),
     ("Stranger <x@example.test>", False),
     ("Orin <orin@datatalks.club>", False),
 ])
@@ -522,3 +522,16 @@ def test_orin_gmail_payload_uses_gmail_id_as_message_id():
     result = run_code({"code": code}, event)["result"]
     assert result["message_id"] == "m1" and result["from"] == "alerts@dtcdev.click"
     assert result["to"] == "orin@datatalks.club"
+
+
+def test_orin_gmail_trigger_real_ban_request():
+    _, wf = _load("orin-mailbox")
+    ev = _orin_gmail_event("Alexey Grigorev <alexey@datatalks.club>",
+                           subject="[Automated] Slack ban request: spammer")
+    assert matching.matches(wf, ev) is True
+
+
+def test_orin_gmail_trigger_alexey_other_subject_ignored():
+    _, wf = _load("orin-mailbox")
+    ev = _orin_gmail_event("Alexey Grigorev <alexey@datatalks.club>", subject="Hi Orin")
+    assert matching.matches(wf, ev) is False
