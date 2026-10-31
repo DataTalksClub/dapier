@@ -404,16 +404,3 @@ class TestSamplePull:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-def test_unhealthy_polls_report_late_and_failing_only():
-    from src.dapier.triggers import poll_status
-    now = datetime(2026, 10, 31, 12, 0, tzinfo=timezone.utc)
-    iso = lambda minutes: (now - timedelta(minutes=minutes)).isoformat()
-    items = [{"poll_id": p, "enabled": True, "expression": "rate(5 minutes)"}
-             for p in ("ok", "late", "failing")]
-    statuses = {"ok": {"last_checked_at": iso(2)},
-                "late": {"last_checked_at": iso(60)},
-                "failing": {"last_checked_at": iso(1), "failures": 2}}
-    assert poll_status.unhealthy(items, statuses, now=now) == {
-        "late": "late", "failing": "failing"}

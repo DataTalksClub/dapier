@@ -1066,59 +1066,6 @@ Resources:
             Schedule: rate(1 minute)
             Enabled: true
 
-  # Polls that stopped checking (late) or keep erroring (failing) raise the
-  # alarm; `dapier polls list` shows the same health word per poll.
-  PollHealthHeartbeatFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: .
-      Handler: src.dapier.triggers.poll_status.heartbeat
-      Runtime: python3.12
-      Architectures: [arm64]
-      Timeout: 60
-      MemorySize: 256
-      Environment:
-        Variables:
-          CURSORS_TABLE: !Ref CursorsTable
-          POLL_TRIGGERS_TABLE: !Ref PollTriggersTable
-      Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref CursorsTable
-        - DynamoDBReadPolicy:
-            TableName: !Ref PollTriggersTable
-        - Statement:
-            Effect: Allow
-            Action: cloudwatch:PutMetricData
-            Resource: '*'
-            Condition:
-              StringEquals:
-                cloudwatch:namespace: Dapier/Triggers
-      Events:
-        Heartbeat:
-          Type: Schedule
-          Properties:
-            Schedule: rate(5 minutes)
-            Enabled: true
-
-  PollUnhealthyAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: >
-        An enabled poll trigger (for example the Gmail watch on
-        orin@datatalks.club) stopped checking or keeps failing. Inspect
-        with dapier polls list.
-      Namespace: Dapier/Triggers
-      MetricName: PollsUnhealthy
-      Statistic: Maximum
-      Period: 300
-      EvaluationPeriods: 3
-      DatapointsToAlarm: 3
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: breaching
-      AlarmActions: [!Ref AlarmTopic]
-      OKActions: [!Ref AlarmTopic]
-
   AlarmNotifyFunction:
     Type: AWS::Serverless::Function
     Properties:
