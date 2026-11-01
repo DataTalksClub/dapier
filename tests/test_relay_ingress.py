@@ -173,3 +173,25 @@ def test_display_body_rebuilds_an_empty_body_from_raw_mime(monkeypatch):
 
     assert rehydrated is True
     assert content == inbox.email_body(dict(parsed))
+
+
+def test_s3_pointer_body_parts_are_loaded_inline(monkeypatch):
+    html = b"<table><tr><td>Receipt #0000-0000 Total EUR 30.00</td></tr></table>"
+    fake = _FakeS3({("mail", "processed/x/body.html"): html})
+    monkeypatch.setattr(ingress_module, "_s3", lambda: fake)
+    event = dict(_relay_event(), body={
+        "html": {"content_type": "text/html", "size": len(html),
+                 "s3": {"bucket": "mail", "key": "processed/x/body.html"}},
+        "text": None}, attachments=[])
+    data = ingress_module._normalize_email(event)["data"]
+    assert data["html"]["value"] == html.decode()
+    assert data["body"]["html"]["value"] == html.decode()
+    assert "s3" not in data["html"]
+
+
+def test_unreadable_s3_body_part_stays_a_pointer(monkeypatch):
+    monkeypatch.setattr(ingress_module, "_s3", lambda: _FakeS3({}))
+    pointer = {"content_type": "text/html", "s3": {"bucket": "mail", "key": "gone"}}
+    data = ingress_module._normalize_email(
+        dict(_relay_event(), body={"html": pointer, "text": None}, attachments=[]))["data"]
+    assert data["html"] == pointer

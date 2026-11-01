@@ -68,6 +68,37 @@ def _content_value(text, content_type):
     return {"content_type": content_type, "value": text, "size": len(text.encode())}
 
 
+def _inline_body_parts(body):
+    """Load s3-pointer body parts inline.
+
+    A contract payload may carry ``{"content_type", "s3", "size"}`` parts
+    instead of ``value``. Flow code steps and the renderer read only inline
+    values, so an unloaded part used to surface as an empty body (a blank
+    PDF). Parts are capped like the intake envelope; a part that cannot be
+    fetched stays a pointer so downstream steps fail loudly.
+    """
+    if not isinstance(body, dict):
+        return body
+    from ..triggers.intake import email_ingress
+
+    loaded = dict(body)
+    for name in ("text", "html"):
+        part = body.get(name)
+        pointer = part.get("s3") if isinstance(part, dict) else None
+        if (not isinstance(pointer, dict) or "value" in part
+                or not pointer.get("bucket") or not pointer.get("key")):
+            continue
+        try:
+            raw = _s3().get_object(Bucket=pointer["bucket"], Key=pointer["key"])["Body"].read()
+        except Exception:
+            continue
+        text = raw.decode("utf-8", errors="replace")[:email_ingress.BODY_LIMIT]
+        if text:
+            loaded[name] = _content_value(text, part.get("content_type") or "text/" + (
+                "html" if name == "html" else "plain"))
+    return loaded
+
+
 def _stage_attachments(message, event_id):
     """Stage raw attachment parts into the dapier mail bucket.
 
@@ -162,6 +193,7 @@ def _normalize_email(payload):
                 body = full.get("body")
             if attachments is None:
                 attachments = full.get("attachments")
+    body = _inline_body_parts(body)
     recipients = payload.get("recipients")
     if isinstance(recipients, dict) and "matched" not in recipients:
         recipients = dict(recipients, matched=recipients.get("addresses") or [])
