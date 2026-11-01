@@ -125,3 +125,50 @@ def test_empty_rendered_input_value_fails(queue_run):
 def test_missing_input_fails(queue_run):
     with pytest.raises(ValueError, match="email body object"):
         queue_run(ACTION, {"id": "e", "data": {}})
+
+
+def test_blank_render_input_is_refused(queue_run):
+    for html in ("<pre></pre>", "<html><head><style>p{color:red}</style></head><body>"
+                 "<div>&nbsp;</div><!-- x --></body></html>"):
+        with pytest.raises(ValueError, match="no visible text"):
+            queue_run({**ACTION, "input_value": "{html}"}, {"id": "blank", "data": {"html": html}})
+
+
+
+def test_html_only_forwarded_receipt_pdf_has_extractable_text(queue_run):
+    """The strip step plus a real Chromium render of the redacted fixture."""
+    import io
+    from pathlib import Path
+
+    import yaml
+
+    pypdf = pytest.importorskip("pypdf")
+    sync_playwright = pytest.importorskip("playwright.sync_api").sync_playwright
+    root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load((root / "workflows" / "invoice-intake.yaml").read_text())
+
+    def find(actions):
+        for action in actions:
+            if action.get("id") == "strip-forwarded":
+                return action
+            for branch in ("then", "else"):
+                found = find(action.get(branch, []))
+                if found:
+                    return found
+
+    html = (root / "tests" / "fixtures" / "html_only_receipt.html").read_text()
+    scope = {"input": {"body": {"html": {"value": html}}}}
+    exec(find(workflow["actions"])["code"], scope)
+    put, _, _ = queue_run({**ACTION, "input_value": "{html}"},
+                          {"id": "fixture", "data": {"html": scope["output"]["html"]}})
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            page = browser.new_page()
+            page.set_content(put["Body"].decode())
+            pdf = page.pdf(format="A4", print_background=True)
+            browser.close()
+    except Exception as exc:  # no browser installed in this environment
+        pytest.skip(f"chromium unavailable: {exc}")
+    text = pypdf.PdfReader(io.BytesIO(pdf)).pages[0].extract_text()
+    assert "Receipt #0000-0000" in text and "30.00" in text

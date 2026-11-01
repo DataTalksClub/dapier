@@ -2,7 +2,7 @@
 import json
 import os
 import re
-from html import escape
+from html import escape, unescape
 from html.parser import HTMLParser
 
 
@@ -96,12 +96,29 @@ def _offline_document(source):
     return html.encode("utf-8")
 
 
+def _visible_text(document):
+    """The text a browser would paint from ``document``; empty when blank.
+
+    An embedded image counts as content (its text is a stand-in marker).
+    """
+    if re.search(r"<img\b", document, re.I):
+        return "[image]"
+    text = re.sub(r"<(script|style|head|title)\b.*?</\1\s*>", " ", document,
+                  flags=re.I | re.S)
+    text = re.sub(r"<!--.*?-->|<[^>]*>", " ", text, flags=re.S)
+    text = unescape(text).replace("\xa0", " ")
+    return text.strip()
+
+
 def run_render_job(action, event, workflow_id, steps=None):
     import boto3
 
     data = event.get("data", {})
     job_id = f"{event['id']}:{workflow_id}:{action.get('id', 'render')}"
     source = _offline_document(_render_source(action, event, data, steps))
+    if not _visible_text(source.decode("utf-8")):
+        raise ValueError(f"render input has no visible text; refusing to ship a blank PDF "
+                         f"(job {job_id})")
     s3 = boto3.client("s3")
     input_bucket = os.environ["RENDER_ARTIFACTS_BUCKET"]
     input_key = f"inputs/{job_id.replace('/', '_')}.html"

@@ -418,8 +418,12 @@ actions:
               matched = header_line.match(html, position)
           # Drop the marker's own now-empty wrapper tags: bare closing tags
           # ahead of the cut, then the header block's closers behind it.
-          prefix = re.sub(r"(?:<[^>]*>|\s)*$", "", html[:marker.start()])
-          boundary = re.match(r"(?:</(?:div|p)>|\s)*", html[position:])
+          # Only wrapper tags go: stripping </style>, </head> or <body> here
+          # left the sender's CSS unclosed, so it swallowed the whole body
+          # and the PDF came out blank.
+          prefix = re.sub(r"(?:</?(?:div|p|span|br|blockquote)\b[^>]*>|\s)*$", "",
+                          html[:marker.start()], flags=re.I)
+          boundary = re.match(r"(?:</(?:div|p)>|<br\s*/?>|\s)*", html[position:], flags=re.I)
           stripped = prefix + html[position + boundary.end():]
       output = {"html": stripped.strip(), "forwarded_header_removed": marker is not None}
     tests:
@@ -443,6 +447,16 @@ actions:
               today\nSubject: Receipt\nTo: d@e.f\n\nOrder total: 42 EUR\n"
       expected:
         html: "Order total: 42 EUR"
+        forwarded_header_removed: true
+    - name: a forward inside a styled document keeps its head and body open
+      input:
+        body:
+          html:
+            value: "<html><head><style>p{margin:0}</style></head><body><div>---------- Forwarded
+              message ----------<br>From: a@b.c<br>Date: today<br>Subject: Receipt<br>To:
+              d@e.f<br></div><p>Total: 42 EUR</p></body></html>"
+      expected:
+        html: "<html><head><style>p{margin:0}</style></head><body><p>Total: 42 EUR</p></body></html>"
         forwarded_header_removed: true
     - name: no marker leaves the body alone
       input:
