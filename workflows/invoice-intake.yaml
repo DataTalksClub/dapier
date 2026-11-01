@@ -484,3 +484,9 @@ actions:
     pdf:
       page_format: A4
       print_background: true
+  - id: body-to-dataops
+    type: dataops
+    connection_id: dataops
+    auth_secret_id: dapier.dataops
+    document_step: route.else.render-pdf
+    filename: invoice-email.pdf
