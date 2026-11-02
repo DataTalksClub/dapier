@@ -81,6 +81,14 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - run: make layer
       - run: sam build --config-env sandbox
+      - name: Deploy renderer ECR access policy stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/renderer-ecr-access.yaml \
+            --stack-name dapier-renderer-ecr-access \
+            --capabilities CAPABILITY_IAM \
+            --role-arn arn:aws:iam::817685572750:role/dapier-cloudformation-service \
+            --region "$AWS_REGION"
       - name: Apply renderer ECR policy before rollback recovery
         run: uv run --with pyyaml python scripts/apply-renderer-ecr-policy.py
       - name: Inspect effective renderer ECR policy (read-only)
