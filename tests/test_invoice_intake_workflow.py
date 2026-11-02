@@ -16,6 +16,10 @@ def shipped_workflow():
     return yaml.safe_load(WORKFLOW_FILE.read_text())
 
 
+def test_dead_clean_subject_step_is_absent():
+    assert find_action(shipped_workflow(), "clean-subject") is None
+
+
 def find_action(workflow, action_id):
     """A step anywhere in the chain, including condition branches."""
     for action in workflow["actions"]:
