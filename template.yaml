@@ -30,8 +30,8 @@ Parameters:
     Description: Optional DataOps team store name for /hooks/developer shared secret (empty disables)
   HubIntakeTokenSecret:
     Type: String
-    Default: ""
-    Description: Optional DataOps team store name for Hub intake Bearer token (empty disables Hub notify)
+    Default: dapier.hub
+    Description: DataOps team store name holding the Hub service bearer token for the hub_session action
   HubIntakeUrl:
     Type: String
     Default: https://hub.dtcdev.click/api/intake/tasks
@@ -244,7 +244,7 @@ Resources:
         - python3.12
       CompatibleArchitectures:
         - arm64
-      RetentionPolicy: Delete
+      RetentionPolicy: Retain
 
   # The API's execution role, explicit and named. The implicit role this
   # replaces accumulated inline policy documents deploy after deploy until

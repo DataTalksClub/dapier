@@ -68,6 +68,13 @@ OperatorEmails: "$OPERATOR_EMAILS"
 NotifyEmail: "${NOTIFY_EMAIL:-dev@dtcdev.click}"
 AlertEmailSender: "${ALERT_EMAIL_SENDER:-DTC Alerts <alerts@dtcdev.click>}"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
+# Hub session integration (t1603u): the DataOps team store entry holding the
+# Dapier service bearer token for hub.dtcdev.click (agent credential with
+# fleet:launch + an intake write grant on project dapier-agents). The hub_session
+# action reads the token through src.dapier.secrets.value; an empty value here
+# would leave the stack parameter empty and the action refusing to start
+# sessions, so default to the agreed store name instead of keeping the old blank.
+HubIntakeTokenSecret: "${HUB_INTAKE_TOKEN_SECRET:-dapier.hub}"
 ${github_token_lines}
 EOF
 
