@@ -1661,8 +1661,8 @@ Resources:
       Handler: src.dapier.error_digest.handler
       Runtime: python3.12
       Architectures: [arm64]
-      Timeout: 30
-      MemorySize: 128
+      Timeout: 120
+      MemorySize: 512
       Environment:
         Variables:
           DAPIER_EMAIL_SENDER: !Ref EmailSender

@@ -381,3 +381,47 @@ def test_template_schedules_the_digest_daily():
     assert "DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail" in text
     assert "ses:SendEmail" in text
     assert "Schedule: cron(0 7 * * ? *)" in text
+
+
+# --- lean scan: the digest must not hold every step payload in memory ---
+
+def test_api_summary_scans_without_step_payloads(monkeypatch):
+    """Many failed runs with huge recorded input/output used to push the
+    128MB / 30s digest Lambda into a timeout. The summary only counts and
+    labels runs, so its scan projects the payload attributes away."""
+    from src.dapier.api import errors, runs as runs_api
+
+    huge = "x" * 200_000
+    rows = [{"execution_id": f"wf-{i % 5}:act:{i}", "workflow_id": f"wf-{i % 5}",
+             "status": "failed", "error": f"boom {i}",
+             "started_at": f"2026-11-02T06:{i % 60:02d}:00+00:00",
+             "input": {"body": huge}, "output": {"body": huge}}
+            for i in range(300)]
+    calls = []
+
+    class Table:
+        def scan(self, **kwargs):
+            calls.append(kwargs)
+            names = kwargs.get("ExpressionAttributeNames") or {}
+            keep = {names[t.strip()] for t in kwargs["ProjectionExpression"].split(",")}
+            return {"Items": [{k: v for k, v in row.items() if k in keep}
+                              for row in rows]}
+
+    monkeypatch.setattr(runs_api, "_table", lambda: Table())
+    now = datetime(2026, 11, 2, 7, 0, tzinfo=timezone.utc)
+    _, summary = errors.api_summary(1, now=now)
+
+    assert summary["total_failed_runs"] == runs_api.MAX_LIMIT
+    assert summary["bounded"] is True
+    assert {w["workflow_id"] for w in summary["workflows"]} == {f"wf-{i}" for i in range(5)}
+    assert all(w["last_error"].startswith("boom") for w in summary["workflows"])
+    names = set().union(*(c["ExpressionAttributeNames"].values() for c in calls))
+    assert "input" not in names and "output" not in names
+    subject, body = error_digest.render(summary)
+    assert "200 failed runs" in subject and len(body) < 5000
+
+
+def test_error_digest_lambda_has_headroom():
+    text = open("template.yaml").read()
+    block = text[text.index("  ErrorDigestFunction:"):text.index("  ErrorDigestErrorAlarm:")]
+    assert "Timeout: 120" in block and "MemorySize: 512" in block

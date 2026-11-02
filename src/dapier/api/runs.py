@@ -399,7 +399,22 @@ def _wanted(run, workflow_id=None, status=None, since=None, before=None):
     return not _out_of_window(run.get("started_at") or "", since=since, before=before)
 
 
-def _scan_items(filtered=False):
+# The attributes a list row is rolled up from (run_summary and run_id_of),
+# without the recorded ``input``/``output`` payloads — the bulk of an
+# execution item. Names are aliased: status/error are DynamoDB reserved words.
+_LEAN_FIELDS = (
+    "kind", "run_id", "execution_id", "workflow_id", "action_id", "connector",
+    "event_type", "status", "started_at", "finished_at", "error",
+    "resolved_at", "resolved_reason", "resolved_by", "retry_attempt",
+    "duration_ms", "lease_until",
+)
+_LEAN_SCAN = {
+    "ProjectionExpression": ", ".join(f"#f{i}" for i in range(len(_LEAN_FIELDS))),
+    "ExpressionAttributeNames": {f"#f{i}": name for i, name in enumerate(_LEAN_FIELDS)},
+}
+
+
+def _scan_items(filtered=False, lean=False):
     """The scanned window for a list call: ``(items, bounded)``.
 
     Each pull is bounded and the walk stops at the table's end or the page
@@ -412,10 +427,15 @@ def _scan_items(filtered=False):
     ``filtered`` doubles the page budget (MAX_FILTERED_SCAN_PAGES), because
     filters are applied client-side after the scan and a narrow query needs a
     wider net to find the same number of rows.
+
+    ``lean`` projects away the recorded step payloads (input/output) for
+    callers that only count and label runs, such as the error digest: a
+    20-page failure scan otherwise holds thousands of full payloads in memory.
+    The rows then have no ``event_summary``/``delayed_until``.
     """
     table = _table()
     items = []
-    kwargs = {"Limit": SCAN_PAGE_SIZE}
+    kwargs = {"Limit": SCAN_PAGE_SIZE, **(_LEAN_SCAN if lean else {})}
     budget = MAX_FILTERED_SCAN_PAGES if filtered else MAX_SCAN_PAGES
     for _ in range(budget):
         page = table.scan(**kwargs)
@@ -524,7 +544,7 @@ def _search_blob(run_id, items):
 
 
 def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
-           visible=None):
+           visible=None, lean=False):
     """The most recent runs, newest first, optionally filtered.
 
     A bounded scan groups into runs; runs older than the scan window age
@@ -536,7 +556,8 @@ def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
     unrestricted) drops the runs of workflows the caller may not see.
     """
     status_code, payload = api_list(limit, workflow_id=workflow_id, status=status,
-                                    since=since, before=before, visible=visible)
+                                    since=since, before=before, visible=visible,
+                                    lean=lean)
     return payload["runs"] if status_code == 200 else []
 
 
@@ -568,7 +589,7 @@ def _keep_actor(rows, match):
 
 def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
              q=None, next_token=None, visible=None, owner=None, as_id=None,
-             assignee=None):
+             assignee=None, lean=False):
     """The list response: runs plus a ``paging`` block.
 
     ``next`` carries the last returned row's sort key; the follow-up call
@@ -607,7 +628,8 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     query = str(q or "").strip().lower()
     owners = visibility.owners_for(visible)
     narrowed = bool(workflow_id or status or since or before or query or match)
-    items, clipped = _scan_items(filtered=narrowed)
+    scan_args = {"lean": True} if lean and not query else {}
+    items, clipped = _scan_items(filtered=narrowed, **scan_args)
     grouped = _grouped(items)
     runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
     _derive_recovered(runs)

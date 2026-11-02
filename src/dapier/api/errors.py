@@ -38,7 +38,8 @@ def api_summary(days=DEFAULT_DAYS, now=None, visible=None):
         days = DEFAULT_DAYS
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(days=days)).isoformat()
-    failed = runs.recent(runs.MAX_LIMIT, status="problems", since=since)
+    failed = runs.recent(runs.MAX_LIMIT, status="problems", since=since,
+                         lean=True)
     bounded = len(failed) >= runs.MAX_LIMIT
     owners = runs.visibility.owners_for(visible)
     if visible is not None:

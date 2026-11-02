@@ -13,7 +13,8 @@ def _patch_recent(monkeypatch, failed):
     import src.dapier.api.runs as runs
     seen = {}
 
-    def fake_recent(limit, workflow_id=None, status=None, since=None, before=None):
+    def fake_recent(limit, workflow_id=None, status=None, since=None, before=None,
+                    lean=False):
         seen.update(limit=limit, status=status, since=since)
         return failed
 

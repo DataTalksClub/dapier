@@ -1255,7 +1255,8 @@ def test_errors_summary_groups_failed_runs_by_workflow(monkeypatch):
     ]
     seen = {}
 
-    def fake_recent(limit, workflow_id=None, status=None, since=None, before=None):
+    def fake_recent(limit, workflow_id=None, status=None, since=None, before=None,
+                    lean=False):
         seen["args"] = (limit, status, since)
         return [run for run in failed if run["status"] in ("failed", "error")]
 
