@@ -1208,6 +1208,15 @@ Resources:
             Action:
               - ecr:BatchGetImage
               - ecr:GetDownloadUrlForLayer
+          - Sid: AllowDapierDeploymentRoleImageAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:role/dapier-cloudformation-service
+            Action:
+              - ecr:GetRepositoryPolicy
+              - ecr:SetRepositoryPolicy
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
 
   HtmlRendererFunction:
     Type: AWS::Serverless::Function

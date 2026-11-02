@@ -81,6 +81,8 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - run: make layer
       - run: sam build --config-env sandbox
+      - name: Apply renderer ECR policy before rollback recovery
+        run: uv run --with pyyaml python scripts/apply-renderer-ecr-policy.py
       # A failed deploy whose rollback also failed leaves the stack in
       # UPDATE_ROLLBACK_FAILED, where every further deploy is rejected.
       - name: Resume an interrupted rollback
@@ -89,12 +91,10 @@ jobs:
             --query 'Stacks[0].StackStatus' --output text)
           echo "stack status: $status"
           if [ "$status" = "UPDATE_ROLLBACK_FAILED" ]; then
-            # The renderer Lambda could not roll back because its imported
-            # ECR repository lacked the Lambda image-pull policy. Skip that
-            # failed resource for rollback; the immediately following deploy
-            # applies the policy and reconciles the function.
-            aws cloudformation continue-update-rollback --stack-name dapier \
-              --resources-to-skip HtmlRendererFunction
+            # Resume the complete rollback. The repository policy in the
+            # template grants the deploy role access to the renderer image,
+            # allowing CloudFormation to restore the function without skips.
+            aws cloudformation continue-update-rollback --stack-name dapier
             for attempt in {1..60}; do
               status=$(aws cloudformation describe-stacks --stack-name dapier \
                 --query 'Stacks[0].StackStatus' --output text)
