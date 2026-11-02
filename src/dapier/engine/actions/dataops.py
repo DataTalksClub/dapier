@@ -185,6 +185,43 @@ def _dropbox_intake_body(action, event, *, steps=None):
         }],
     }
 
+RENDER_RESULT_FIELDS = {"output", "checksum", "content_type", "job_id", "size_bytes", "sizeBytes"}
+
+
+def _source_hash(source_data):
+    """Stable identity of the original email (not of any render output)."""
+    # Without a source_event the render result is merged into the same dict:
+    # drop those fields so only the original email content is hashed.
+    stable = {k: v for k, v in source_data.items() if k not in RENDER_RESULT_FIELDS}
+    blob = json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def _stable_transfer_key(route, message_id, kind, filename, source_hash):
+    # Rendered PDFs are not byte-deterministic, and DataOps fingerprints the
+    # manifest (checksum + storageUri) per (route, messageId). Derive the key
+    # from the email identity only so a re-render reuses the first staged copy.
+    identity = [route.lower(), message_id.strip(), kind, filename, source_hash]
+    digest = hashlib.sha256(json.dumps(identity, separators=(",", ":")).encode()).hexdigest()
+    return f"email/{digest}/{filename}"
+
+
+def _already_staged(key):
+    """Return (uri, body, checksum) of an object staged earlier under ``key``,
+    or None. Replays must submit the first delivery's bytes and checksum."""
+    bucket = os.environ["DATAOPS_EMAIL_DOCUMENTS_BUCKET"]
+    full = _safe_staging_key(f"{STAGING_PREFIX}{key}")
+    try:
+        obj = _s3().get_object(Bucket=bucket, Key=full)
+    except Exception as exc:
+        code = getattr(exc, "response", {}).get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "NotFound"):
+            return None
+        raise
+    body = obj["Body"].read()
+    return f"s3://{bucket}/{full}", body, f"sha256:{hashlib.sha256(body).hexdigest()}"
+
+
 def _email_transfer_key(route, message_id, kind, index, filename, body, content_type, checksum):
     # DataOps fingerprints source URIs: retrying after a lost response must
     # submit the same manifest. Include the bytes so changed content cannot
@@ -204,7 +241,8 @@ def _email_intake_body(action, event, *, steps=None):
     if document_step:
         # A prior step (merge_pdfs) already decided the one document this
         # email is about: forward exactly that, not every attachment.
-        documents = [_step_document(document_step, route, message_id, action, steps)]
+        documents = [_step_document(document_step, route, message_id, action, steps,
+                                    source_hash=_source_hash(source_data))]
     else:
         documents = []
         for index, attachment in enumerate(data.get("attachments", [])):
@@ -229,14 +267,17 @@ def _email_intake_body(action, event, *, steps=None):
                 })
         output = data.get("output") or {}
         if output.get("bucket") and output.get("key"):
-            body = base._s3_body(output)
             filename = base._safe_filename(action.get("filename", "invoice-email.pdf"))
             content_type = data.get("content_type", "application/pdf")
-            checksum = f"sha256:{data['checksum']}"
-            storage_uri = _stage_document(
-                _email_transfer_key(route, message_id, "rendered-email-pdf", 0, filename,
-                                    body, content_type, checksum),
-                body, content_type, checksum)
+            key = _stable_transfer_key(route, message_id, "rendered-email-pdf", filename,
+                                       _source_hash(source_data))
+            staged = _already_staged(key)
+            if staged:
+                storage_uri, body, checksum = staged
+            else:
+                body = base._s3_body(output)
+                checksum = f"sha256:{data['checksum']}"
+                storage_uri = _stage_document(key, body, content_type, checksum)
             documents.append({
                 "kind": "rendered-email-pdf",
                 "storageUri": storage_uri,
@@ -258,8 +299,9 @@ def _email_intake_body(action, event, *, steps=None):
     }
 
 
-RENDER_WAIT_SECONDS = 45
+RENDER_WAIT_SECONDS = 180  # cold render starts took 52.6 s; WorkerFunction Timeout covers this
 RENDER_POLL_SECONDS = 3
+RENDER_POLL_MAX_SECONDS = 15
 
 
 def _await_document(document, job_id, ref):
@@ -267,6 +309,7 @@ def _await_document(document, job_id, ref):
     the PDF may not exist yet: wait a bounded time, then fail with an error
     naming the render job instead of a raw NoSuchKey."""
     deadline = time.monotonic() + (RENDER_WAIT_SECONDS if job_id else 0)
+    delay = RENDER_POLL_SECONDS
     while True:
         try:
             return base._s3_body(document)
@@ -280,10 +323,11 @@ def _await_document(document, job_id, ref):
                     f"dataops document_step '{ref}': output s3://{document['bucket']}/{document['key']} "
                     f"does not exist ({what} has not produced it; the job may have failed - "
                     f"check the render dead-letter queue)") from None
-            time.sleep(RENDER_POLL_SECONDS)
+            time.sleep(min(delay, max(deadline - time.monotonic(), 0)))
+            delay = min(delay * 1.5, RENDER_POLL_MAX_SECONDS)
 
 
-def _step_document(ref, route, message_id, action, steps):
+def _step_document(ref, route, message_id, action, steps, source_hash=None):
     """Stage the one document a prior step produced (a merge_pdfs output:
     ``{"filename", "output": {"bucket", "key"}}`` under the step's output)
     and build its intake document entry. The checksum is computed over the
@@ -293,13 +337,23 @@ def _step_document(ref, route, message_id, action, steps):
     document = output.get("output") if isinstance(output.get("output"), dict) else {}
     if not (isinstance(document, dict) and document.get("bucket") and document.get("key")):
         raise ValueError(f"dataops document_step '{ref}' does not reference a stored file")
-    body = _await_document(document, output.get("job_id"), ref)
     filename = base._safe_filename(str(document.get("filename") or output.get("filename") or "").strip()
                                    or action.get("filename") or "invoice-document.pdf")
+    key = None
+    if output.get("job_id") and source_hash:
+        # Render-produced PDFs differ byte-wise between runs: key them by
+        # the email identity and reuse the first staged copy on replay.
+        key = _stable_transfer_key(route, message_id, "attachment", filename, source_hash)
+        staged = _already_staged(key)
+        if staged:
+            storage_uri, body, checksum = staged
+            return {"kind": "attachment", "storageUri": storage_uri, "filename": filename,
+                    "contentType": "application/pdf", "sizeBytes": len(body), "checksum": checksum}
+    body = _await_document(document, output.get("job_id"), ref)
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
     storage_uri = _stage_document(
-        _email_transfer_key(route, message_id, "attachment", 0, filename,
-                            body, "application/pdf", checksum),
+        key or _email_transfer_key(route, message_id, "attachment", 0, filename,
+                                   body, "application/pdf", checksum),
         body, "application/pdf", checksum)
     return {
         "kind": "attachment",

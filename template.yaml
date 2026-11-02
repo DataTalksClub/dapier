@@ -706,7 +706,7 @@ Resources:
       Architectures: [arm64]
       Layers:
         - Ref: JsRuntimeLayer
-      Timeout: 60
+      Timeout: 300  # dataops document_step waits up to 180 s for a cold render
       MemorySize: 512
       Environment:
         Variables:
@@ -916,7 +916,7 @@ Resources:
   EventQueue:
     Type: AWS::SQS::Queue
     Properties:
-      VisibilityTimeout: 180
+      VisibilityTimeout: 1800  # >= 6x WorkerFunction Timeout (300)
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
         maxReceiveCount: 5

@@ -168,3 +168,84 @@ def test_render_output_arriving_late_is_awaited():
          patch.object(dataops, "_stage_document", return_value="s3://stage/k"):
         doc = dataops._step_document("route.else.render-pdf", "invoice", "msg-1", RENDER_ACTION, RENDER_STEPS)
     assert doc["sizeBytes"] == len(BODY)
+
+
+class _FakeStagingS3:
+    """In-memory staging bucket: put_object stores, get_object replays."""
+    def __init__(self):
+        self.objects = {}
+
+    def put_object(self, Bucket, Key, Body, **_):
+        self.objects.setdefault((Bucket, Key), Body)
+
+    def get_object(self, Bucket, Key):
+        if (Bucket, Key) not in self.objects:
+            raise _NoSuchKey()
+        import io
+        return {"Body": io.BytesIO(self.objects[(Bucket, Key)])}
+
+
+def _manifest(fake, render_bytes, event, steps, action):
+    from src.dapier.engine.actions import dataops
+    with patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
+         patch.object(dataops, "_s3", return_value=fake), \
+         patch.object(dataops.base, "_s3_body", return_value=render_bytes):
+        return dataops._email_intake_body(action, event, steps=steps)
+
+
+def test_rerendered_document_step_submits_the_same_manifest():
+    from src.dapier.engine.actions import dataops
+    fake = _FakeStagingS3()
+    first = _manifest(fake, b"%PDF render one", EVENT, RENDER_STEPS, RENDER_ACTION)
+    second = _manifest(fake, b"%PDF render two", EVENT, RENDER_STEPS, RENDER_ACTION)
+    assert first["documents"] == second["documents"]
+    assert first["documents"][0]["checksum"] == "sha256:" + hashlib.sha256(b"%PDF render one").hexdigest()
+
+
+def test_rerendered_email_pdf_submits_the_same_manifest():
+    fake = _FakeStagingS3()
+    def event(body, checksum):
+        data = {**EVENT["data"], "attachments": [], "content_type": "application/pdf",
+                "output": {"bucket": "artifacts", "key": "body.pdf"},
+                "checksum": checksum}
+        return {**EVENT, "data": data}
+    first = _manifest(fake, b"one", event(b"one", hashlib.sha256(b"one").hexdigest()), None, ACTION | {"document_step": ""})
+    second = _manifest(fake, b"two", event(b"two", hashlib.sha256(b"two").hexdigest()), None, ACTION | {"document_step": ""})
+    assert first["documents"] == second["documents"]
+    assert first["documents"][0]["kind"] == "rendered-email-pdf"
+
+
+def test_different_email_content_gets_a_different_key():
+    fake = _FakeStagingS3()
+    other = {**EVENT, "data": {**EVENT["data"], "subject": "Another receipt"}}
+    first = _manifest(fake, b"one", EVENT, RENDER_STEPS, RENDER_ACTION)
+    second = _manifest(fake, b"two", other, RENDER_STEPS, RENDER_ACTION)
+    assert first["documents"][0]["storageUri"] != second["documents"][0]["storageUri"]
+
+
+def test_render_wait_is_180_seconds_with_backoff():
+    from src.dapier.engine.actions import dataops
+    assert dataops.RENDER_WAIT_SECONDS == 180
+    clock = {"t": 0.0}
+    sleeps = []
+    def sleep(s):
+        sleeps.append(s)
+        clock["t"] += s
+    with patch.object(dataops.base, "_s3_body", side_effect=_NoSuchKey()), \
+         patch.object(dataops.time, "monotonic", side_effect=lambda: clock["t"]), \
+         patch.object(dataops.time, "sleep", side_effect=sleep):
+        with pytest.raises(RuntimeError, match="dead-letter"):
+            dataops._await_document({"bucket": "b", "key": "k"}, "job-1", "render")
+    assert 178 <= sum(sleeps) <= 181
+    assert sleeps[-3] > sleeps[0]
+
+
+def test_worker_timeout_covers_the_render_wait():
+    import re, pathlib
+    text = pathlib.Path("template.yaml").read_text()
+    worker = text.split("  WorkerFunction:\n", 1)[1]
+    timeout = int(re.search(r"Timeout: (\d+)", worker).group(1))
+    queue = text.split("  EventQueue:\n", 1)[1]
+    visibility = int(re.search(r"VisibilityTimeout: (\d+)", queue).group(1))
+    assert timeout >= 180 + 60
+    assert visibility >= timeout
