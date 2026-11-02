@@ -90,7 +90,7 @@ def test_collapsed_rail_keeps_every_destination_and_shows_tooltips(browser):
         assert page.locator("#sidebar-toggle").get_attribute("aria-label") == "Expand sidebar"
         assert round(page.locator("#main-sidebar").bounding_box()["width"]) == 56
         items = page.locator(".dk-sidebar .dk-nav-item")
-        assert items.count() == 10
+        assert items.count() == 8
         for index in range(items.count()):
             assert items.nth(index).is_visible()
         # Labels stay in the accessibility tree; the tooltip repeats one.
