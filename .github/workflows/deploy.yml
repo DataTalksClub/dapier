@@ -89,7 +89,12 @@ jobs:
             --query 'Stacks[0].StackStatus' --output text)
           echo "stack status: $status"
           if [ "$status" = "UPDATE_ROLLBACK_FAILED" ]; then
-            aws cloudformation continue-update-rollback --stack-name dapier
+            # The renderer Lambda could not roll back because its imported
+            # ECR repository lacked the Lambda image-pull policy. Skip that
+            # failed resource for rollback; the immediately following deploy
+            # applies the policy and reconciles the function.
+            aws cloudformation continue-update-rollback --stack-name dapier \
+              --resources-to-skip HtmlRendererFunction
             aws cloudformation wait stack-update-complete --stack-name dapier
           fi
       - run: scripts/deploy.sh
