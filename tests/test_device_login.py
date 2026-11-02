@@ -647,6 +647,16 @@ def test_the_peek_budget_is_shared_across_handler_instances(monkeypatch, store):
     start or a second concurrent container) draw on one account budget,
     and unknown codes spend it too."""
     _signed_in(monkeypatch)
+    # Keep all requests in one fixed-window bucket. The real-time test could
+    # straddle a ten-minute boundary under a full-suite run and legitimately
+    # receive a fresh bucket halfway through the assertions.
+    real_allow = device_sessions.allow
+
+    def allow_in_fixed_bucket(kind, subject, limit, **kwargs):
+        kwargs.setdefault("now", 1_800_000_000)
+        return real_allow(kind, subject, limit, **kwargs)
+
+    monkeypatch.setattr(device_sessions, "allow", allow_in_fixed_bucket)
     event = _device_event("/api/agent/device/pending", method="GET")
     event["queryStringParameters"] = {"code": "ZZZZ-ZZZZ"}
     first = [agent_api.route(event, "GET", "/api/agent/device/pending")["statusCode"] for _ in range(12)]
