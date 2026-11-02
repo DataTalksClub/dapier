@@ -1211,7 +1211,6 @@ Resources:
 
   HtmlRendererFunction:
     Type: AWS::Serverless::Function
-    DependsOn: HtmlRendererRepository
     Properties:
       PackageType: Image
       ImageUri: !Ref HtmlRendererImageUri
