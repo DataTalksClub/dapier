@@ -1218,6 +1218,27 @@ Resources:
               - ecr:BatchGetImage
               - ecr:GetDownloadUrlForLayer
 
+  # Lambda's image deployment API checks the identity policy on the role
+  # CloudFormation assumes to create/update the function. The ECR repository
+  # policy below grants Lambda's pull access; this role policy grants the
+  # deploy-time repository and image operations documented for image functions.
+  HtmlRendererCloudFormationImageAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DapierRendererImageAccess
+      Roles:
+        - dapier-cloudformation-service
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - ecr:GetRepositoryPolicy
+              - ecr:SetRepositoryPolicy
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Resource: !GetAtt HtmlRendererRepository.Arn
+
   HtmlRendererFunction:
     Type: AWS::Serverless::Function
     Properties:
