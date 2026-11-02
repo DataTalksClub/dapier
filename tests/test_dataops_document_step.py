@@ -171,18 +171,37 @@ def test_render_output_arriving_late_is_awaited():
 
 
 class _FakeStagingS3:
-    """In-memory staging bucket: put_object stores, get_object replays."""
+    """In-memory staging bucket: put_object stores, get_object/head/list replay."""
     def __init__(self):
         self.objects = {}
+        self.meta = {}
+        self._tick = 0
 
-    def put_object(self, Bucket, Key, Body, **_):
+    def put_object(self, Bucket, Key, Body, Metadata=None, **_):
+        self._tick += 1
         self.objects.setdefault((Bucket, Key), Body)
+        self.meta.setdefault((Bucket, Key), {
+            "Metadata": dict(Metadata or {}),
+            "LastModified": f"2026-11-02T08:51:{self._tick:02d}Z",
+        })
 
     def get_object(self, Bucket, Key):
         if (Bucket, Key) not in self.objects:
             raise _NoSuchKey()
         import io
         return {"Body": io.BytesIO(self.objects[(Bucket, Key)])}
+
+    def head_object(self, Bucket, Key):
+        if (Bucket, Key) not in self.objects:
+            raise _NoSuchKey()
+        return self.meta.get((Bucket, Key), {"Metadata": {}})
+
+    def list_objects_v2(self, Bucket, Prefix="", **_):
+        contents = []
+        for (b, k), info in self.meta.items():
+            if b == Bucket and k.startswith(Prefix):
+                contents.append({"Key": k, "LastModified": info["LastModified"]})
+        return {"Contents": contents, "IsTruncated": False}
 
 
 def _manifest(fake, render_bytes, event, steps, action):
@@ -194,12 +213,170 @@ def _manifest(fake, render_bytes, event, steps, action):
 
 
 def test_rerendered_document_step_submits_the_same_manifest():
-    from src.dapier.engine.actions import dataops
     fake = _FakeStagingS3()
     first = _manifest(fake, b"%PDF render one", EVENT, RENDER_STEPS, RENDER_ACTION)
     second = _manifest(fake, b"%PDF render two", EVENT, RENDER_STEPS, RENDER_ACTION)
     assert first["documents"] == second["documents"]
+    assert first["documents"][0]["kind"] == "rendered-email-pdf"
     assert first["documents"][0]["checksum"] == "sha256:" + hashlib.sha256(b"%PDF render one").hexdigest()
+
+
+def test_document_step_and_body_completion_share_rendered_manifest():
+    """invoice-intake (body-to-dataops with document_step) and
+    invoice-body-completion (intake-rendered without document_step) must
+    produce identical manifests for the same email so the pair never 409s."""
+    fake = _FakeStagingS3()
+    intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
+    completion_action = {**ACTION, "document_step": "", "filename": "invoice-email.pdf"}
+    completion_event = {
+        "connector": "email", "event": "message.rendered",
+        "id": "ev1:render", "occurred_at": "2026-10-12T09:01:00+00:00",
+        "data": {
+            "source_event": EVENT,
+            "message_id": EVENT["data"]["message_id"],
+            "route": EVENT["data"]["route"],
+            "content_type": "application/pdf",
+            "output": {"bucket": "artifacts", "key": "invoice-body/ev1.pdf"},
+            "checksum": hashlib.sha256(b"%PDF render two").hexdigest(),
+        },
+    }
+    first = _manifest(fake, b"%PDF render one", EVENT, RENDER_STEPS, intake_action)
+    second = _manifest(fake, b"%PDF render two", completion_event, None, completion_action)
+    assert first["documents"] == second["documents"]
+    assert first["documents"][0]["kind"] == "rendered-email-pdf"
+
+
+def test_replay_attachment_restaging_keeps_same_rendered_manifest():
+    """Replaying an email with non-PDF attachments re-stages them under
+    relay-attachments/replay-<uuid>/... and drops inbound_message_id; the
+    rendered email PDF identity must remain unchanged."""
+    fake = _FakeStagingS3()
+    original_event = {
+        **EVENT,
+        "data": {
+            **EVENT["data"],
+            "inbound_message_id": "ses-orig-1",
+            "route_address": "invoice@in.example.com",
+            "s3": {"bucket": "raw", "key": "inbound/ses-orig-1"},
+            "attachments": [
+                {"filename": "logo.png", "content_type": "image/png",
+                 "checksum": "sha256:" + "b" * 64,
+                 "s3": {"bucket": "artifacts", "key": "relay-attachments/ses-orig-1/attachments/0/logo.png"}},
+            ],
+        },
+    }
+    replayed_event = {
+        **EVENT,
+        "id": "replay-999",
+        "data": {
+            **EVENT["data"],
+            "route_address": "invoice",
+            "attachments": [
+                {"filename": "logo.png", "content_type": "image/png",
+                 "checksum": "sha256:" + "b" * 64,
+                 "s3": {"bucket": "artifacts", "key": "relay-attachments/replay-999/attachments/0/logo.png"}},
+            ],
+        },
+    }
+    intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
+    first = _manifest(fake, b"%PDF original", original_event, RENDER_STEPS, intake_action)
+    second = _manifest(fake, b"%PDF replayed", replayed_event, RENDER_STEPS, intake_action)
+    assert first["documents"] == second["documents"]
+
+
+def test_replay_reuses_legacy_byte_keyed_rendered_pdf():
+    """Messages first accepted before a771da4 were staged under the
+    byte-derived _email_transfer_key. Even if a later failed replay staged a
+    second render under a newer key, _prior_staged_rendered selects the
+    oldest staged object (matching DataOps first-write-wins)."""
+    from src.dapier.engine.actions import dataops
+    fake = _FakeStagingS3()
+    first_bytes = b"%PDF-1.4 original accepted render at 08:51Z"
+    first_sha = hashlib.sha256(first_bytes).hexdigest()
+    first_checksum = f"sha256:{first_sha}"
+    legacy_rel = dataops._email_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", 0,
+        "invoice-email.pdf", first_bytes, "application/pdf", first_checksum,
+    )
+    fake.put_object(
+        Bucket="staging", Key=f"transfer/{legacy_rel}", Body=first_bytes,
+        Metadata={"sha256": first_sha},
+    )
+    # Later failed replay staged a different render under a newer key:
+    later_bytes = b"%PDF-1.4 later failed replay at 10:29Z"
+    later_sha = hashlib.sha256(later_bytes).hexdigest()
+    later_rel = dataops._stable_transfer_key(
+        "invoice", "msg-1", "attachment", "invoice-email.pdf",
+        dataops._legacy_source_hash(EVENT["data"]),
+    )
+    fake.put_object(
+        Bucket="staging", Key=f"transfer/{later_rel}", Body=later_bytes,
+        Metadata={"sha256": later_sha},
+    )
+
+    intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
+    manifest = _manifest(fake, b"%PDF-1.4 third render", EVENT, RENDER_STEPS, intake_action)
+    assert manifest["documents"] == [{
+        "kind": "rendered-email-pdf",
+        "storageUri": f"s3://staging/transfer/{legacy_rel}",
+        "filename": "invoice-email.pdf",
+        "contentType": "application/pdf",
+        "sizeBytes": len(first_bytes),
+        "checksum": first_checksum,
+    }]
+
+
+def test_rendered_409_recovers_by_trying_remaining_staged_candidates():
+    """If the initial staged candidate 409s (e.g. an unaccepted object had an
+    earlier timestamp or different kind), run_dataops retries remaining staged
+    candidates for (route, message_id) and returns DataOps's 200 duplicate."""
+    import io
+    import urllib.error
+    from src.dapier.engine.actions import dataops
+
+    fake = _FakeStagingS3()
+    unaccepted_bytes = b"%PDF unaccepted early stage"
+    unaccepted_sha = hashlib.sha256(unaccepted_bytes).hexdigest()
+    unaccepted_rel = dataops._email_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", 0,
+        "invoice-email.pdf", unaccepted_bytes, "application/pdf", f"sha256:{unaccepted_sha}",
+    )
+    fake.put_object(
+        Bucket="staging", Key=f"transfer/{unaccepted_rel}", Body=unaccepted_bytes,
+        Metadata={"sha256": unaccepted_sha},
+    )
+    accepted_bytes = b"%PDF accepted second stage"
+    accepted_sha = hashlib.sha256(accepted_bytes).hexdigest()
+    accepted_rel = dataops._email_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", 0,
+        "invoice-email.pdf", accepted_bytes, "application/pdf", f"sha256:{accepted_sha}",
+    )
+    fake.put_object(
+        Bucket="staging", Key=f"transfer/{accepted_rel}", Body=accepted_bytes,
+        Metadata={"sha256": accepted_sha},
+    )
+
+    seen_uris = []
+
+    def fake_request(url, payload, headers=None, timeout=15):
+        uri = payload["documents"][0]["storageUri"]
+        seen_uris.append(uri)
+        if uri.endswith(accepted_rel):
+            return {"status": "duplicate", "invoices": [{"id": "inv-1", "amount": "219.99"}]}
+        raise urllib.error.HTTPError(url, 409, "Conflict", hdrs=None, fp=io.BytesIO(b""))
+
+    intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
+    with patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
+         patch.object(dataops, "_s3", return_value=fake), \
+         patch("src.dapier.engine.actions.base.secrets_value", return_value="tok"), \
+         patch("src.dapier.engine.actions.base._connected_connection",
+               return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
+         patch("src.dapier.engine.actions.base._json_request", side_effect=fake_request):
+        result = run_dataops(intake_action, EVENT, steps=RENDER_STEPS)
+
+    assert result == {"status": "duplicate", "invoices": [{"id": "inv-1", "amount": "219.99"}]}
+    assert seen_uris[0].endswith(unaccepted_rel)
+    assert seen_uris[-1].endswith(accepted_rel)
 
 
 def test_rerendered_email_pdf_submits_the_same_manifest():

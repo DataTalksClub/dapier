@@ -92,18 +92,22 @@ def run_dataops(action, event, *, steps=None):
         token = value
     if not token:
         raise ValueError("DataOps secret does not contain a token")
+    url = _target_url(action)
+    body = _intake_body(action, event, steps=steps)
+    headers = {"x-dataops-intake-secret": token}
+    timeout = action.get("timeout_seconds", 15)
     try:
-        return base._json_request(
-            _target_url(action),
-            _intake_body(action, event, steps=steps),
-            headers={"x-dataops-intake-secret": token},
-            timeout=action.get("timeout_seconds", 15),
-        )
+        return base._json_request(url, body, headers=headers, timeout=timeout)
     except urllib.error.HTTPError as exc:
         # Exact duplicate intakes return 200 with their invoice previews.
         # A 409 means that the immutable source changed; swallowing it would
         # lose the preview and make a broken handoff appear successful.
         if exc.code == 409:
+            recovered = _recover_rendered_conflict(
+                url, body, action, event, steps=steps,
+                headers=headers, timeout=timeout)
+            if recovered is not None:
+                return recovered
             raise ValueError(
                 "DataOps source conflict: this message was filed with different "
                 "content; repair the original source before retrying"
@@ -186,13 +190,32 @@ def _dropbox_intake_body(action, event, *, steps=None):
     }
 
 RENDER_RESULT_FIELDS = {"output", "checksum", "content_type", "job_id", "size_bytes", "sizeBytes"}
+VOLATILE_SOURCE_FIELDS = RENDER_RESULT_FIELDS | {
+    "inbound_message_id", "route_address", "recipients", "s3", "raw_mime",
+}
+
+
+def _legacy_source_hash(source_data):
+    """Pre-normalization source hash (a771da4), kept for staged-candidate lookup."""
+    stable = {k: v for k, v in source_data.items() if k not in RENDER_RESULT_FIELDS}
+    blob = json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()
 
 
 def _source_hash(source_data):
-    """Stable identity of the original email (not of any render output)."""
-    # Without a source_event the render result is merged into the same dict:
-    # drop those fields so only the original email content is hashed.
-    stable = {k: v for k, v in source_data.items() if k not in RENDER_RESULT_FIELDS}
+    """Stable identity of the original email (not of any render output or replay envelope)."""
+    # Without a source_event the render result is merged into the same dict,
+    # and replays re-stage attachments under relay-attachments/replay-<uuid>/...
+    # and drop/rebuild envelope transport fields: strip those so a replay
+    # hashes to the same identity as the original delivery.
+    stable = {}
+    for k, v in source_data.items():
+        if k in VOLATILE_SOURCE_FIELDS:
+            continue
+        if k == "attachments" and isinstance(v, list):
+            v = [{ak: av for ak, av in item.items() if ak != "s3"}
+                 if isinstance(item, dict) else item for item in v]
+        stable[k] = v
     blob = json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(blob.encode()).hexdigest()
 
@@ -215,21 +238,212 @@ def _already_staged(key):
         obj = _s3().get_object(Bucket=bucket, Key=full)
     except Exception as exc:
         code = getattr(exc, "response", {}).get("Error", {}).get("Code")
-        if code in ("NoSuchKey", "404", "NotFound"):
+        if code in ("NoSuchKey", "404", "NotFound", "AccessDenied", "403"):
             return None
         raise
     body = obj["Body"].read()
     return f"s3://{bucket}/{full}", body, f"sha256:{hashlib.sha256(body).hexdigest()}"
 
 
+def _email_transfer_key_for_digest(route, message_id, kind, index, filename, content_type, checksum, body_digest):
+    identity = [route.lower(), message_id.strip(), kind, index, filename,
+                content_type, checksum, body_digest]
+    digest = hashlib.sha256(json.dumps(identity, separators=(",", ":")).encode()).hexdigest()
+    return f"email/{digest}/{filename}"
+
+
 def _email_transfer_key(route, message_id, kind, index, filename, body, content_type, checksum):
     # DataOps fingerprints source URIs: retrying after a lost response must
     # submit the same manifest. Include the bytes so changed content cannot
     # overwrite a source object already accepted under this message identity.
-    identity = [route.lower(), message_id.strip(), kind, index, filename,
-                content_type, checksum, hashlib.sha256(body).hexdigest()]
-    digest = hashlib.sha256(json.dumps(identity, separators=(",", ":")).encode()).hexdigest()
-    return f"email/{digest}/{filename}"
+    return _email_transfer_key_for_digest(
+        route, message_id, kind, index, filename,
+        content_type, checksum, hashlib.sha256(body).hexdigest())
+
+
+def _prior_staged_rendered(route, message_id, filename, content_type="application/pdf",
+                           source_data=None, *, source_hash=None, first_only=False):
+    """Discover rendered-PDF objects already staged for ``(route, message_id)``
+    in DATAOPS_EMAIL_DOCUMENTS_BUCKET, ordered by ``LastModified`` ascending
+    (oldest first, matching DataOps's first-write-wins idempotency rule).
+
+    Covers both the stable-key scheme and the pre-a771da4 byte-derived
+    ``_email_transfer_key`` scheme (verified via the object's sha256 metadata
+    or body digest), across ``rendered-email-pdf`` and ``attachment`` kinds.
+    """
+    bucket = os.environ.get("DATAOPS_EMAIL_DOCUMENTS_BUCKET")
+    if not bucket or not route or not message_id:
+        return []
+    s3 = _s3()
+    hashes = []
+    if source_hash:
+        hashes.append(source_hash)
+    if isinstance(source_data, dict):
+        for fn in (_source_hash, _legacy_source_hash):
+            h = fn(source_data)
+            if h not in hashes:
+                hashes.append(h)
+    stable_by_full_key = {}
+    for sh in hashes:
+        for candidate_kind in ("rendered-email-pdf", "attachment"):
+            rel = _stable_transfer_key(route, message_id, candidate_kind, filename, sh)
+            full = _safe_staging_key(f"{STAGING_PREFIX}{rel}")
+            stable_by_full_key.setdefault(full, candidate_kind)
+
+    items = []
+    if hasattr(s3, "list_objects_v2"):
+        token = None
+        for _ in range(10):
+            kwargs = {"Bucket": bucket, "Prefix": f"{STAGING_PREFIX}email/"}
+            if token:
+                kwargs["ContinuationToken"] = token
+            try:
+                page = s3.list_objects_v2(**kwargs)
+            except Exception:
+                break
+            if not isinstance(page, dict):
+                break
+            contents = page.get("Contents")
+            if isinstance(contents, list):
+                items.extend(item for item in contents if isinstance(item, dict))
+            if not page.get("IsTruncated") or not page.get("NextContinuationToken"):
+                break
+            token = page["NextContinuationToken"]
+
+    candidates = []
+    seen_uris = set()
+    if items:
+        safe_suffix = "/" + _safe_staging_key(filename)
+        matching_items = [
+            item for item in items
+            if isinstance(item.get("Key"), str) and item["Key"].endswith(safe_suffix)
+        ]
+        matching_items.sort(key=lambda item: (
+            str(item.get("LastModified") or ""), item.get("Key") or "",
+        ))
+        for item in matching_items:
+            full_key = item["Key"]
+            matched_kind = stable_by_full_key.get(full_key)
+            body = None
+            if not matched_kind:
+                sha256_hex = None
+                if hasattr(s3, "head_object"):
+                    try:
+                        head = s3.head_object(Bucket=bucket, Key=full_key)
+                        if isinstance(head, dict):
+                            sha256_hex = (head.get("Metadata") or {}).get("sha256")
+                    except Exception:
+                        sha256_hex = None
+                if not sha256_hex:
+                    try:
+                        body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+                        sha256_hex = hashlib.sha256(body).hexdigest()
+                    except Exception:
+                        continue
+                for candidate_kind in ("rendered-email-pdf", "attachment"):
+                    rel = _email_transfer_key_for_digest(
+                        route, message_id, candidate_kind, 0, filename,
+                        content_type, f"sha256:{sha256_hex}", sha256_hex)
+                    if _safe_staging_key(f"{STAGING_PREFIX}{rel}") == full_key:
+                        matched_kind = candidate_kind
+                        break
+            if not matched_kind:
+                continue
+            if body is None:
+                try:
+                    body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+                except Exception:
+                    continue
+            uri = f"s3://{bucket}/{full_key}"
+            if uri in seen_uris:
+                continue
+            seen_uris.add(uri)
+            candidates.append({
+                "kind": matched_kind,
+                "storageUri": uri,
+                "filename": filename,
+                "contentType": content_type,
+                "sizeBytes": len(body),
+                "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
+            })
+            if first_only:
+                return candidates
+
+    for full_key, candidate_kind in stable_by_full_key.items():
+        uri = f"s3://{bucket}/{full_key}"
+        if uri in seen_uris:
+            continue
+        rel = full_key[len(STAGING_PREFIX):] if full_key.startswith(STAGING_PREFIX) else full_key
+        staged = _already_staged(rel)
+        if staged:
+            storage_uri, body, checksum = staged
+            seen_uris.add(storage_uri)
+            candidates.append({
+                "kind": candidate_kind,
+                "storageUri": storage_uri,
+                "filename": filename,
+                "contentType": content_type,
+                "sizeBytes": len(body),
+                "checksum": checksum,
+            })
+            if first_only:
+                return candidates
+    return candidates
+
+
+def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=None, timeout=15):
+    """On a 409 for a rendered email PDF, retry against any earlier staged
+    candidates for ``(route, message_id)`` in DATAOPS_EMAIL_DOCUMENTS_BUCKET.
+
+    Handles messages whose first accepted delivery was staged under the
+    pre-a771da4 byte-derived key or an earlier kind/hash variant, even when a
+    subsequent failed replay staged a newer render beforehand.
+    """
+    if _is_leads_action(action) or not isinstance(event, dict) or event.get("connector") == "dropbox":
+        return None
+    if not isinstance(body, dict):
+        return None
+    data = event.get("data") if isinstance(event.get("data"), dict) else {}
+    source_data = (data.get("source_event", {}).get("data", data)
+                   if isinstance(data.get("source_event"), dict) else data)
+    if not isinstance(source_data, dict):
+        source_data = {}
+    document_step = str(action.get("document_step") or "").strip()
+    if document_step:
+        node = (steps or {}).get(document_step)
+        step_out = node.get("output") if isinstance(node, dict) and isinstance(node.get("output"), dict) else {}
+        if not step_out.get("job_id"):
+            return None
+    else:
+        out = data.get("output") if isinstance(data.get("output"), dict) else {}
+        if not (out.get("bucket") and out.get("key")):
+            return None
+    docs = body.get("documents") if isinstance(body.get("documents"), list) else []
+    if len(docs) != 1 or not isinstance(docs[0], dict):
+        return None
+    current = docs[0]
+    route = str(body.get("recipientRoute") or data.get("route") or source_data.get("route") or "")
+    message_id = str(body.get("messageId") or data.get("message_id") or source_data.get("message_id") or "")
+    filename = str(current.get("filename") or action.get("filename") or "invoice-email.pdf")
+    content_type = str(current.get("contentType") or "application/pdf")
+    candidates = _prior_staged_rendered(
+        route, message_id, filename, content_type,
+        source_data, source_hash=_source_hash(source_data), first_only=False)
+    for cand in candidates:
+        other_kind = "attachment" if cand["kind"] == "rendered-email-pdf" else "rendered-email-pdf"
+        for variant in (cand, {**cand, "kind": other_kind}):
+            if variant == current:
+                continue
+            try:
+                return base._json_request(
+                    url, {**body, "documents": [variant]},
+                    headers=headers, timeout=timeout,
+                )
+            except urllib.error.HTTPError as retry_exc:
+                if retry_exc.code == 409:
+                    continue
+                raise
+    return None
 
 
 def _email_intake_body(action, event, *, steps=None):
@@ -239,10 +453,11 @@ def _email_intake_body(action, event, *, steps=None):
     route = data.get("route") or source_data["route"]
     document_step = str(action.get("document_step") or "").strip()
     if document_step:
-        # A prior step (merge_pdfs) already decided the one document this
-        # email is about: forward exactly that, not every attachment.
+        # A prior step (merge_pdfs or render_html_to_pdf) already decided the
+        # one document this email is about: forward exactly that.
         documents = [_step_document(document_step, route, message_id, action, steps,
-                                    source_hash=_source_hash(source_data))]
+                                    source_hash=_source_hash(source_data),
+                                    source_data=source_data)]
     else:
         documents = []
         for index, attachment in enumerate(data.get("attachments", [])):
@@ -269,23 +484,25 @@ def _email_intake_body(action, event, *, steps=None):
         if output.get("bucket") and output.get("key"):
             filename = base._safe_filename(action.get("filename", "invoice-email.pdf"))
             content_type = data.get("content_type", "application/pdf")
-            key = _stable_transfer_key(route, message_id, "rendered-email-pdf", filename,
-                                       _source_hash(source_data))
-            staged = _already_staged(key)
-            if staged:
-                storage_uri, body, checksum = staged
+            sh = _source_hash(source_data)
+            prior = _prior_staged_rendered(
+                route, message_id, filename, content_type,
+                source_data, source_hash=sh, first_only=True)
+            if prior:
+                documents.append(prior[0])
             else:
+                key = _stable_transfer_key(route, message_id, "rendered-email-pdf", filename, sh)
                 body = base._s3_body(output)
                 checksum = f"sha256:{data['checksum']}"
                 storage_uri = _stage_document(key, body, content_type, checksum)
-            documents.append({
-                "kind": "rendered-email-pdf",
-                "storageUri": storage_uri,
-                "filename": filename,
-                "contentType": content_type,
-                "sizeBytes": len(body),
-                "checksum": checksum,
-            })
+                documents.append({
+                    "kind": "rendered-email-pdf",
+                    "storageUri": storage_uri,
+                    "filename": filename,
+                    "contentType": content_type,
+                    "sizeBytes": len(body),
+                    "checksum": checksum,
+                })
     sender = source_data.get("sender", {})
     sender_value = (sender.get("addresses") or [sender.get("header") or "unknown@example.com"])[0]
     return {
@@ -327,11 +544,12 @@ def _await_document(document, job_id, ref):
             delay = min(delay * 1.5, RENDER_POLL_MAX_SECONDS)
 
 
-def _step_document(ref, route, message_id, action, steps, source_hash=None):
-    """Stage the one document a prior step produced (a merge_pdfs output:
-    ``{"filename", "output": {"bucket", "key"}}`` under the step's output)
-    and build its intake document entry. The checksum is computed over the
-    stored bytes, so passthrough documents keep the original attachment's."""
+def _step_document(ref, route, message_id, action, steps, source_hash=None, source_data=None):
+    """Stage the one document a prior step produced (a merge_pdfs or
+    render_html_to_pdf output: ``{"filename", "output": {"bucket", "key"}}``
+    under the step's output) and build its intake document entry. The
+    checksum is computed over the stored bytes, so passthrough documents keep
+    the original attachment's."""
     node = (steps or {}).get(ref)
     output = node.get("output") if isinstance(node, dict) and isinstance(node.get("output"), dict) else {}
     document = output.get("output") if isinstance(output.get("output"), dict) else {}
@@ -339,24 +557,25 @@ def _step_document(ref, route, message_id, action, steps, source_hash=None):
         raise ValueError(f"dataops document_step '{ref}' does not reference a stored file")
     filename = base._safe_filename(str(document.get("filename") or output.get("filename") or "").strip()
                                    or action.get("filename") or "invoice-document.pdf")
+    kind = "rendered-email-pdf" if output.get("job_id") else "attachment"
     key = None
     if output.get("job_id") and source_hash:
         # Render-produced PDFs differ byte-wise between runs: key them by
         # the email identity and reuse the first staged copy on replay.
-        key = _stable_transfer_key(route, message_id, "attachment", filename, source_hash)
-        staged = _already_staged(key)
-        if staged:
-            storage_uri, body, checksum = staged
-            return {"kind": "attachment", "storageUri": storage_uri, "filename": filename,
-                    "contentType": "application/pdf", "sizeBytes": len(body), "checksum": checksum}
+        prior = _prior_staged_rendered(
+            route, message_id, filename, "application/pdf",
+            source_data, source_hash=source_hash, first_only=True)
+        if prior:
+            return prior[0]
+        key = _stable_transfer_key(route, message_id, kind, filename, source_hash)
     body = _await_document(document, output.get("job_id"), ref)
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
     storage_uri = _stage_document(
-        key or _email_transfer_key(route, message_id, "attachment", 0, filename,
+        key or _email_transfer_key(route, message_id, kind, 0, filename,
                                    body, "application/pdf", checksum),
         body, "application/pdf", checksum)
     return {
-        "kind": "attachment",
+        "kind": kind,
         "storageUri": storage_uri,
         "filename": filename,
         "contentType": "application/pdf",
