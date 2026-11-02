@@ -3,6 +3,7 @@ request path, the error shape, the projection views steps consume, and the
 field-rendering helpers the create/update payload builders share."""
 import importlib
 import json
+import urllib.error
 import urllib.parse
 from datetime import datetime
 
@@ -41,6 +42,8 @@ def _request_json(method, access_token, path, payload=None, *, transport=None):
         body = json.dumps(payload, separators=(",", ":")).encode()
     try:
         status, response = transport(method, url, headers=headers, body=body, timeout=15)
+    except urllib.error.HTTPError as exc:
+        status, response = exc.code, exc.read()
     except Exception as exc:
         raise RuntimeError(f"zoom unreachable: {type(exc).__name__}")
     try:

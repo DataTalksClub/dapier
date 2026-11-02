@@ -596,3 +596,28 @@ def test_webinar_action_chains_validate():
         validate_action_chain([{"type": "zoom_update_webinar",
                                 "connection_id": "zoom",
                                 "webinar_id": "9", "bogus": 1}])
+
+
+def test_zoom_find_recording_handles_urllib_http_404_as_not_found():
+    import io
+    import urllib.error
+    from plugins.zoom.runners import run_zoom_find_recording
+
+    def raising_404(method, url, *, headers=None, body=None, timeout=15):
+        raise urllib.error.HTTPError(
+            url, 404, "Not Found", {},
+            io.BytesIO(b'{"code":3301,"message":"There is no recording for this meeting"}'),
+        )
+
+    out = run_zoom_action(
+        run_zoom_find_recording,
+        {"meeting_id": "86583618661"},
+        transport=raising_404,
+    )
+    assert out == {
+        "found": False,
+        "count": 0,
+        "recording": None,
+        "recordings": [],
+    }
+
