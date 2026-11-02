@@ -30,6 +30,8 @@ def test_verification_health_and_safe_errors(monkeypatch):
         assert TOKEN not in str(error.value)
     with pytest.raises(ValueError): verifier('invalid token')
     assert verifier('legacy-custom-token', transport=transport)[0] == 'courses.datatalks.club'
+    monkeypatch.setattr('src.dapier.engine.actions.base._default_transport', transport)
+    assert verifier(TOKEN) == ('courses.datatalks.club', 'Course Management Platform production')
 
 
 def test_console_and_agent_store_the_same_verified_scoped_connection(monkeypatch):

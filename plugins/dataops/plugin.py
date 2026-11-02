@@ -1,7 +1,6 @@
 """DataOps service connections. Invoice processing remains in DataOps."""
 import json
 import re
-import urllib.request
 
 from src.dapier.connections.importing import register_token_provider
 from src.dapier.connectors.registry import ConnectionTest, register_connection_test
@@ -9,17 +8,17 @@ from src.dapier.connectors.registry import ConnectionTest, register_connection_t
 IDENTITY_URL = "https://ops.dtcdev.click/api/me"
 
 
-def _transport(method, url, *, headers, body, timeout):
-    request = urllib.request.Request(url, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.status, response.read()
+def _default_transport(method, url, *, headers=None, body=None, timeout=15):
+    from src.dapier.engine.actions import base
+
+    return base._default_transport(method, url, headers=headers, body=body, timeout=timeout)
 
 
 def verify_account(token, *, transport=None):
     if not re.fullmatch(r"dops_svc_[a-f0-9]{64}", str(token or "")):
         raise ValueError("Enter a valid DataOps service credential")
     try:
-        status, raw = (transport or _transport)("GET", IDENTITY_URL,
+        status, raw = (transport or _default_transport)("GET", IDENTITY_URL,
             headers={"authorization": f"Bearer {token}"}, body=None, timeout=15)
         data = json.loads(raw) if status == 200 else {}
         service = data.get("service") or {}

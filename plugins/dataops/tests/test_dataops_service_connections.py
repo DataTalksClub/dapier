@@ -28,6 +28,8 @@ def test_verification_health_and_safe_errors(monkeypatch):
             verifier(TOKEN, transport=lambda *a, **kw: (status, raw))
         assert TOKEN not in str(error.value)
     with pytest.raises(ValueError): verifier('invalid')
+    monkeypatch.setattr('src.dapier.engine.actions.base._default_transport', transport)
+    assert verifier(TOKEN) == ('invoice-reader', 'DataOps invoice reader')
 
 
 def test_console_and_agent_store_the_same_verified_scoped_connection(monkeypatch):

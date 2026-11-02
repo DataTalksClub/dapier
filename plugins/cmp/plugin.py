@@ -1,7 +1,6 @@
 """CMP credential orchestration; course management stays in CMP."""
 import json
 import re
-import urllib.request
 from src.dapier.connections.importing import register_token_provider
 from src.dapier.connectors.registry import ConnectionTest, register_connection_test
 
@@ -9,17 +8,19 @@ API_URL = "https://courses.datatalks.club/api/courses/"
 ACCOUNT_ID = "courses.datatalks.club"
 ACCOUNT_TITLE = "Course Management Platform production"
 
-def _transport(method, url, *, headers, body, timeout):
-    request = urllib.request.Request(url, headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.status, response.read()
+
+def _default_transport(method, url, *, headers=None, body=None, timeout=15):
+    from src.dapier.engine.actions import base
+
+    return base._default_transport(method, url, headers=headers, body=body, timeout=timeout)
+
 
 def verify_account(token, *, transport=None):
     # CMP uses Django's Token authentication, not Bearer authentication.
     if not re.fullmatch(r"[!-~]{1,512}", str(token or "")):
         raise ValueError("Enter a valid CMP API token")
     try:
-        status, raw = (transport or _transport)("GET", API_URL,
+        status, raw = (transport or _default_transport)("GET", API_URL,
             headers={"authorization": f"Token {token}"}, body=None, timeout=15)
         data = json.loads(raw) if status == 200 else {}
         if not isinstance(data, dict) or not isinstance(data.get("courses"), list):
