@@ -83,6 +83,12 @@ jobs:
       - run: sam build --config-env sandbox
       - name: Apply renderer ECR policy before rollback recovery
         run: uv run --with pyyaml python scripts/apply-renderer-ecr-policy.py
+      - name: Inspect effective renderer ECR policy (read-only)
+        continue-on-error: true
+        run: |
+          aws ecr get-repository-policy --registry-id 817685572750 \
+            --repository-name dapier-html-renderer \
+            --query policyText --output text || echo "Unable to read renderer ECR policy with deploy role"
       # A failed deploy whose rollback also failed leaves the stack in
       # UPDATE_ROLLBACK_FAILED, where every further deploy is rejected.
       - name: Resume an interrupted rollback
