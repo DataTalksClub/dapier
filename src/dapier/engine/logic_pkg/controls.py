@@ -1,11 +1,14 @@
 """The flow controls between steps: filters,
 conditions, paths, decisions (the LLM if/switch), and delays
 (the pause/resume machinery)."""
+import logging
 import re
 import time
 from .core import (MAX_DELAY_SECONDS, MAX_SUSPENDED_SECONDS, RunSuspended,
                    _TOKEN, _iso, _lookup, evaluate_rules, parse_moment,
                    predicate_rules, render_value)
+
+logger = logging.getLogger(__name__)
 
 
 def _predicate_scope(event, scope):
@@ -214,6 +217,9 @@ def _decision_branch(workflow_id, action_id, step, event, run_action, *,
                 break
     if not isinstance(steps, list):
         raise ValueError(f"decision '{action_id}' branch '{branch}' must be a list of steps")
+    if not steps:
+        logger.info("decision '%s' in %s intentionally skipped branch '%s' (no actions)",
+                    action_id, workflow_id, branch)
     from .chains import run_chain  # lazy: chains (transitively) imports this module
 
     stop = run_chain(

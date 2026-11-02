@@ -394,6 +394,42 @@ def test_handler_records_inbox_outcome(monkeypatch):
     assert completed == [("inbox-1", ["wf-1"], None)]
 
 
+def test_handler_raises_error_and_alert_when_zoom_event_matches_no_workflow(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    notified = []
+    completed = []
+    monkeypatch.setattr(worker, "notify_failure",
+                        lambda exc, event: notified.append((str(exc), event)))
+    monkeypatch.setattr(worker.inbox, "record", lambda event: "zoom:evt-1")
+    monkeypatch.setattr(worker.inbox, "complete",
+                        lambda inbox_id, matched, error=None: completed.append((inbox_id, matched, error)))
+    monkeypatch.setattr(worker, "execute", lambda payload, **hooks: [])
+
+    zoom_event = {
+        "id": "zoom:evt-1",
+        "connector": "zoom",
+        "event": "recording.completed",
+        "data": {"meeting_id": 85059188709, "topic": "Lamin Ceesay and Alexey Grigorev"},
+    }
+    event = {"Records": [{"attributes": {"SenderId": "AROAINTAKE:test"}, "messageId": "m1",
+                          "body": json.dumps(zoom_event)}]}
+    result = worker.handler(event, None)
+
+    assert result == {"batchItemFailures": []}
+    assert completed == [("zoom:evt-1", [], None)]
+    assert len(notified) == 1
+    assert notified[0][0] == "Zoom event 'recording.completed' matched no workflow"
+    assert notified[0][1]["id"] == "zoom:evt-1"
+    assert len(calls) == 1
+    item = calls[0][1]["Item"]
+    assert item["execution_id"] == "zoom-unmatched:match-workflow:zoom:evt-1"
+    assert item["run_id"] == "zoom-unmatched:zoom:evt-1"
+    assert item["workflow_id"] == "zoom-unmatched"
+    assert item["status"] == "failed"
+    assert item["error"] == "Zoom event 'recording.completed' matched no workflow"
+
+
 def test_handler_requeues_and_stays_quiet_on_lease_busy(monkeypatch):
     notified = []
     completed = []

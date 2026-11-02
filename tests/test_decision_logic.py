@@ -521,3 +521,18 @@ class DryRunTests(unittest.TestCase):
         step = dryrun.find_step(WORKFLOW, "classify.one-on-one.zoom-calls-agent")
         assert step is not None and step["type"] == "agent"
         assert dryrun.find_step(WORKFLOW, "classify.default.fallback") is not None
+
+    def test_empty_decision_branch_logs_intentionally_skipped(self):
+        step = {**SWITCH_STEP, "choices": ["one-on-one", "otherwise"], "cases": [
+            {"choice": "one-on-one",
+             "actions": [{"id": "zoom-calls-agent", "type": "agent", "prompt": "x"}]},
+            {"choice": "otherwise", "actions": []},
+        ]}
+        with self.assertLogs("src.dapier.engine.logic_pkg.controls", level="INFO") as logs:
+            stop, output, status, ran, _ = run_decision(step, "otherwise")
+        assert stop is None and status == "completed"
+        assert ran == []
+        assert output["choice"] == "otherwise"
+        assert output["branch"] == "otherwise"
+        assert output["steps"] == 0
+        assert any("intentionally skipped branch 'otherwise'" in msg for msg in logs.output)

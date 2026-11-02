@@ -903,6 +903,47 @@ def _emit_failure_notice(exc, event, *, paused=False):
         logger.exception("failure notice failed")
 
 
+def _report_unmatched_zoom(event):
+    """Record a failed execution and alert the operator when a Zoom event
+    matches no workflow, so unmatched Zoom deliveries never drop silently."""
+    exc = RuntimeError(f"Zoom event '{event.get('event')}' matched no workflow")
+    logger.error("zoom event matched no workflow", extra={
+        "event": event.get("event"), "event_id": event.get("id"),
+    })
+    if os.environ.get("EXECUTIONS_TABLE"):
+        try:
+            import boto3
+
+            now = int(time.time())
+            stamp = now_iso()
+            item = {
+                "execution_id": _execution_id("zoom-unmatched", "match-workflow", event),
+                "run_id": _run_id("zoom-unmatched", event),
+                "workflow_id": "zoom-unmatched",
+                "action_id": "match-workflow",
+                "action_type": "trigger",
+                "connector": event.get("connector"),
+                "event_type": event.get("event"),
+                "correlation_id": event.get("correlation_id") or event.get("id"),
+                "status": "failed",
+                "error": str(exc)[:500],
+                "started_at": stamp,
+                "finished_at": stamp,
+                "lease_until": now - 1,
+                "expires_at": now + 90 * 86400,
+                "input": _stored(event.get("data") or {}, limit=TRIGGER_INPUT_LIMIT),
+            }
+            if event.get("occurred_at"):
+                item["occurred_at"] = event["occurred_at"]
+            boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(
+                Item=item,
+            )
+        except Exception:
+            logger.warning("recording unmatched zoom failure failed",
+                           extra={"event_id": event.get("id")}, exc_info=True)
+    _emit_failure_notice(exc, event)
+
+
 def _poll_now(message):
     """Run one manual poll check; failures are logged and notified like a
     scheduled fire's, never re-raised (no SQS retry of an operator click)."""
@@ -1062,4 +1103,6 @@ def handler(event, _context):
         else:
             inbox.complete(inbox_id, matched)
             _note_schedule_fire(payload, matched=matched)
+            if payload.get("connector") == "zoom" and not matched:
+                _report_unmatched_zoom(payload)
     return {"batchItemFailures": failures}

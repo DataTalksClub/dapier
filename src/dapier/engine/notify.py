@@ -98,15 +98,17 @@ def notify_addresses(workflow_id):
 def _ingress_subject(event):
     """A name for a failure with no workflow behind it, or None.
 
-    Only named ingress failures notify the operator — today, poll-trigger
-    fires the worker could not run (the connector's ``poll`` marker names
-    the trigger). Arbitrary untagged queue records stay quiet: the DLQ and
-    worker alarms cover garbage volume.
+    Only named ingress failures notify the operator — poll-trigger fires the
+    worker could not run (the connector's ``poll`` marker names the trigger)
+    and Zoom events that matched no workflow. Arbitrary untagged queue
+    records stay quiet: the DLQ and worker alarms cover garbage volume.
     """
     data = event.get("data") if isinstance(event.get("data"), dict) else {}
     poll = event.get("poll") or data.get("poll")
     if event.get("connector") == "poll" and poll:
         return f"poll:{poll}"
+    if event.get("connector") == "zoom":
+        return "zoom-unmatched"
     return None
 
 

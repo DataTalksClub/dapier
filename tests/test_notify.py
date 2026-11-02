@@ -256,6 +256,36 @@ def test_untagged_non_poll_events_stay_declined(monkeypatch):
     assert calls == []
 
 
+def test_unmatched_zoom_event_notifies_the_operator(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
+    ses = FakeSes()
+    event = {
+        "id": "zoom:12aa1ffeb801a12b4e20bb59e002ab93",
+        "connector": "zoom",
+        "event": "recording.completed",
+        "data": {"meeting_id": 85059188709, "topic": "1x1"},
+    }
+
+    result = notify.notify_failure(
+        RuntimeError("Zoom event 'recording.completed' matched no workflow"),
+        event, ses=ses)
+
+    assert result["to"] == ["ops@example.test"]
+    assert result["run_id"] == "zoom-unmatched:zoom:12aa1ffeb801a12b4e20bb59e002ab93"
+    sent = ses.calls[0]
+    assert "[dapier] Run failed: zoom-unmatched" in sent["Message"]["Subject"]["Data"]
+    body = sent["Message"]["Body"]["Text"]["Data"]
+    assert "workflow: zoom-unmatched" in body
+    assert "trigger: zoom / recording.completed" in body
+    assert "failing step error: Zoom event 'recording.completed' matched no workflow" in body
+    item = calls[0][1]["Item"]
+    assert item["execution_id"] == "zoom-unmatched:failure-notice:zoom:12aa1ffeb801a12b4e20bb59e002ab93"
+    assert item["workflow_id"] == "zoom-unmatched"
+
+
 def test_non_dict_events_stay_declined(monkeypatch):
     calls = []
     _patch_table(monkeypatch, calls)
