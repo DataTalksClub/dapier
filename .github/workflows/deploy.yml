@@ -97,6 +97,13 @@ jobs:
           aws ecr get-repository-policy --registry-id 817685572750 \
             --repository-name dapier-html-renderer \
             --query policyText --output text || echo "Unable to read renderer ECR policy with deploy role"
+      - name: Check renderer image artifact (read-only)
+        continue-on-error: true
+        run: |
+          aws ecr batch-get-image --registry-id 817685572750 \
+            --repository-name dapier-html-renderer \
+            --image-ids imageTag=20260712-lambda \
+            --query '{images:images[].imageId,failures:failures}' --output json
       # A failed deploy whose rollback also failed leaves the stack in
       # UPDATE_ROLLBACK_FAILED, where every further deploy is rejected.
       - name: Resume an interrupted rollback
