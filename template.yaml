@@ -1228,6 +1228,12 @@ Resources:
             BucketName: !Ref RenderArtifactsBucket
         - SQSSendMessagePolicy:
             QueueName: !GetAtt EventQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ecr:BatchGetImage
+                - ecr:GetDownloadUrlForLayer
+              Resource: !GetAtt HtmlRendererRepository.Arn
       Events:
         Jobs:
           Type: SQS
