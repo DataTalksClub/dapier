@@ -9,7 +9,8 @@ cached = true
 
 [sandbox.deploy.parameters]
 resolve_s3 = true
-resolve_image_repos = true
+resolve_image_repos = false
+image_repositories = ["HtmlRendererFunction=817685572750.dkr.ecr.eu-west-1.amazonaws.com/dapier-html-renderer"]
 capabilities = "CAPABILITY_IAM"
 role_arn = "arn:aws:iam::817685572750:role/dapier-cloudformation-service"
 confirm_changeset = false
