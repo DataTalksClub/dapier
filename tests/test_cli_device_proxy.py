@@ -150,6 +150,7 @@ def test_no_proxy_bypasses_a_dead_env_proxy(
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
     session = auth.login_device(
