@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +77,7 @@ def main() -> None:
         print(policy_text)
         return
 
-    subprocess.run(
+    result = subprocess.run(
         [
             "aws",
             "ecr",
@@ -88,8 +89,18 @@ def main() -> None:
             "--policy-text",
             policy_text,
         ],
-        check=True,
+        capture_output=True,
+        text=True,
     )
+    if result.returncode:
+        if "AccessDeniedException" in result.stderr and "ecr:SetRepositoryPolicy" in result.stderr:
+            print(
+                "GitHub OIDC role cannot set the ECR policy directly; continuing with "
+                "CloudFormation rollback using the configured deployment role.",
+                file=sys.stderr,
+            )
+            return
+        raise SystemExit(result.stderr or f"aws ecr set-repository-policy failed ({result.returncode})")
 
 
 if __name__ == "__main__":
