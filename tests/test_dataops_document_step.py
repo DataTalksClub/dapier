@@ -715,3 +715,168 @@ def test_worker_timeout_covers_the_render_wait():
     visibility = int(re.search(r"VisibilityTimeout: (\d+)", queue).group(1))
     assert timeout >= 180 + 60
     assert visibility >= timeout
+
+
+def test_replay_of_legacy_filing_reconciles_to_the_filed_manifest():
+    """2026-11-02 AC3 live case: a message first accepted under the byte
+    derived key (before the stable-key scheme) cannot be re-delivered
+    byte-identically because renders are not deterministic. The intake reuse
+    path submits the failed replay's stable-keyed copy, DataOps rejects it
+    (409), and recovery may now reconcile with the corroborated legacy
+    original: its key recomputes only from route, message_id, kind,
+    filename, content_type and the object's own bytes, and DataOps accepts
+    the POST because the full manifest (envelope + document) matches the
+    first filing exactly. No content is replaced and nothing is re-staged."""
+    import io
+    import urllib.error
+    from unittest.mock import patch
+
+    from src.dapier.engine.actions import dataops
+
+    fake = _FakeStagingS3()
+    filed_bytes = b"%PDF-1.4 render filed at 08:53Z"
+    filed_sha = hashlib.sha256(filed_bytes).hexdigest()
+    legacy_key = dataops._email_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", 0,
+        "invoice-email.pdf", filed_bytes, "application/pdf",
+        "sha256:" + filed_sha,
+    )
+    fake.put_object(
+        Bucket="staging", Key="transfer/" + legacy_key, Body=filed_bytes,
+        Metadata={"sha256": filed_sha},
+    )
+    spurious_bytes = b"%PDF-1.4 spurious render staged by the failed replay"
+    spurious_sha = hashlib.sha256(spurious_bytes).hexdigest()
+    spurious_key = dataops._stable_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", "invoice-email.pdf",
+        dataops._source_hash(EVENT["data"]),
+    )
+    fake.put_object(
+        Bucket="staging", Key="transfer/" + spurious_key, Body=spurious_bytes,
+        Metadata={"sha256": spurious_sha},
+    )
+
+    filed = {
+        "version": "2026-07-01",
+        "messageId": EVENT["data"]["message_id"],
+        "recipientRoute": EVENT["data"]["route"],
+        "from": "unknown@example.com",
+        "subject": EVENT["data"]["subject"],
+        "receivedAt": "2026-10-12T09:00:00Z",
+        "documents": [{
+            "kind": "rendered-email-pdf",
+            "storageUri": "s3://staging/transfer/" + legacy_key,
+            "filename": "invoice-email.pdf",
+            "contentType": "application/pdf",
+            "sizeBytes": len(filed_bytes),
+            "checksum": "sha256:" + filed_sha,
+        }],
+    }
+    seen = []
+
+    def fake_request(url, payload, headers=None, timeout=15):
+        seen.append(payload)
+        if payload == filed:
+            return {"status": "duplicate", "invoices": [{"id": "inv-1"}]}
+        raise urllib.error.HTTPError(url, 409, "Conflict", hdrs=None, fp=io.BytesIO(b""))
+
+    intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
+    with patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
+         patch.object(dataops, "_s3", return_value=fake), \
+         patch.object(dataops.base, "_s3_body", return_value=b"%PDF-1.4 replay render"), \
+         patch("src.dapier.engine.actions.base.secrets_value", return_value="tok"), \
+         patch("src.dapier.engine.actions.base._connected_connection",
+               return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
+         patch("src.dapier.engine.actions.base._json_request", side_effect=fake_request):
+        result = run_dataops(intake_action, EVENT, steps=RENDER_STEPS)
+
+    assert result == {"status": "duplicate", "invoices": [{"id": "inv-1"}]}
+    # seen[0] is the intake build POST (the spurious stable-keyed copy DataOps
+    # rejects); seen[1] is the recovery POST that reconciles to the filing.
+    assert seen[0]["documents"][0]["storageUri"].endswith(spurious_key)
+    assert seen[1] == filed
+    assert len(fake.objects) == 2
+
+
+def test_recovery_of_legacy_filing_still_conflicts_when_email_changed():
+    """Review finding A still holds: recovery may now try the corroborated
+    legacy original, but DataOps arbitrates on the full manifest, so a
+    genuinely changed email under the same (route, message_id) still fails
+    with 'DataOps source conflict' - the recovery POST carries the changed
+    envelope, DataOps 409s it, and no stale candidate masks the conflict."""
+    import io
+    import urllib.error
+    from unittest.mock import patch
+
+    from src.dapier.engine.actions import dataops
+
+    fake = _FakeStagingS3()
+    filed_bytes = b"%PDF-1.4 render filed at 08:53Z"
+    filed_sha = hashlib.sha256(filed_bytes).hexdigest()
+    legacy_key = dataops._email_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", 0,
+        "invoice-email.pdf", filed_bytes, "application/pdf",
+        "sha256:" + filed_sha,
+    )
+    fake.put_object(
+        Bucket="staging", Key="transfer/" + legacy_key, Body=filed_bytes,
+        Metadata={"sha256": filed_sha},
+    )
+    changed_event = {
+        **EVENT,
+        "data": {
+            **EVENT["data"],
+            "subject": "Altered Stripe receipt for 9999 EUR",
+            "body": {"html": {"content_type": "text/html", "size": 10, "value": "<p>9999</p>"}},
+        },
+    }
+    changed_bytes = b"%PDF-1.4 changed-email replay render"
+    changed_sha = hashlib.sha256(changed_bytes).hexdigest()
+    changed_key = dataops._stable_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", "invoice-email.pdf",
+        dataops._source_hash(changed_event["data"]),
+    )
+    fake.put_object(
+        Bucket="staging", Key="transfer/" + changed_key, Body=changed_bytes,
+        Metadata={"sha256": changed_sha},
+    )
+
+    filed = {
+        "version": "2026-07-01",
+        "messageId": EVENT["data"]["message_id"],
+        "recipientRoute": EVENT["data"]["route"],
+        "from": "unknown@example.com",
+        "subject": EVENT["data"]["subject"],
+        "receivedAt": "2026-10-12T09:00:00Z",
+        "documents": [{
+            "kind": "rendered-email-pdf",
+            "storageUri": "s3://staging/transfer/" + legacy_key,
+            "filename": "invoice-email.pdf",
+            "contentType": "application/pdf",
+            "sizeBytes": len(filed_bytes),
+            "checksum": "sha256:" + filed_sha,
+        }],
+    }
+    seen = []
+
+    def fake_request(url, payload, headers=None, timeout=15):
+        seen.append(payload)
+        if payload == filed:
+            return {"status": "duplicate"}
+        raise urllib.error.HTTPError(url, 409, "Conflict", hdrs=None, fp=io.BytesIO(b""))
+
+    intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
+    with patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
+         patch.object(dataops, "_s3", return_value=fake), \
+         patch.object(dataops.base, "_s3_body", return_value=changed_bytes), \
+         patch("src.dapier.engine.actions.base.secrets_value", return_value="tok"), \
+         patch("src.dapier.engine.actions.base._connected_connection",
+               return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
+         patch("src.dapier.engine.actions.base._json_request", side_effect=fake_request):
+        with pytest.raises(ValueError, match="DataOps source conflict"):
+            run_dataops(intake_action, changed_event, steps=RENDER_STEPS)
+
+    assert len(seen) == 2
+    assert seen[0]["documents"][0]["storageUri"].endswith(changed_key)
+    assert seen[1]["documents"][0]["storageUri"].endswith(legacy_key)
+    assert seen[1]["subject"] == "Altered Stripe receipt for 9999 EUR"

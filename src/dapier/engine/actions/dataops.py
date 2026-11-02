@@ -498,9 +498,20 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
 
 
 def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=None, timeout=15):
-    """On a 409 for a rendered email PDF, reconcile only against staged
-    candidates in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the
-    same message/document (same route, message_id, kind, and content hash).
+    """On a 409 for a rendered email PDF, reconcile against staged candidates
+    in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the same
+    message/document (same route, message_id, kind, and content hash).
+
+    Corroborated legacy byte-keyed candidates are allowed here: a delivery
+    first accepted before the stable-key scheme was deployed was staged under
+    a key derived from its render bytes, so no byte-identical or
+    metadata-carried candidate can exist for it (the 2026-11-02 replays of
+    the 05:09Z/06:57Z filings). The corroboration gate in
+    _prior_staged_rendered still accepts a legacy candidate only when a
+    stable-keyed object for this exact email identity exists, and DataOps
+    remains the final arbiter: every recovery POST carries the current
+    envelope, and DataOps compares the full manifest hash, so a genuinely
+    changed email still returns 409 and the conflict is re-raised.
     """
     if _is_leads_action(action) or not isinstance(event, dict) or event.get("connector") == "dropbox":
         return None
@@ -534,8 +545,7 @@ def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=
     candidates = _prior_staged_rendered(
         route, message_id, filename, content_type,
         source_data, source_hash=_source_hash(source_data),
-        body_sha256=body_sha256, kind=kind,
-        allow_corroborated_legacy=False, first_only=False)
+        body_sha256=body_sha256, kind=kind, first_only=False)
     deadline = time.monotonic() + CONFLICT_RECOVERY_TIMEOUT_SECONDS
     attempts = 0
     for cand in candidates:
