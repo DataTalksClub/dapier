@@ -17,6 +17,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 
+from ..clock import now_iso
 from ..paging import decode_token, encode_token
 from . import services as connection_services
 from .providers import oauth_providers, slack_tokens
@@ -74,10 +75,6 @@ class ConnectionError(ValueError):
 
 class BindingError(ConnectionError):
     """The verified provider account does not match the bound account."""
-
-
-def now_iso():
-    return datetime.now(timezone.utc).isoformat()
 
 
 def validate_connection_id(connection_id):
