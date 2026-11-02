@@ -138,3 +138,33 @@ def test_the_registry_lists_document_step():
     assert "document_step" in spec.optional
     keys = [field["key"] for field in spec.fields]
     assert "document_step" in keys
+
+
+class _NoSuchKey(Exception):
+    response = {"Error": {"Code": "NoSuchKey"}}
+
+
+RENDER_STEPS = {"route.else.render-pdf": {"output": {
+    "job_id": "ev1:invoice-intake:render-pdf",
+    "output": {"bucket": "artifacts", "key": "invoice-body/ev1.pdf"}}}}
+RENDER_ACTION = {**ACTION, "document_step": "route.else.render-pdf"}
+
+
+def test_missing_render_output_fails_with_clear_error_naming_the_job():
+    from src.dapier.engine.actions import dataops
+    with patch.object(dataops.base, "_s3_body", side_effect=_NoSuchKey()), \
+         patch.object(dataops, "RENDER_WAIT_SECONDS", 0), \
+         patch.object(dataops, "RENDER_POLL_SECONDS", 0):
+        with pytest.raises(RuntimeError) as err:
+            dataops._step_document("route.else.render-pdf", "invoice", "msg-1", RENDER_ACTION, RENDER_STEPS)
+    assert "ev1:invoice-intake:render-pdf" in str(err.value)
+    assert "dead-letter" in str(err.value)
+
+
+def test_render_output_arriving_late_is_awaited():
+    from src.dapier.engine.actions import dataops
+    with patch.object(dataops.base, "_s3_body", side_effect=[_NoSuchKey(), BODY]), \
+         patch.object(dataops, "RENDER_POLL_SECONDS", 0), \
+         patch.object(dataops, "_stage_document", return_value="s3://stage/k"):
+        doc = dataops._step_document("route.else.render-pdf", "invoice", "msg-1", RENDER_ACTION, RENDER_STEPS)
+    assert doc["sizeBytes"] == len(BODY)

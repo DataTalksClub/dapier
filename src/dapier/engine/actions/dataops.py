@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+import time
 import urllib.error
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -257,6 +258,31 @@ def _email_intake_body(action, event, *, steps=None):
     }
 
 
+RENDER_WAIT_SECONDS = 45
+RENDER_POLL_SECONDS = 3
+
+
+def _await_document(document, job_id, ref):
+    """Read a prior step's stored file. A render step only queues its job, so
+    the PDF may not exist yet: wait a bounded time, then fail with an error
+    naming the render job instead of a raw NoSuchKey."""
+    deadline = time.monotonic() + (RENDER_WAIT_SECONDS if job_id else 0)
+    while True:
+        try:
+            return base._s3_body(document)
+        except Exception as exc:
+            code = getattr(exc, "response", {}).get("Error", {}).get("Code")
+            if code not in ("NoSuchKey", "404"):
+                raise
+            if time.monotonic() >= deadline:
+                what = f"render job {job_id}" if job_id else f"step '{ref}'"
+                raise RuntimeError(
+                    f"dataops document_step '{ref}': output s3://{document['bucket']}/{document['key']} "
+                    f"does not exist ({what} has not produced it; the job may have failed - "
+                    f"check the render dead-letter queue)") from None
+            time.sleep(RENDER_POLL_SECONDS)
+
+
 def _step_document(ref, route, message_id, action, steps):
     """Stage the one document a prior step produced (a merge_pdfs output:
     ``{"filename", "output": {"bucket", "key"}}`` under the step's output)
@@ -267,7 +293,7 @@ def _step_document(ref, route, message_id, action, steps):
     document = output.get("output") if isinstance(output.get("output"), dict) else {}
     if not (isinstance(document, dict) and document.get("bucket") and document.get("key")):
         raise ValueError(f"dataops document_step '{ref}' does not reference a stored file")
-    body = base._s3_body(document)
+    body = _await_document(document, output.get("job_id"), ref)
     filename = base._safe_filename(str(document.get("filename") or output.get("filename") or "").strip()
                                    or action.get("filename") or "invoice-document.pdf")
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
