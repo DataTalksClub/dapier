@@ -229,6 +229,10 @@ def _stable_transfer_key(route, message_id, kind, filename, source_hash):
     return f"email/{digest}/{filename}"
 
 
+def _s3_error_code(exc):
+    return str(getattr(exc, "response", {}).get("Error", {}).get("Code") or "")
+
+
 def _already_staged(key):
     """Return (uri, body, checksum) of an object staged earlier under ``key``,
     or None. Replays must submit the first delivery's bytes and checksum."""
@@ -237,8 +241,7 @@ def _already_staged(key):
     try:
         obj = _s3().get_object(Bucket=bucket, Key=full)
     except Exception as exc:
-        code = getattr(exc, "response", {}).get("Error", {}).get("Code")
-        if code in ("NoSuchKey", "404", "NotFound", "AccessDenied", "403"):
+        if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
             return None
         raise
     body = obj["Body"].read()
@@ -261,15 +264,26 @@ def _email_transfer_key(route, message_id, kind, index, filename, body, content_
         content_type, checksum, hashlib.sha256(body).hexdigest())
 
 
-def _prior_staged_rendered(route, message_id, filename, content_type="application/pdf",
-                           source_data=None, *, source_hash=None, first_only=False):
-    """Discover rendered-PDF objects already staged for ``(route, message_id)``
-    in DATAOPS_EMAIL_DOCUMENTS_BUCKET, ordered by ``LastModified`` ascending
-    (oldest first, matching DataOps's first-write-wins idempotency rule).
+STAGING_SCAN_MAX_PAGES = 2
+STAGING_SCAN_MAX_OBJECTS = 200
+STAGING_SCAN_MAX_PROBES = 10
+STAGING_SCAN_TIMEOUT_SECONDS = 5.0
+CONFLICT_RECOVERY_MAX_CANDIDATES = 3
+CONFLICT_RECOVERY_TIMEOUT_SECONDS = 10.0
 
-    Covers both the stable-key scheme and the pre-a771da4 byte-derived
-    ``_email_transfer_key`` scheme (verified via the object's sha256 metadata
-    or body digest), across ``rendered-email-pdf`` and ``attachment`` kinds.
+
+def _prior_staged_rendered(route, message_id, filename, content_type="application/pdf",
+                           source_data=None, *, source_hash=None, body_sha256=None,
+                           kind="rendered-email-pdf", allow_corroborated_legacy=True,
+                           first_only=False):
+    """Discover rendered-PDF objects already staged for ``(route, message_id)``
+    in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the same
+    message/document (same message_id, same ``kind``, and matching source or
+    content hash).
+
+    Prefers direct key lookups (stable keys for current/legacy source_hash and
+    the direct byte-derived key when ``body_sha256`` is known) before falling
+    back to a count- and time-bounded prefix scan.
     """
     bucket = os.environ.get("DATAOPS_EMAIL_DOCUMENTS_BUCKET")
     if not bucket or not route or not message_id:
@@ -283,121 +297,210 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
             h = fn(source_data)
             if h not in hashes:
                 hashes.append(h)
-    stable_by_full_key = {}
-    for sh in hashes:
-        for candidate_kind in ("rendered-email-pdf", "attachment"):
-            rel = _stable_transfer_key(route, message_id, candidate_kind, filename, sh)
-            full = _safe_staging_key(f"{STAGING_PREFIX}{rel}")
-            stable_by_full_key.setdefault(full, candidate_kind)
 
-    items = []
-    if hasattr(s3, "list_objects_v2"):
-        token = None
-        for _ in range(10):
-            kwargs = {"Bucket": bucket, "Prefix": f"{STAGING_PREFIX}email/"}
-            if token:
-                kwargs["ContinuationToken"] = token
-            try:
-                page = s3.list_objects_v2(**kwargs)
-            except Exception:
-                break
-            if not isinstance(page, dict):
-                break
-            contents = page.get("Contents")
-            if isinstance(contents, list):
-                items.extend(item for item in contents if isinstance(item, dict))
-            if not page.get("IsTruncated") or not page.get("NextContinuationToken"):
-                break
-            token = page["NextContinuationToken"]
+    direct_rel_keys = []
+    stable_full_keys = set()
+    corroborating_full_keys = set()
+    for sh in hashes:
+        rel = _stable_transfer_key(route, message_id, kind, filename, sh)
+        full = _safe_staging_key(f"{STAGING_PREFIX}{rel}")
+        if rel not in direct_rel_keys:
+            direct_rel_keys.append(rel)
+        stable_full_keys.add(full)
+        corroborating_full_keys.add(full)
+        att_rel = _stable_transfer_key(route, message_id, "attachment", filename, sh)
+        corroborating_full_keys.add(_safe_staging_key(f"{STAGING_PREFIX}{att_rel}"))
+
+    sha_hex = ""
+    if body_sha256:
+        sha_hex = (str(body_sha256).split(":", 1)[1]
+                   if str(body_sha256).startswith("sha256:") else str(body_sha256))
+    if sha_hex:
+        legacy_rel = _email_transfer_key_for_digest(
+            route, message_id, kind, 0, filename,
+            content_type, f"sha256:{sha_hex}", sha_hex)
+        if legacy_rel not in direct_rel_keys:
+            direct_rel_keys.append(legacy_rel)
+        stable_full_keys.add(_safe_staging_key(f"{STAGING_PREFIX}{legacy_rel}"))
 
     candidates = []
     seen_uris = set()
-    if items:
-        safe_suffix = "/" + _safe_staging_key(filename)
-        matching_items = [
-            item for item in items
-            if isinstance(item.get("Key"), str) and item["Key"].endswith(safe_suffix)
-        ]
-        matching_items.sort(key=lambda item: (
-            str(item.get("LastModified") or ""), item.get("Key") or "",
-        ))
-        for item in matching_items:
-            full_key = item["Key"]
-            matched_kind = stable_by_full_key.get(full_key)
-            body = None
-            if not matched_kind:
-                sha256_hex = None
-                if hasattr(s3, "head_object"):
-                    try:
-                        head = s3.head_object(Bucket=bucket, Key=full_key)
-                        if isinstance(head, dict):
-                            sha256_hex = (head.get("Metadata") or {}).get("sha256")
-                    except Exception:
-                        sha256_hex = None
-                if not sha256_hex:
-                    try:
-                        body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
-                        sha256_hex = hashlib.sha256(body).hexdigest()
-                    except Exception:
-                        continue
-                for candidate_kind in ("rendered-email-pdf", "attachment"):
-                    rel = _email_transfer_key_for_digest(
-                        route, message_id, candidate_kind, 0, filename,
-                        content_type, f"sha256:{sha256_hex}", sha256_hex)
-                    if _safe_staging_key(f"{STAGING_PREFIX}{rel}") == full_key:
-                        matched_kind = candidate_kind
+    for rel in direct_rel_keys:
+        staged = _already_staged(rel)
+        if staged:
+            storage_uri, body, checksum = staged
+            if storage_uri not in seen_uris:
+                seen_uris.add(storage_uri)
+                candidates.append({
+                    "kind": kind,
+                    "storageUri": storage_uri,
+                    "filename": filename,
+                    "contentType": content_type,
+                    "sizeBytes": len(body),
+                    "checksum": checksum,
+                })
+                if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+                    return candidates
+
+    if not hasattr(s3, "list_objects_v2"):
+        return candidates
+
+    deadline = time.monotonic() + STAGING_SCAN_TIMEOUT_SECONDS
+    items = []
+    token = None
+    for _ in range(STAGING_SCAN_MAX_PAGES):
+        if time.monotonic() >= deadline or len(items) >= STAGING_SCAN_MAX_OBJECTS:
+            break
+        kwargs = {
+            "Bucket": bucket,
+            "Prefix": f"{STAGING_PREFIX}email/",
+            "MaxKeys": STAGING_SCAN_MAX_OBJECTS - len(items),
+        }
+        if token:
+            kwargs["ContinuationToken"] = token
+        page = s3.list_objects_v2(**kwargs)
+        if not isinstance(page, dict):
+            break
+        contents = page.get("Contents")
+        if isinstance(contents, list):
+            for item in contents:
+                if isinstance(item, dict):
+                    items.append(item)
+                    if len(items) >= STAGING_SCAN_MAX_OBJECTS:
                         break
-            if not matched_kind:
-                continue
-            if body is None:
-                try:
-                    body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
-                except Exception:
+        if not page.get("IsTruncated") or not page.get("NextContinuationToken"):
+            break
+        token = page["NextContinuationToken"]
+
+    if not items:
+        return candidates
+
+    safe_suffix = "/" + _safe_staging_key(filename)
+    matching_items = [
+        item for item in items
+        if isinstance(item.get("Key"), str) and item["Key"].endswith(safe_suffix)
+    ]
+    has_corroborating_stable = allow_corroborated_legacy and any(
+        item["Key"] in corroborating_full_keys for item in matching_items
+    )
+    matching_items.sort(key=lambda item: (
+        str(item.get("LastModified") or ""), item.get("Key") or "",
+    ))
+    probes = 0
+    has_foreign_key = False
+    pending_legacy = []
+    for item in matching_items:
+        if time.monotonic() >= deadline or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+            break
+        full_key = item["Key"]
+        uri = f"s3://{bucket}/{full_key}"
+        if uri in seen_uris:
+            continue
+        if full_key in stable_full_keys:
+            try:
+                body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+            except Exception as exc:
+                if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
                     continue
-            uri = f"s3://{bucket}/{full_key}"
-            if uri in seen_uris:
-                continue
+                raise
             seen_uris.add(uri)
             candidates.append({
-                "kind": matched_kind,
+                "kind": kind,
                 "storageUri": uri,
                 "filename": filename,
                 "contentType": content_type,
                 "sizeBytes": len(body),
                 "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
             })
-            if first_only:
+            if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
                 return candidates
-
-    for full_key, candidate_kind in stable_by_full_key.items():
-        uri = f"s3://{bucket}/{full_key}"
-        if uri in seen_uris:
             continue
-        rel = full_key[len(STAGING_PREFIX):] if full_key.startswith(STAGING_PREFIX) else full_key
-        staged = _already_staged(rel)
-        if staged:
-            storage_uri, body, checksum = staged
-            seen_uris.add(storage_uri)
+        if full_key in corroborating_full_keys:
+            continue
+        if probes >= STAGING_SCAN_MAX_PROBES:
+            break
+        probes += 1
+        sha256_hex = None
+        meta_source_hash = None
+        body = None
+        if hasattr(s3, "head_object"):
+            try:
+                head = s3.head_object(Bucket=bucket, Key=full_key)
+                if isinstance(head, dict):
+                    meta = head.get("Metadata") or {}
+                    sha256_hex = meta.get("sha256")
+                    meta_source_hash = meta.get("source_hash")
+            except Exception as exc:
+                if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
+                    continue
+                raise
+        if not sha256_hex:
+            try:
+                body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+                sha256_hex = hashlib.sha256(body).hexdigest()
+            except Exception as exc:
+                if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
+                    continue
+                raise
+        rel = _email_transfer_key_for_digest(
+            route, message_id, kind, 0, filename,
+            content_type, f"sha256:{sha256_hex}", sha256_hex)
+        if _safe_staging_key(f"{STAGING_PREFIX}{rel}") != full_key:
+            has_foreign_key = True
+            continue
+        if (sha_hex and sha256_hex == sha_hex) or (meta_source_hash and meta_source_hash in hashes):
+            if body is None:
+                try:
+                    body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+                except Exception as exc:
+                    if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
+                        continue
+                    raise
+            seen_uris.add(uri)
             candidates.append({
-                "kind": candidate_kind,
-                "storageUri": storage_uri,
+                "kind": kind,
+                "storageUri": uri,
                 "filename": filename,
                 "contentType": content_type,
                 "sizeBytes": len(body),
-                "checksum": checksum,
+                "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
             })
-            if first_only:
+            if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+                return candidates
+        elif not meta_source_hash:
+            pending_legacy.append((full_key, uri, body))
+
+    if has_corroborating_stable and not has_foreign_key:
+        for full_key, uri, body in pending_legacy:
+            if time.monotonic() >= deadline or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+                break
+            if uri in seen_uris:
+                continue
+            if body is None:
+                try:
+                    body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+                except Exception as exc:
+                    if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
+                        continue
+                    raise
+            seen_uris.add(uri)
+            candidates.append({
+                "kind": kind,
+                "storageUri": uri,
+                "filename": filename,
+                "contentType": content_type,
+                "sizeBytes": len(body),
+                "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
+            })
+            if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
                 return candidates
     return candidates
 
 
 def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=None, timeout=15):
-    """On a 409 for a rendered email PDF, retry against any earlier staged
-    candidates for ``(route, message_id)`` in DATAOPS_EMAIL_DOCUMENTS_BUCKET.
-
-    Handles messages whose first accepted delivery was staged under the
-    pre-a771da4 byte-derived key or an earlier kind/hash variant, even when a
-    subsequent failed replay staged a newer render beforehand.
+    """On a 409 for a rendered email PDF, reconcile only against staged
+    candidates in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the
+    same message/document (same route, message_id, kind, and content hash).
     """
     if _is_leads_action(action) or not isinstance(event, dict) or event.get("connector") == "dropbox":
         return None
@@ -422,27 +525,34 @@ def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=
     if len(docs) != 1 or not isinstance(docs[0], dict):
         return None
     current = docs[0]
+    kind = str(current.get("kind") or "rendered-email-pdf")
     route = str(body.get("recipientRoute") or data.get("route") or source_data.get("route") or "")
     message_id = str(body.get("messageId") or data.get("message_id") or source_data.get("message_id") or "")
     filename = str(current.get("filename") or action.get("filename") or "invoice-email.pdf")
     content_type = str(current.get("contentType") or "application/pdf")
+    body_sha256 = str(data.get("checksum") or current.get("checksum") or "")
     candidates = _prior_staged_rendered(
         route, message_id, filename, content_type,
-        source_data, source_hash=_source_hash(source_data), first_only=False)
+        source_data, source_hash=_source_hash(source_data),
+        body_sha256=body_sha256, kind=kind,
+        allow_corroborated_legacy=False, first_only=False)
+    deadline = time.monotonic() + CONFLICT_RECOVERY_TIMEOUT_SECONDS
+    attempts = 0
     for cand in candidates:
-        other_kind = "attachment" if cand["kind"] == "rendered-email-pdf" else "rendered-email-pdf"
-        for variant in (cand, {**cand, "kind": other_kind}):
-            if variant == current:
+        if time.monotonic() >= deadline or attempts >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+            break
+        if cand.get("kind") != kind or cand == current or cand.get("storageUri") == current.get("storageUri"):
+            continue
+        attempts += 1
+        try:
+            return base._json_request(
+                url, {**body, "documents": [cand]},
+                headers=headers, timeout=timeout,
+            )
+        except urllib.error.HTTPError as retry_exc:
+            if retry_exc.code == 409:
                 continue
-            try:
-                return base._json_request(
-                    url, {**body, "documents": [variant]},
-                    headers=headers, timeout=timeout,
-                )
-            except urllib.error.HTTPError as retry_exc:
-                if retry_exc.code == 409:
-                    continue
-                raise
+            raise
     return None
 
 
@@ -487,7 +597,9 @@ def _email_intake_body(action, event, *, steps=None):
             sh = _source_hash(source_data)
             prior = _prior_staged_rendered(
                 route, message_id, filename, content_type,
-                source_data, source_hash=sh, first_only=True)
+                source_data, source_hash=sh,
+                body_sha256=data.get("checksum"),
+                kind="rendered-email-pdf", first_only=True)
             if prior:
                 documents.append(prior[0])
             else:
@@ -564,7 +676,9 @@ def _step_document(ref, route, message_id, action, steps, source_hash=None, sour
         # the email identity and reuse the first staged copy on replay.
         prior = _prior_staged_rendered(
             route, message_id, filename, "application/pdf",
-            source_data, source_hash=source_hash, first_only=True)
+            source_data, source_hash=source_hash,
+            body_sha256=output.get("checksum") or document.get("checksum"),
+            kind=kind, first_only=True)
         if prior:
             return prior[0]
         key = _stable_transfer_key(route, message_id, kind, filename, source_hash)
