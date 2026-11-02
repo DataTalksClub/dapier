@@ -972,9 +972,9 @@ def test_tokens_create_prints_value_once(isolated_home, monkeypatch, capsys):
 
 def test_tokens_create_writes_owner_only_file(isolated_home, monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: dict(TOKEN_CREATED))
-    path = tmp_path / "private" / "host.token"
-    assert main.main(["tokens", "create", "--name", "host-worker", "--agent",
-                      "host-worker", "--output", str(path)]) == 0
+    path = tmp_path / "private" / "machine.token"
+    assert main.main(["tokens", "create", "--name", "machine", "--agent",
+                      "machine", "--output", str(path)]) == 0
     assert path.read_text().strip() == "dap_SECRET_VALUE"
     from src.dapier.private_files import require_private
     require_private(path)

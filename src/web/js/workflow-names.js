@@ -50,6 +50,7 @@ export function workflowLabelHtml(id, fallback = 'Run') {
 
 /* Action type prefix → app (the designer's appPrefixes, designer/src/catalog.ts). */
 const APP_PREFIXES = [
+  [/^hub_session$/, 'hub'],
   [/^slack(_|$)/, 'slack'], [/^telegram(_|$)/, 'telegram'], [/^gmail(_|$)/, 'gmail'],
   [/^email(_|$)/, 'email'], [/^dropbox(_|$)/, 'dropbox'], [/^s3(_|$)/, 's3'],
   [/^drive(_|$)/, 'google-drive'], [/^youtube(_|$)/, 'youtube'],
@@ -66,7 +67,7 @@ const GOOGLE = new Set(['gmail', 'google-drive', 'google-sheets', 'google-calend
    anything else gets the neutral plug. */
 const GLYPHS = {
   webhook: 'webhook', custom: 'webhook', email: 'mail', schedule: 'clock',
-  poll: 'refresh-cw', agent: 'bot', code: 'code-2', js: 'code-2', dataops: 'database',
+  poll: 'refresh-cw', hub: 'bot', code: 'code-2', js: 'code-2', dataops: 'database',
   s3: 'database', renderer: 'file-text', render_html_to_pdf: 'file-text', run_workflow: 'workflow',
 };
 

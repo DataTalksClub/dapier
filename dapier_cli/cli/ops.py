@@ -1,10 +1,10 @@
-"""Single-command operator nouns: overview, usage, quota, errors, agent-tasks, workers, worker, catalog."""
+"""Single-command operator nouns: overview, usage, quota, errors, catalog."""
 
 import sys
 
 from .. import commands
 
-GROUPS = ("costs", "overview", "usage", "quota", "errors", "agent-tasks", "workers", "worker", "catalog",
+GROUPS = ("costs", "overview", "usage", "quota", "errors", "catalog",
           "store-check",)
 
 
@@ -29,40 +29,6 @@ def register(sub):
     errors_sub = errors_p.add_subparsers(dest="command")
     errors_sub.add_parser("send-digest",
                           help="Render and email the error digest now (operator)")
-    agent_tasks_p = sub.add_parser(
-        "agent-tasks", help="Host jobs the agent action enqueued (run by `dapier worker`)")
-    agent_tasks_sub = agent_tasks_p.add_subparsers(dest="command", required=True)
-    agent_tasks_list = agent_tasks_sub.add_parser("list", help="List host agent tasks, newest first")
-    agent_tasks_list.add_argument("--limit", default=None,
-                                  help="How many to show (default 50, max 200)")
-    agent_tasks_list.add_argument("--status", default=None,
-                                  help="Only rows with this status: queued, running, succeeded, failed, timed_out, interrupted")
-    agent_tasks_list.add_argument("--owner",
-                                  help="Only this person's tasks (alias or email, for example orin)")
-    agent_tasks_list.add_argument("--as", dest="as_id",
-                                  help="Only tasks for this subject id")
-    agent_tasks_list.add_argument("--assignee",
-                                  help="Only tasks assigned to this subject id")
-    agent_tasks_show = agent_tasks_sub.add_parser("show", help="Show one agent task and its recorded logs")
-    agent_tasks_show.add_argument("task_id")
-    workers_p = sub.add_parser(
-        "workers", help="Host workers (`dapier worker` processes) that run agent tasks")
-    workers_sub = workers_p.add_subparsers(dest="command", required=True)
-    workers_sub.add_parser("list", help="List host workers, most recently seen first")
-    worker_p = sub.add_parser(
-        "worker",
-        help="Run headless host jobs over HTTPS until interrupted.")
-    worker_p.add_argument("--token-file", default=None,
-                          help="Owner-only Dapier host-worker token file")
-    worker_p.add_argument("--workspace-root", default=None,
-                          help="Host job root directory (default ~/dapier-ws)")
-    worker_p.add_argument("--max-runtime", type=int, default=3600,
-                          help="Maximum seconds per headless job")
-    worker_p.add_argument("--capability", action="append", default=[],
-                          help="Advertise a capability, e.g. browser (repeatable)")
-    worker_p.add_argument("--engine", choices=("claude", "codex"), default="claude",
-                          help="Agent engine available on this worker")
-    worker_p.add_argument("--once", action="store_true", help="Poll once and exit")
     catalog_p = sub.add_parser("catalog", help="Show the action and trigger catalog (GET /api/catalog)")
     catalog_p.add_argument("--json", action="store_true", help="Print the raw catalog JSON")
     store_check_p = sub.add_parser(
@@ -89,22 +55,6 @@ def run(args, api_url, debug, child=None):
         if getattr(args, "command", None) == "send-digest":
             return commands.errors_send_digest(api_url, debug)
         return commands.errors_summary(api_url, debug, days=args.days)
-    if args.group == "agent-tasks":
-        if args.command == "show":
-            return commands.agent_tasks_show(api_url, args.task_id, debug)
-        return commands.agent_tasks_list(api_url, debug,
-                                         limit=getattr(args, "limit", None),
-                                         status=getattr(args, "status", None),
-                                         owner=getattr(args, "owner", None),
-                                         as_id=getattr(args, "as_id", None),
-                                         assignee=getattr(args, "assignee", None))
-    if args.group == "workers":
-        return commands.workers_list(api_url, debug)
-    if args.group == "worker":
-        return commands.worker_run(api_url, token_file=args.token_file,
-                                   workspace_root=args.workspace_root,
-                                   max_runtime=args.max_runtime, once=args.once,
-                                   capabilities=args.capability, engine=args.engine)
     if args.group == "catalog":
         return commands.catalog_show(api_url, debug, as_json=args.json)
     if args.group == "store-check":

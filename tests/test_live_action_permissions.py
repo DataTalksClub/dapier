@@ -57,11 +57,11 @@ def test_api_and_worker_can_send_attachment_email_and_api_can_stage_intake():
                for s in api_statements)
 
 
-def test_api_can_enqueue_agent_host_tasks():
-    grants = [s for s in _api_role_statements(_resources())
-              if s.get("Resource") == "HostQueue.Arn"]
-    actions = {action for grant in grants for action in grant["Action"]}
-    assert "sqs:SendMessage" in actions
+def test_legacy_agent_host_queue_is_removed():
+    resources = _resources()
+    assert "HostQueue" not in resources
+    assert "HostDeadLetterQueue" not in resources
+    assert resources["HostTasksTable"]["DeletionPolicy"] == "Retain"
 
 
 def test_api_can_enqueue_render_jobs_with_send_only_permission():

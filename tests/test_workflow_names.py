@@ -16,7 +16,7 @@ def _flow(trigger, actions, **extra):
 AGENT_RELAY = _flow(
     {"connector": "webhook", "event": "request.received",
      "filters": {"hook": {"equals": "agent-redo"}}},
-    [{"id": "run", "type": "agent", "prompt": "{body.prompt}"}])
+    [{"id": "run", "type": "hub_session", "title": "Task", "text": "{body.prompt}", "acceptance_criteria": "Done"}])
 
 DROPBOX_ON_UPLOAD = _flow(
     {"connector": "dropbox", "event": "file.created",
@@ -31,9 +31,9 @@ MAILING_LIST_BACKUP = _flow(
 
 
 @pytest.mark.parametrize("workflow, expected", [
-    (AGENT_RELAY, "Webhook agent-redo → Agent"),
-    (_flow({"connector": "zoom", "event": "recording.completed"}, [{"type": "agent"}]),
-     "Zoom recording completed → Agent"),
+    (AGENT_RELAY, "Webhook agent-redo → Hub session"),
+    (_flow({"connector": "zoom", "event": "recording.completed"}, [{"type": "hub_session", "title": "Task", "text": "Do it", "acceptance_criteria": "Done"}]),
+     "Zoom recording completed → Hub session"),
     (DROPBOX_ON_UPLOAD,
      "Dropbox file created in income-invoices → DataOps, delete from Dropbox"),
     (MAILING_LIST_BACKUP, "Drive file created → Upload to S3"),
@@ -81,10 +81,10 @@ def test_registry_labels_read_verb_first_and_names_keep_capitals(monkeypatch):
     monkeypatch.setitem(registry.ACTIONS, "cal_delete", Entry("Google Calendar (delete event)"))
     monkeypatch.setitem(registry.ACTIONS, "box_move", Entry("Dropbox: move file"))
     workflow = _flow({"connector": "custom", "event": "oauth.review"},
-                     [{"type": "agent"}, {"type": "cal_create"}, {"type": "cal_delete"},
+                     [{"type": "hub_session", "title": "T", "text": "T", "acceptance_criteria": "T"}, {"type": "cal_create"}, {"type": "cal_delete"},
                       {"type": "box_move"}])
     assert naming.action_summary(workflow, limit=4) == (
-        "Agent, Google Calendar, delete event in Google Calendar, move file in Dropbox")
+        "Hub session, Google Calendar, delete event in Google Calendar, move file in Dropbox")
 
 
 def test_only_plumbing_still_names_the_steps():
@@ -126,9 +126,9 @@ def test_override_wins():
     assert naming.display_name({**AGENT_RELAY, "name": "  Redo agent tasks "}) == \
         ("Redo agent tasks", "custom")
     assert naming.display_name({**AGENT_RELAY, "name": ""}) == \
-        ("Webhook agent-redo → Agent", "auto")
+        ("Webhook agent-redo → Hub session", "auto")
     assert naming.name_fields(AGENT_RELAY) == {
-        "name": "Webhook agent-redo → Agent", "name_source": "auto"}
+        "name": "Webhook agent-redo → Hub session", "name_source": "auto"}
 
 
 YAML = """\
@@ -141,8 +141,10 @@ trigger:
       equals: agent-redo
 actions:
   - id: run
-    type: agent
-    prompt: hi
+    type: hub_session
+    title: Hello
+    text: hi
+    acceptance_criteria: Finish the task
 """
 
 
@@ -190,14 +192,14 @@ def test_save_without_an_id_slugs_the_generated_name(store):
     body = {"yaml": YAML.format(id_line="", name="''")}
     status, payload = designer_store.api_save(body)
     assert status == 200, payload
-    assert payload["file"] == "webhook-agent-redo-agent.yaml"
-    assert payload["name"] == "Webhook agent-redo → Agent"
+    assert payload["file"] == "webhook-agent-redo-hub-session.yaml"
+    assert payload["name"] == "Webhook agent-redo → Hub session"
     assert payload["name_source"] == "auto"
     # A second unnamed save of the same flow does not clobber the first.
     status, payload = designer_store.api_save(body)
-    assert status == 200 and payload["file"] == "webhook-agent-redo-agent-2.yaml"
+    assert status == 200 and payload["file"] == "webhook-agent-redo-hub-session-2.yaml"
     status, payload = designer_store.api_save(body)
-    assert payload["file"] == "webhook-agent-redo-agent-3.yaml"
+    assert payload["file"] == "webhook-agent-redo-hub-session-3.yaml"
 
 
 def test_save_without_an_id_uses_the_override(store):
@@ -223,11 +225,11 @@ def test_list_get_and_overview_carry_name_fields(store):
     assert status == 200
     row = payload["workflows"][0]
     assert row["id"] == "agent-relay"
-    assert row["name"] == "Webhook agent-redo → Agent" and row["name_source"] == "auto"
+    assert row["name"] == "Webhook agent-redo → Hub session" and row["name_source"] == "auto"
     # ?q= searches the name too.
     assert designer_store.api_list(q="agent-redo →")[1]["workflows"]
     status, payload = designer_store.api_get("agent-relay.yaml")
-    assert payload["name"] == "Webhook agent-redo → Agent"
+    assert payload["name"] == "Webhook agent-redo → Hub session"
     assert payload["name_source"] == "auto"
     view = overview._workflow_view({**workflow, "name": "Redo"}, "agent-relay.yaml",
                                    published=True)
@@ -242,7 +244,7 @@ from dapier_cli import main as cli_main  # noqa: E402
 
 LISTED = {"workflows": [
     {"id": "agent-relay", "source": "agent-relay.yaml", "enabled": True,
-     "name": "Webhook agent-redo → Agent", "name_source": "auto"},
+     "name": "Webhook agent-redo → Hub session", "name_source": "auto"},
     {"id": "twin-a", "source": "twin-a.yaml", "enabled": False,
      "name": "Twin", "name_source": "custom"},
     {"id": "twin-b", "source": "twin-b.yaml", "enabled": True,
@@ -263,7 +265,7 @@ def test_cli_list_shows_name_and_id_columns(monkeypatch, capsys):
     lines = capsys.readouterr().out.splitlines()
     assert lines[0].split() == ["NAME", "ID", "STATE"]
     row = next(line for line in lines if "agent-relay" in line)
-    assert row.startswith("Webhook agent-redo → Agent")
+    assert row.startswith("Webhook agent-redo → Hub session")
     assert row.index("Webhook") < row.index("agent-relay") < row.index("On")
 
 
@@ -279,7 +281,7 @@ def test_cli_resolves_ids_names_and_files(monkeypatch):
     assert resolve("u", "agent-relay.yaml") == "agent-relay.yaml"
     assert calls == []  # a file name needs no lookup
     assert resolve("u", "agent-relay") == "agent-relay.yaml"
-    assert resolve("u", "webhook AGENT-redo → agent") == "agent-relay.yaml"
+    assert resolve("u", "webhook AGENT-redo → hub session") == "agent-relay.yaml"
     with pytest.raises(cli_commands.WorkflowRefError, match="twin-a, twin-b"):
         resolve("u", "TWIN")
     with pytest.raises(cli_commands.WorkflowRefError, match="No workflow"):
@@ -293,14 +295,14 @@ def test_cli_commands_accept_a_name(isolated_home, monkeypatch, capsys):
         calls.append((method, path))
         if path == "/api/agent/designer/workflows":
             return LISTED
-        return {"workflow": {"id": "agent-relay"}, "name": "Webhook agent-redo → Agent",
+        return {"workflow": {"id": "agent-relay"}, "name": "Webhook agent-redo → Hub session",
                 "name_source": "auto"}
 
     monkeypatch.setattr(cli_commands.api, "call", fake_call)
-    assert cli_main.main(["workflows", "show", "Webhook agent-redo → Agent"]) == 0
+    assert cli_main.main(["workflows", "show", "Webhook agent-redo → Hub session"]) == 0
     assert calls[-1] == ("GET", "/api/agent/designer/workflows/agent-relay.yaml")
     out = capsys.readouterr().out
-    assert "Name: Webhook agent-redo → Agent (auto" in out
+    assert "Name: Webhook agent-redo → Hub session (auto" in out
     assert "ID:   agent-relay" in out
     assert cli_main.main(["workflows", "show", "twin"]) == 4
     assert "pass the id instead" in capsys.readouterr().out

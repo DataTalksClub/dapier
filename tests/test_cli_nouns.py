@@ -1,5 +1,4 @@
-"""CLI nouns: emails, webhooks, and workflows sample."""
-import json
+"""CLI nouns: emails, webhooks, and workflow samples."""
 
 from dapier_cli import commands, main
 
@@ -42,7 +41,7 @@ def test_workflows_sample_flags(monkeypatch):
     assert workflows.resource == "slack.channels"
 
 
-def test_help_drops_triggers_hooks_and_agent_mail():
+def test_help_drops_legacy_agent_runner_commands():
     parser = main.build_parser()
     top = parser.format_help()
     assert "agent-mail" not in top
@@ -50,10 +49,11 @@ def test_help_drops_triggers_hooks_and_agent_mail():
                if getattr(action, "choices", None) and "webhooks" in action.choices][0].choices
     assert "triggers" not in choices
     assert "hooks" not in choices
+    assert "worker" not in choices
+    assert "workers" not in choices
+    assert "agent-tasks" not in choices
     webhooks_help = choices["webhooks"].format_help()
     assert "trigger" not in webhooks_help.lower()
-    worker_help = choices["worker"].format_help()
-    assert "API" not in worker_help
     emails_help = choices["emails"].format_help()
     for name in ("list", "show", "from"):
         assert name in emails_help

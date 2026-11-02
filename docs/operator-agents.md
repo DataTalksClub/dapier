@@ -32,9 +32,7 @@ A full operator stays signed in as themselves and narrows a list:
 
 ```bash
 dapier runs list --owner orin
-dapier agent-tasks list --owner orin
 dapier runs list --as <subject-id>
-dapier agent-tasks list --assignee <subject-id>
 ```
 
-`--owner` must name someone in the directory. `--as` and `--assignee` take a subject id, or the same alias. The console has a View as control in the page header, next to Refresh. Choosing a person filters workflows, runs, and agent tasks and hides write controls. The filter does not switch the account a write runs as.
+`--owner` must name someone in the directory. `--as` takes a subject id, or the same alias. The console has a View as control in the page header, next to Refresh. Choosing a person filters workflows and runs and hides write controls. The filter does not switch the account a write runs as.

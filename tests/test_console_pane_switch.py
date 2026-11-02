@@ -24,7 +24,7 @@ def test_emails_uses_family_tabs_not_a_pane_switch():
     """Received / Addresses live in the shared #page-tabs strip (the
     Workflows pattern), not in an in-content pane switch. The router swaps
     the two panels under the strip."""
-    page = HTML[HTML.index('data-page="emails"'):HTML.index('data-page="agents"')]
+    page = HTML[HTML.index('data-page="emails"'):HTML.index('data-page="schedules"')]
     assert "pane-switch" not in page
     assert 'data-family="emails"' in HTML
     assert 'data-email-panel="received"' in page

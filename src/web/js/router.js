@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, $$ } from './ui.js';
 
-const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'audit', 'costs', 'runs', 'agents', 'workers'];
+const VIEWS = ['overview', 'workflows', 'designer', 'connections', 'emails', 'schedules', 'credentials', 'tokens', 'audit', 'costs', 'runs'];
 const WORKFLOW_TABS = new Set(['list', 'hooks', 'polls']);
 const EMAIL_TABS = new Set(['received', 'addresses']);
 const NAV_FOR = {
@@ -147,8 +147,6 @@ export async function setView(view, push = true, options = {}) {
   const VIEW_META = {
     overview: ['Home', 'Automations and their latest results at a glance.'],
     runs: ['Runs', 'Every trigger, run, and failure — newest first.'],
-    agents: ['Agents', 'Agent tasks and the runs behind them.'],
-    workers: ['Workers', 'Machines that run agent tasks.'],
     tokens: ['Access', 'Machine tokens for API access.'],
     costs: ['Costs', 'Recorded paid API charges and token usage.'],
     audit: ['Audit', 'Who changed what — newest first.'],

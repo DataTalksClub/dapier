@@ -104,10 +104,14 @@ def test_required_criteria_and_engine_rejection_are_shared_save_rules():
         registry.validate_action_chain([{**valid, "engine": "codex"}])
     with pytest.raises(registry.ActionError, match="not one of"):
         registry.validate_action_chain([{**valid, "tier": "custom"}])
+    with pytest.raises(registry.ActionError, match="unsupported action type"):
+        registry.validate_action_chain([{"type": "agent", "prompt": "obsolete"}])
 
 
 def test_catalog_exposes_same_required_fields_to_all_clients():
-    entry = next(e for e in registry.catalog()["actions"] if e["type"] == "hub_session")
+    actions = registry.catalog()["actions"]
+    assert "agent" not in {e["type"] for e in actions}
+    entry = next(e for e in actions if e["type"] == "hub_session")
     fields = {f["key"]: f for f in entry["fields"]}
     assert fields["acceptance_criteria"]["required"] is True
     assert fields["workspace"]["default"] == "dapier-agents"
@@ -253,6 +257,14 @@ def test_designer_mirror_exposes_registered_fields():
     entry = next(e for e in registry.catalog()["actions"] if e["type"] == "hub_session")
     assert keys == [f["key"] for f in entry["fields"]]
     assert re.search(r'key: "acceptance_criteria"[^\n]*required: true', match.group(1))
+
+
+def test_designer_catalog_has_no_legacy_agent_action():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    for path in (root / "designer/src/catalog.ts", root / "src/web/designer.js"):
+        assert 'type: "agent"' not in path.read_text(encoding="utf-8")
 
 
 def test_cli_can_save_hub_session_through_shared_workflow_api(monkeypatch, tmp_path):

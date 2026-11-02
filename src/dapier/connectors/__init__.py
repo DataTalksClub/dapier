@@ -11,7 +11,6 @@ specs.
 
 from . import registry, trigger_discovery  # noqa: F401
 from . import (  # noqa: F401  (import = registration)
-    agent,
     ai,
     code,
     csv,

@@ -4,7 +4,7 @@ A workflow's ``id`` is its stable internal key (file name, API paths, run
 records, hook triggers). People read a *name* instead: the optional ``name:``
 override when the YAML carries one, else a name generated from what the flow
 does — ``"<trigger phrase> → <main actions>"``, e.g. ``"Webhook agent-redo →
-Agent"`` or ``"Dropbox file created in income-invoices → DataOps, delete from
+Hub session"`` or ``"Dropbox file created in income-invoices → DataOps, delete from
 Dropbox"``.
 
 This module is the single source of truth: the console, the designer, and
@@ -52,7 +52,6 @@ _CONNECTOR_NOUNS = {
 # Action labels: verb phrases people recognise. Unknown types fall back to
 # the connector registry's label, then the type itself.
 _ACTION_LABELS = {
-    "agent": "Agent",
     "ai": "AI",
     "dataops": "DataOps",
     "dropbox_upload": "Upload to Dropbox",

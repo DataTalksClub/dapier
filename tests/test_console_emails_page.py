@@ -20,7 +20,7 @@ def test_emails_page_is_a_mailbox_of_received_mail():
     """The page lists received email from the inbox API with outcome
     filters, then the addresses and a per-address sender policy panel."""
     html = (WEB / "index.html").read_text()
-    page = html[html.index('data-page="emails"'):html.index('data-page="agents"')]
+    page = html[html.index('data-page="emails"'):html.index('data-page="schedules"')]
     for marker in ('id="email-mail-list"', 'id="email-filter-chips"',
                    'id="email-mail-more"', 'id="email-addresses"', 'id="email-from-list"',
                    'id="email-from-mode"', 'id="email-from-anyone"', 'id="email-from-title"',
@@ -75,7 +75,7 @@ def test_emails_reading_pane_matches_the_agent_runs_layout():
     Addresses are family tabs in the shared strip (the Workflows
     pattern), not an in-content switch."""
     html = (WEB / "index.html").read_text()
-    page = html[html.index('data-page="emails"'):html.index('data-page="agents"')]
+    page = html[html.index('data-page="emails"'):html.index('data-page="schedules"')]
     assert "pane-switch" not in page
     assert 'data-family="emails"' in html
     assert 'data-email-panel="received"' in page

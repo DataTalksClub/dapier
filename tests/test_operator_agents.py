@@ -16,7 +16,6 @@ import pytest
 from src.dapier.api import runs
 from src.dapier.api.admin import dispatch
 from src.dapier.auth import actors, session, visibility
-from src.dapier.host_tasks import api_list
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,7 +31,6 @@ def test_orin_is_a_full_operator_like_alexey():
     assert actors.gate(payload) == "operator"
     assert actors.stable_subject(payload) == "sub-orin"
     assert actors.action_allowed(payload, "runs")
-    assert actors.action_allowed(payload, "agent-tasks")
     assert actors.action_allowed(payload, "workflow.publish")
     assert actors.action_allowed(payload, "typefully.social_sets")
     assert actors.action_allowed(payload, "typefully.upload_media")
@@ -47,7 +45,6 @@ def test_orin_is_a_full_operator_like_alexey():
     assert actors.action_allowed(payload, "credential")
     assert actors.action_allowed(payload, "quota.set")
     assert actors.console_allowed("GET", "/api/admin/runs")
-    assert actors.console_allowed("GET", "/api/admin/agent-tasks")
     assert actors.console_allowed("PUT", "/api/admin/designer/workflows")
     assert actors.console_allowed("GET", "/api/admin/triggers/inbox")
     # The agent band stays closed on these paths for agent rows; Orin no
@@ -118,26 +115,6 @@ def test_runs_list_keeps_only_the_named_owner(monkeypatch):
     assert status == 400
 
 
-def test_agent_tasks_list_filters_by_workflow_owner(monkeypatch):
-    rows = [
-        {"task_id": "agent:wf-orin:e1:a1", "kind": "agent", "status": "succeeded",
-         "created_at": 2},
-        {"task_id": "agent:wf-alex:e2:a1", "kind": "agent", "status": "succeeded",
-         "created_at": 1},
-    ]
-
-    class Tasks:
-        def scan(self, **kwargs):
-            return {"Items": rows}
-
-    monkeypatch.setattr(visibility, "workflow_owners", lambda table_ref=None: {
-        "wf-orin": "orin@datatalks.club", "wf-alex": "alexey@datatalks.club",
-    })
-    status, payload = api_list(Tasks(), owner="orin")
-    assert status == 200
-    assert [task["task_id"] for task in payload["tasks"]] == ["agent:wf-orin:e1:a1"]
-
-
 def test_me_offers_view_as_to_operators_and_narrows_orin(monkeypatch):
     operator = _token(monkeypatch, "alexey@datatalks.club", "sub-alex")
     event = {"headers": {"host": "dapier.example.test"},
@@ -176,8 +153,6 @@ def test_cli_accepts_owner_as_and_assignee():
     register_ops(sub)
     runs_args = parser.parse_args(["runs", "list", "--owner", "orin", "--as", "sub-1"])
     assert runs_args.owner == "orin" and runs_args.as_id == "sub-1"
-    task_args = parser.parse_args(["agent-tasks", "list", "--assignee", "sub-1"])
-    assert task_args.assignee == "sub-1"
 
 
 def test_view_as_filters_runs_and_blocks_writes(monkeypatch):
@@ -249,9 +224,8 @@ def test_console_view_as_is_wired_read_only():
     html = (ROOT / "src/web/index.html").read_text()
     assert 'id="view-as"' in html
     runs_js = (ROOT / "src/web/js/views/runs.js").read_text()
-    agents_js = (ROOT / "src/web/js/views/agents.js").read_text()
     view_js = (ROOT / "src/web/js/view-as.js").read_text()
-    assert "withOwner" in runs_js and "withOwner" in agents_js
+    assert "withOwner" in runs_js
     assert "data-view-as" in (ROOT / "src/web/app.css").read_text()
     assert "Read-only" in view_js or "read-only" in html
     assert "orin@datatalks.club" in (ROOT / "docs/operator-agents.md").read_text()

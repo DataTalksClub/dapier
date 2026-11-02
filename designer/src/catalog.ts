@@ -130,20 +130,6 @@ export const logicOperators = [
 /** Mirrors the run_* dispatch in src/dapier/engine/__init__.py. */
 export const actionCatalog: ActionEntry[] = [
   {
-    type: "agent",
-    label: "Agent",
-    icon: Bot,
-    description: "Queue a prompt for a Dapier worker — a machine running `dapier worker`, listed on the console's Workers page. The worker runs the prompt as a headless Claude session in its workspace; the step returns as soon as the task is queued. With no worker running, tasks stay queued until one starts. The trigger's stored attachments (an email's files) are staged into the workspace under attachments/ and the run is told where they landed; set Pass trigger attachments to off to skip them.",
-    fields: [
-      { key: "prompt", label: "Prompt", type: "textarea", required: true, placeholder: "{subject}\n\n{text}" },
-      { key: "workspace", label: "Workspace", required: true, placeholder: "/home/alexey/git/dapier" },
-      { key: "engine", label: "Engine", placeholder: "claude" },
-      { key: "requires", label: "Required capabilities", placeholder: "browser" },
-      { key: "tag_prefix", label: "Tag prefix", placeholder: "agent" },
-      { key: "attachments", label: "Pass trigger attachments", type: "select", options: ["default", "off"], default: "default" }
-    ]
-  },
-  {
     type: "hub_session",
     label: "Hub session",
     icon: Bot,

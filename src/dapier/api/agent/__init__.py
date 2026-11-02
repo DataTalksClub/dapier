@@ -164,15 +164,6 @@ def _route(event, method, path):
         return operator_overview(event)
     if path == "/api/agent/runs" and method == "GET":
         return runs_api(event)
-    if path == "/api/agent/agent-tasks" and method == "GET":
-        return agent_tasks_api(event)
-    if path == "/api/agent/workers" and method == "GET":
-        return workers_api(event)
-    if method == "POST" and path in (
-        "/api/agent/host-jobs/claim", "/api/agent/host-jobs/heartbeat",
-        "/api/agent/host-jobs/finish", "/api/agent/host-jobs/attachment",
-    ):
-        return host_jobs_api(event, path.rsplit("/", 1)[-1])
     if path == "/api/agent/runs/export" and method == "GET":
         return runs_export_api(event)
     if path == "/api/agent/runs/replay-failed" and method == "POST":

@@ -1,6 +1,4 @@
 import { renderCosts } from './views/costs.js';
-import { renderAgentTasks } from './views/agents.js';
-import { renderWorkers } from './views/workers.js';
 /* Console bootstrap: global event wiring and the first fetch. */
 import { $, $$, icons, notice, hardenSecretInputs, showForbidden, showStartupError } from './ui.js';
 import { api } from './api.js';
@@ -193,8 +191,6 @@ $$('.nav-item, .view-link').forEach((link) => link.addEventListener('click', asy
   const target = link.dataset.view || link.dataset.target;
   const tab = link.dataset.tab;
   if (!await setView(target, true, tab ? { tab } : {})) return;
-  if (target === 'agents') renderAgentTasks();
-  if (target === 'workers') renderWorkers();
   if (target === 'costs') renderCosts();
   if (target === 'audit') refreshAudit();
 }));
@@ -224,8 +220,6 @@ window.addEventListener('popstate', async () => {
   closeMobileMenu();
   if (await setView(view, false)) {
     if (view === 'designer') await designerFromLocation();
-    if (view === 'agents') renderAgentTasks();
-    if (view === 'workers') renderWorkers();
     if (view === 'costs') renderCosts();
     if (view === 'audit') refreshAudit();
   }
@@ -279,8 +273,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   if (initialView === 'costs') renderCosts();
   if (initialView === 'audit') refreshAudit();
-  if (initialView === 'agents') renderAgentTasks();
-  if (initialView === 'workers') renderWorkers();
   const oauth = new URLSearchParams(window.location.search);
   if (initialView === 'connections' && oauth.has('oauth')) {
     showOAuthResult(oauth.get('oauth'), oauth.get('connection'));

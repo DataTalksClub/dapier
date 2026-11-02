@@ -37,8 +37,7 @@ def tokens_create(api_url, name, agent, debug=False, output=None):
                     {"token_id": name, "agent": agent}, debug=debug)
     print(f"Created API token {data.get('token_id')} "
           f"(subject {data.get('subject')}, agent {data.get('agent')}).")
-    if agent != "host-worker":
-        print(f"Grant it access with `dapier grants save` using subject {data.get('subject')}.")
+    print(f"Grant it access with `dapier grants save` using subject {data.get('subject')}.")
     if output:
         path = Path(output).expanduser()
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)

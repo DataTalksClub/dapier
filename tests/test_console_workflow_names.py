@@ -110,9 +110,9 @@ def test_app_strip_reads_nested_branches_and_collapses_the_middle():
     ctx.eval("""var wf = {trigger: {connector: 'telegram', event: 'message.received'},
       actions: [{type: 'condition', then: [{type: 'slack'}]},
                 {type: 'paths', paths: [{actions: [{type: 'sheets_append_row'}]}]},
-                {type: 'dropbox_upload'}, {type: 'agent'}]};""")
+                {type: 'dropbox_upload'}, {type: 'hub_session'}]};""")
     assert ctx.eval("JSON.stringify(workflowApps(wf).map((a) => a.key))") == \
-        '["telegram","slack","google-sheets","dropbox","agent"]'
+        '["telegram","slack","google-sheets","dropbox","hub"]'
     strip = ctx.eval("appStripHtml(wf, 'flow text')")
     assert strip.count('class="app-tile"') == 2 and ">+3<" in strip
     assert 'data-mark="telegram"' in strip and 'data-icon="bot"' in strip
@@ -126,13 +126,11 @@ def test_plumbing_only_flow_still_gets_a_code_tile():
     assert 'data-icon="code-2"' in ctx.eval("appStripHtml(wf)")
 
 
-def test_runs_and_agent_tasks_show_names():
+def test_runs_show_names():
     runs = (WEB / "js/views/runs.js").read_text()
     assert "workflowLabelHtml(run.workflow_id)" in runs
     assert "workflowName(run.workflow_id)" in runs
     assert "escapeHtml(workflowName(id))" in runs  # filter options
-    agents = (WEB / "js/views/agents.js").read_text()
-    assert "workflowName(task.workflow)" in agents
 
 
 def test_designer_header_edits_the_name_not_the_id():

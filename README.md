@@ -388,15 +388,10 @@ allow-list ignores everyone. `mode=anyone` still refuses a message with no
 From. Additional workflow filters AND with the address rule. Sender admission
 is separate from receiving-address configuration and outbound senders.
 
-An `agent` action queues a prompt for a Dapier worker — a machine running
-`dapier worker`, which picks the task up and runs a headless Claude Code
-process there, reporting the terminal result through the authenticated API.
-Tasks stay queued until a worker is running; the console's **Workers** tab
-and `dapier workers list` show which workers are active. An agent action can
-sit on an email, a webhook, a schedule, or a poll.
-The host needs a dedicated Dapier token, not AWS credentials or Aplexer; see
-[headless worker setup](docs/headless-worker.md). Webhooks are managed with
-`dapier webhooks`. A sample of what a flow receives is `dapier workflows sample`.
+The `hub_session` action creates a Hub intake and requests a Hub-managed
+headless session. Use it for workflow-triggered coding work; Dapier does not
+run coding agents on host workers. Webhooks are managed with `dapier webhooks`.
+A sample of what a flow receives is `dapier workflows sample`.
 
 A receiving address is a workflow trigger, for example:
 
@@ -417,7 +412,7 @@ trigger:
 
 Action types and their keys match the workflow catalog (`webhook`, `slack`,
 `telegram_send`, `email_send`, `dataops`, `dropbox_upload`, `dropbox_delete`,
-`render_html_to_pdf`, `code`). Text fields accept `{field}` templates from the
+`render_html_to_pdf`, `code`, `hub_session`). Text fields accept `{field}` templates from the
 triggering event; `{trigger.field}` reaches the same data (plus envelope
 scalars like `trigger.connector` and `trigger.occurred_at`), and
 `{steps.<action_id>.output.<path>}` / `{steps.<action_id>.status}` reference an

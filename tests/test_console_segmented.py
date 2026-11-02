@@ -27,16 +27,9 @@ def test_single_choice_filters_are_radiogroups():
                   "sched-window-chips", "email-filter-chips"):
         match = re.search(rf'<div id="{track}" class="dk-tabs[^"]*" role="radiogroup" aria-label="[^"]+">', HTML)
         assert match, track
-    assert '<div class="dk-tabs agent-filters" role="radiogroup"' in HTML
     assert '<div class="dk-tabs dk-tabs--sm" role="radiogroup" aria-label="Who can write">' in HTML
     activity = (WEB / "js" / "views" / "activity.js").read_text()
     assert 'role="radio"' in activity and "aria-checked" in activity
-
-
-def test_agent_filter_counts_ride_inside_the_segment():
-    agents = HTML[HTML.index('class="dk-tabs agent-filters"'):]
-    agents = agents[:agents.index("</div>")]
-    assert agents.count('<span class="dk-count">') == 4
 
 
 def test_tabs_helper_loads_once_per_page():

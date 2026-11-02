@@ -60,10 +60,6 @@ def test_console_javascript_modules_parse():
 def _api_payload(path):
     if path == "/api/admin/me":
         return {"operator": True, "username": "tester@example.com", "name": "Tester"}
-    if path == "/api/admin/workers":
-        return {"workers": []}
-    if path.startswith("/api/admin/agent-tasks"):
-        return {"tasks": []}
     if path.startswith("/api/admin/triggers/inbox"):
         return {"events": [], "next": None}
     if path.startswith("/api/admin/email-from"):

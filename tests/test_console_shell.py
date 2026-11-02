@@ -126,11 +126,11 @@ def test_phone_drawer_is_modal_and_a_destination_closes_it(browser):
         assert _focused_id(page) == "menu-toggle"
 
         toggle.click()
-        page.locator('.dk-sidebar .dk-nav-item[data-view="agents"]').click()
-        page.wait_for_function("location.pathname === '/agents'")
+        page.locator('.dk-sidebar .dk-nav-item[data-view="runs"]').click()
+        page.wait_for_function("location.pathname === '/runs'")
         assert toggle.get_attribute("aria-expanded") == "false"
         assert page.evaluate("document.querySelector('.dk-main').inert") is False
-        assert page.locator("#view-title").inner_text() == "Agents"
+        assert page.locator("#view-title").inner_text() == "Runs"
         assert page.errors == []
 
 

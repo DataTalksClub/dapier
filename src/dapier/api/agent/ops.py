@@ -1,12 +1,11 @@
 """Operational read and action endpoints: operator overview, runs
-and their replay/cancel/export, host agent tasks and workers,
-usage and quota, error summary and digest, audit trail, per-
-workflow storage, and the trigger inbox."""
+and their replay/cancel/export, usage and quota, error summary and digest,
+audit trail, per-workflow storage, and the trigger inbox."""
 
 import json
 
 from ...auth import actors
-from ... import error_digest, host_jobs, host_tasks, host_workers
+from ... import error_digest
 from ...engine import usage
 from .. import errors as errors_api, runs
 from .. import storage as storage_api
@@ -27,7 +26,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["costs_api", "agent_tasks_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "host_jobs_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "runs_resolve_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api", "workers_api"]
+__all__ = ["costs_api", "audit_api", "audit_export_api", "errors_digest_api", "errors_summary_api", "inbox_api", "inbox_replay_api", "operator_overview", "quota_api", "runs_api", "runs_cancel_api", "runs_export_api", "runs_replay_api", "runs_replay_failed_api", "runs_resolve_api", "storage_delete_api", "storage_read_api", "storage_write_api", "usage_api"]
 
 
 
@@ -68,70 +67,6 @@ def runs_api(event, run_id=None):
         as_id=query.get("as") or None,
         assignee=query.get("assignee") or None,
     )
-    return _no_store(_json_response(status, payload))
-
-
-def agent_tasks_api(event):
-    """Operator-only host task list mirroring /api/admin/agent-tasks.
-
-    Same domain function (host_tasks.api_list) as the console route, so the
-    CLI and the console see the same rows: what the agent action enqueued,
-    what `dapier worker` did with it (status, session, error, timestamps).
-    Like the runs read it is not itself audited — require_operator records
-    the denials.
-    """
-    _, error = require_operator(event, "agent-tasks")
-    if error:
-        return error
-    query = event.get("queryStringParameters") or {}
-    if query.get("task_id"):
-        status, payload = host_tasks.api_get(query["task_id"])
-    else:
-        status, payload = host_tasks.api_list(
-            limit=query.get("limit"), status=query.get("status"),
-            owner=query.get("owner"), as_id=query.get("as"),
-            assignee=query.get("assignee"))
-    return _no_store(_json_response(status, payload))
-
-
-def workers_api(event):
-    """Operator-only host worker list mirroring /api/admin/workers.
-
-    Same domain function (host_workers.api_list) as the console route, so
-    `dapier workers list` and the console Workers page see the same rows:
-    which `dapier worker` processes checked in, which is active, what each
-    is running. Like the agent-tasks read it is not itself audited —
-    require_operator records the denials.
-    """
-    _, error = require_operator(event, "workers")
-    if error:
-        return error
-    return _no_store(_json_response(*host_workers.api_list()))
-
-
-def host_jobs_api(event, operation):
-    """Machine-only host job protocol. An operator login cannot claim jobs."""
-    subject, error = authenticate(event)
-    if error:
-        return error
-    token = _api_token(event)
-    if not token or token.get("agent") != "host-worker":
-        return _json_response(403, {"error": "Host worker token required"})
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except (TypeError, ValueError):
-        body = {}
-    if not isinstance(body, dict):
-        body = {}
-    if operation == "claim":
-        status, payload = host_jobs.claim(subject, body)
-    else:
-        if operation == "heartbeat":
-            status, payload = host_jobs.heartbeat(body, subject)
-        elif operation == "attachment":
-            status, payload = host_jobs.attachment(body, subject)
-        else:
-            status, payload = host_jobs.finish(body, subject)
     return _no_store(_json_response(status, payload))
 
 

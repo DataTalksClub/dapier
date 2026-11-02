@@ -204,7 +204,7 @@ def _route_grants_tokens(event, method, path, operator_payload, operator_subject
 
 
 def _route_ops_email(event, method, path, operator_payload, operator_subject):
-    """The email inventory, per-address sender policy, host tasks, workers."""
+    """The email inventory and per-address sender policy."""
     if method == "GET" and path == "/api/admin/email-triggers":
         return routes.list_email_triggers(event)
     if method == "GET" and path == "/api/admin/email-from":
@@ -213,10 +213,6 @@ def _route_ops_email(event, method, path, operator_payload, operator_subject):
         return routes.email_from_add(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/email-from":
         return routes.email_from_remove(event, operator_subject)
-    if method == "GET" and path == "/api/admin/agent-tasks":
-        return routes.agent_tasks_list(event)
-    if method == "GET" and path == "/api/admin/workers":
-        return routes.workers_list(event)
     return None
 
 

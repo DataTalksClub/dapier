@@ -31,8 +31,6 @@ def test_sidebar_lists_daily_pages_then_settings():
         "Workflows",
         "Emails",
         "Runs",
-        "Agents",
-        "Workers",
         "Connections",
         "Access",
         "Costs",
@@ -94,20 +92,6 @@ def test_emails_is_its_own_sidebar_page():
     assert "emails: 'emails'" in ROUTER
     assert "emails: ['Emails', 'Mail Dapier received, and which workflow ran.']" in ROUTER
     assert "/emails" in ingress.CONSOLE_VIEWS
-
-
-def test_workers_is_its_own_page_next_to_agents():
-    """Workers left the Agents tab strip for its own sidebar entry. The
-    route stays /workers, so old links to the former tab still land."""
-    sidebar = _sidebar()
-    assert re.search(r'<a class="dk-nav-item nav-item" href="/workers" data-view="workers">.*?<span class="dk-nav-item__label">Workers</span></a>', sidebar)
-    assert sidebar.index('href="/agents"') < sidebar.index('href="/workers"') < sidebar.index('href="/connections"')
-    assert "workers: 'agents'" not in ROUTER
-    assert "agents: 'agents'" not in ROUTER
-    assert "workers: ['Workers', 'Machines that run agent tasks." in ROUTER
-    assert "agents: ['Agents'" in ROUTER
-    assert "/workers" in ingress.CONSOLE_VIEWS
-    assert "Path: /workers" in TEMPLATE
 
 
 def test_page_tabs_are_dakit_route_tabs():

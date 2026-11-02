@@ -65,8 +65,6 @@
           <a class="dk-nav-item nav-item" href="/workflows" data-view="workflows"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width='8' height='8' x='3' y='3' rx='2'/><path d='M 7 11 v 4 a2 2 0 0 0 2 2 h 4'/><rect width='8' height='8' x='13' y='13' rx='2'/></svg></span><span class="dk-nav-item__label">Workflows</span></a>
           <a class="dk-nav-item nav-item" href="/emails" data-view="emails"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='m 22 7 -8.98 5.73 a2 2 0 0 1 -2.01 0 L 2 7'/><rect x='2' y='4' width='20' height='16' rx='2'/></svg></span><span class="dk-nav-item__label">Emails</span></a>
           <a class="dk-nav-item nav-item" href="/runs" data-view="runs"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 13 5 h 8'/><path d='M 13 12 h 8'/><path d='M 13 19 h 8'/><path d='m 3 17 2 2 4 -4'/><path d='m 3 7 2 2 4 -4'/></svg></span><span class="dk-nav-item__label">Runs</span><span id="nav-runs-count" class="dk-count" hidden></span></a>
-          <a class="dk-nav-item nav-item" href="/agents" data-view="agents"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 12 8 V 4 H 8'/><rect width='16' height='12' x='4' y='8' rx='2'/><path d='M 2 14 h 2'/><path d='M 20 14 h 2'/><path d='M 15 13 v 2'/><path d='M 9 13 v 2'/></svg></span><span class="dk-nav-item__label">Agents</span></a>
-          <a class="dk-nav-item nav-item" href="/workers" data-view="workers"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width='20' height='8' x='2' y='2' rx='2' ry='2'/><rect width='20' height='8' x='2' y='14' rx='2' ry='2'/><line x1='6' x2='6.01' y1='6' y2='6'/><line x1='6' x2='6.01' y1='18' y2='18'/></svg></span><span class="dk-nav-item__label">Workers</span></a>
           <a class="dk-nav-item nav-item" href="/connections" data-view="connections"><span class="dk-nav-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d='M 6.3 20.29 a2.4 2.4 0 0 0 3.41 0 L 12 18 l -6 -6 -2.29 2.29 a2.4 2.4 0 0 0 0 3.41 Z'/><path d='m 2 22 3 -3'/><path d='M 7.5 13.5 10 11'/><path d='M 10.5 16.5 13 14'/><path d='m 18 3 -4 4 h 6 l -4 4'/></svg></span><span class="dk-nav-item__label">Connections</span></a>
         </div>
         <div class="dk-nav-group" aria-labelledby="nav-group-settings">
@@ -333,56 +331,6 @@
             </form>
           </section>
         </aside>
-      </section>
-      <section class="view dk-fill" data-page="agents">
-        <div class="dk-toolbar page-tools agent-toolbar">
-          <div class="dk-cluster toolbar-filters">
-            <div class="dk-tabs agent-filters" role="radiogroup" aria-label="Filter agent runs by status">
-              <button type="button" class="dk-tab" role="radio" data-agent-filter="all" aria-checked="true" tabindex="0">All <span class="dk-count">0</span></button>
-              <button type="button" class="dk-tab" role="radio" data-agent-filter="active" aria-checked="false" tabindex="-1">Active <span class="dk-count">0</span></button>
-              <button type="button" class="dk-tab" role="radio" data-agent-filter="attention" aria-checked="false" tabindex="-1">Needs attention <span class="dk-count">0</span></button>
-              <button type="button" class="dk-tab" role="radio" data-agent-filter="completed" aria-checked="false" tabindex="-1">Succeeded <span class="dk-count">0</span></button>
-            </div>
-          </div>
-          <div class="dk-toolbar__end"><p id="agent-workers-strip" class="sub agent-workers-strip" hidden></p><a class="dk-button dk-button--secondary view-link" href="/workers" data-view="workers">Workers</a></div>
-        </div>
-        <div class="dk-split agent-split" data-dk-split="agent-runs" data-view="list">
-          <section class="dk-split__list" aria-labelledby="agent-runs-title">
-            <header class="dk-split__head"><h2 class="dk-split__title" id="agent-runs-title">Runs</h2><span id="agent-runs-note" class="dk-split__count" role="status">Loading runs…</span></header>
-            <div class="dk-split__tools"><input id="agent-runs-search" class="dk-input" type="search" placeholder="Search runs" aria-label="Search agent runs"></div>
-            <div id="agent-runs-scroll" class="dk-split__scroll"><ul id="agent-runs-list" class="dk-split__items" aria-label="Agent runs"></ul></div>
-            <div class="dk-split__handle"></div>
-          </section>
-          <section id="agent-run-pane" class="dk-split__detail" aria-label="Selected agent run">
-            <header id="agent-run-head" class="dk-split__head" hidden><a class="dk-split__back agent-back" href="/agents" aria-label="Back to Runs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Runs</a><h2 id="agent-run-title" class="dk-split__title" tabindex="-1"></h2></header>
-            <div id="agent-run-detail" class="dk-split__scroll" hidden></div>
-            <div id="agent-run-empty" class="dk-split__empty"><div class="dk-empty"><p class="dk-empty__title">Select a run</p><p class="dk-empty__desc">Read its result and check what happened.</p></div></div>
-          </section>
-        </div>
-      </section>
-      <section class="view" data-page="workers">
-        <div id="workers-empty" class="empty-state" hidden></div>
-        <section class="data-panel" aria-labelledby="workers-active-title">
-          <div class="section-head"><h2 id="workers-active-title">Active now</h2><p class="sub">Checked in within the last two minutes</p></div>
-          <div id="workers-wrap" class="table-wrap workers-table" hidden>
-            <table>
-              <colgroup><col class="col-worker"><col class="col-status"><col class="col-task"><col class="col-engine"><col class="col-workspace"><col class="col-started"></colgroup>
-              <thead><tr><th>Worker</th><th>Status</th><th>Task</th><th>Engine</th><th>Workspace</th><th>Started</th></tr></thead>
-              <tbody id="workers"></tbody>
-            </table>
-          </div>
-          <p id="workers-none-active" class="sub panel-note workers-none" hidden>No worker is running. Agent tasks stay queued until one starts with <code>dapier worker</code>.</p>
-        </section>
-        <details id="workers-offline-section" class="data-panel runs-section" aria-labelledby="workers-offline-title" hidden>
-          <summary class="section-head"><h2 id="workers-offline-title">Offline</h2><p id="workers-offline-count" class="sub"></p><span class="section-chevron" aria-hidden="true"></span></summary>
-          <div class="table-wrap workers-table">
-            <table>
-              <colgroup><col class="col-worker"><col class="col-status"><col class="col-task"><col class="col-engine"><col class="col-workspace"><col class="col-started"></colgroup>
-              <thead><tr><th>Worker</th><th>Status</th><th>Task</th><th>Engine</th><th>Workspace</th><th>Started</th></tr></thead>
-              <tbody id="workers-offline"></tbody>
-            </table>
-          </div>
-        </details>
       </section>
       <section class="view" data-page="schedules">
         <div class="page-tools dk-toolbar trigger-toolbar">
