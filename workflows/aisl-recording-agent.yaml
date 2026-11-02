@@ -1,15 +1,17 @@
-# Zoom recording router: a Zoom cloud recording.transcript_completed webhook fires a
-# decision step (one typed call to OpenRouter's decisions endpoint, keyed by
-# the stored openrouter credential) that classifies the
-# recording after its transcript is archived and runs the matching Hub session in its own
-# workspace: one-on-one calls land in the zoom-calls repo, AI Shipping Labs
+# Zoom recording router: a Zoom cloud recording.completed or
+# recording.transcript_completed webhook fires a decision step (one typed call
+# to OpenRouter's decisions endpoint, keyed by the stored openrouter credential)
+# that classifies the recording and runs the matching Hub session in its own
+# workspace: one-on-one calls land in the zoom-calls workspace, AI Shipping Labs
 # sessions go through the platform's recording pipeline.
 # Reference copy of the live workflow (save/publish via `dapier workflows`).
 id: aisl-recording-agent
 description: >
-  Archive every ready Zoom transcript in private S3, then classify the
-  recording and process AI Shipping Labs sessions or one-on-one calls.
-  DataTalks.Club and other recordings need no further action.
+  Archive any ready Zoom transcript in private S3, then classify the
+  recording on recording.completed or recording.transcript_completed and
+  process AI Shipping Labs sessions or one-on-one calls (waiting/polling
+  for the transcript or transcribing when needed). DataTalks.Club and other
+  recordings need no further action.
 enabled: true
 notify: [alexey@datatalks.club]
 actions:
@@ -46,7 +48,7 @@ actions:
       does not clearly belong to either processing branch.
     prompt: |
       Classify this Zoom cloud recording into exactly one bucket.
-      Its transcript has already been archived in S3.
+      Any ready transcript has already been archived in S3.
       - meeting_id: {meeting_id}
       - topic: {topic}
       - host_id: {host_id}
@@ -61,7 +63,7 @@ actions:
     cases:
       - choice: otherwise
         description: >
-          DataTalks.Club videos and other recordings. The transcript is
+          DataTalks.Club videos and other recordings. Any ready transcript is
           already archived; no further processing is needed.
         actions: []
       - choice: one-on-one
@@ -77,8 +79,9 @@ actions:
             title: "Zoom 1x1 recording: {topic | truncate:50}"
             text: |
               You are the one-on-one Zoom recording processor. A Zoom cloud
-              recording transcript is ready. Work autonomously and finish with a
-              report; do not ask questions.
+              recording event arrived (recording.completed or
+              recording.transcript_completed). Work autonomously and finish
+              with a report; do not ask questions.
 
               Recording event from Zoom:
               - meeting_id: {meeting_id}
@@ -87,17 +90,26 @@ actions:
               - share_url: {share_url}
               - download_url: {download_url}
 
-              Setup: run shell commands from /home/alexey/git/zoom-calls.
-              Read that repo's AGENTS.md and the skill
-              .agents/skills/zoom-recording/SKILL.md, and follow the
-              repository's transcript and summary workflow exactly.
+              Setup: run shell commands in your assigned Hub workspace
+              directory for `zoom-calls` (current working directory; do not
+              hardcode a host path). Pull latest `origin/master` first. Read
+              the repo's AGENTS.md and `.agents/skills/zoom-recording/SKILL.md`,
+              and follow the repository's transcript and summary workflow
+              exactly.
 
-              1. Download: check for an existing transcript before
-              downloading. Use download_zoom.py with the share URL (and the
-              passcode when one is available); when a transcript already
-              exists, fetch only the saved chat (--chat-only). Name the
-              transcript from the meeting topic and date per the skill
-              (<type>/logs/<date>-<firstname-lastname>.txt).
+              1. Download or wait/transcribe: check for an existing transcript
+              and summary in the repo before downloading; if both the
+              transcript and summary for this call are already committed,
+              report their paths and commit SHA and exit cleanly. When
+              triggered by `recording.completed`, Zoom may still be generating
+              the VTT auto-transcript: if no transcript is attached on the
+              first check, poll/wait up to 5 minutes (checking every 60s) for
+              Zoom's cloud transcript to appear, and if it is still not ready,
+              let `download_zoom.py` download the MP4 and transcribe locally
+              with `whisperX`. When a transcript already exists, fetch only
+              the saved chat (`--chat-only`). Name the transcript from the
+              meeting topic and date per the skill
+              (`<type>/logs/<date>-<firstname-lastname>.txt`).
 
               2. Summary: read BOTH the transcript and the saved meeting
               chat — check chat even when you reused a transcript. Write the
@@ -116,7 +128,7 @@ actions:
               4. Report, in this order: the transcript and summary paths, the
               commit, and any blocker. Do not delete or cancel anything.
             acceptance_criteria: |
-              Download or reuse the transcript and saved meeting chat in /home/alexey/git/zoom-calls, write the summary following the repository template with exact chat resource URLs, commit and push to origin/master, and report transcript path, summary path, commit SHA, and any blocker.
+              In the assigned `zoom-calls` Hub workspace, download or reuse the transcript (polling briefly for Zoom's cloud VTT on recording.completed or transcribing via download_zoom.py) and saved meeting chat, write the summary following the repository template with exact chat resource URLs, commit and push to origin/master, and report transcript path, summary path, commit SHA, and any blocker.
       - choice: ai-shipping-labs
         description: >
           An AI Shipping Labs session: cohort lecture, workshop, guest talk,
@@ -130,8 +142,9 @@ actions:
             title: "AISL recording: {topic | truncate:50}"
             text: |
               You are the AI Shipping Labs recording processor. A Zoom cloud
-              recording transcript is ready. Work autonomously and finish with a
-              report; do not ask questions.
+              recording event arrived (recording.completed or
+              recording.transcript_completed). Work autonomously and finish
+              with a report; do not ask questions.
 
               Recording event from Zoom:
               - meeting_id: {meeting_id}
@@ -139,9 +152,11 @@ actions:
               - start_time: {start_time}
               - share_url: {share_url}
 
-              Setup: run shell commands from /home/alexey/git/ai-shipping-labs.
-              Read that repo's AGENTS.md and the skills ai-shipping-labs-prod-api,
-              ai-shipping-labs-events, ai-shipping-labs-event-recaps, plus
+              Setup: run shell commands in your assigned Hub workspace
+              directory for `ai-shipping-labs` (current working directory; do
+              not hardcode a host path). Read that repo's AGENTS.md and the
+              skills ai-shipping-labs-prod-api, ai-shipping-labs-events,
+              ai-shipping-labs-event-recaps, plus
               _docs/integrations/s3_recordings.md. Authenticate to the
               production API exactly as the prod-api skill describes.
 
@@ -149,7 +164,9 @@ actions:
               zoom_meeting_id equals {meeting_id} using the production API. Never
               create an event. If no event matches, or several match, stop and
               report the ambiguity (include topic and start time) without changing
-              anything.
+              anything. If the matched event already has `recording_s3_url`,
+              `transcript_text`, and a published `recap`, verify the URLs and
+              report them without re-saving the recap.
 
               2. Recording pipeline: read the event's recording fields first. If
               recording_s3_url is already set, skip to step 3. Otherwise POST
@@ -161,11 +178,12 @@ actions:
               API error. Never download or upload the video yourself; never touch
               AWS credentials for the video.
 
-              3. Transcript: if transcript_text is missing, POST
-              /api/events/<slug>/sync-transcript to queue transcript ingest,
-              even when the video was already uploaded. Poll until
-              transcript_text is present, or report that Zoom produced no
-              transcript.
+              3. Transcript: when triggered by `recording.completed`, Zoom may
+              still be generating the VTT transcript. If transcript_text is
+              missing, poll by calling POST /api/events/<slug>/sync-transcript
+              and checking the event every 60 seconds (up to 15 minutes) until
+              Zoom finishes the transcript and transcript_text is present, or
+              report that Zoom produced no transcript after polling.
 
               4. Recap: follow the ai-shipping-labs-event-recaps skill to produce
               the recap from the stored transcript, and save it through the event's
@@ -180,15 +198,17 @@ actions:
               viewers). If the event already has an external recording_url, leave
               it untouched.
 
-              6. Do not notify registrants, do not post to Slack, do not delete or
-              cancel anything. Keep passcodes, raw transcripts, chat logs, and
-              presigned URLs private.
+              6. Do not notify registrants manually, do not post to Slack, do not
+              delete or cancel anything. Keep passcodes, raw transcripts, chat
+              logs, and presigned URLs private.
 
               7. Report, in this order: event slug and title, recording upload
               status, transcript status, recap URL, event page URL, and any
               blocker.
             acceptance_criteria: |
-              Match the single AI Shipping Labs event for zoom_meeting_id {meeting_id}, ensure recording upload and transcript sync via the production API, produce and save the recap through the event's source of truth, verify the recap URL and event page recording card, and report event slug/title, upload status, transcript status, recap URL, event page URL, and any blocker.
-trigger:
-  connector: zoom
-  event: recording.transcript_completed
+              In the assigned `ai-shipping-labs` Hub workspace, match the single AI Shipping Labs event for zoom_meeting_id {meeting_id}, ensure recording upload and transcript sync (polling until Zoom's transcript is ready when triggered by recording.completed) via the production API, produce and save the recap through the event's source of truth, verify the recap URL and event page recording card, and report event slug/title, upload status, transcript status, recap URL, event page URL, and any blocker.
+triggers:
+  - connector: zoom
+    event: recording.completed
+  - connector: zoom
+    event: recording.transcript_completed

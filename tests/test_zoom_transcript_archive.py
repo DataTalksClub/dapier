@@ -12,7 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_archive_selects_only_transcripts_and_keeps_recordings_separate():
     workflow = designer_store.parse_workflow(
         (ROOT / "workflows/aisl-recording-agent.yaml").read_text())
-    assert workflow["trigger"] == {"connector": "zoom", "event": "recording.transcript_completed"}
+    assert workflow["triggers"] == [
+        {"connector": "zoom", "event": "recording.completed"},
+        {"connector": "zoom", "event": "recording.transcript_completed"},
+    ]
+    from src.dapier.engine.matching import matches
+    assert matches(workflow, {"connector": "zoom", "event": "recording.completed"})
+    assert matches(workflow, {"connector": "zoom", "event": "recording.transcript_completed"})
     event = {"data": {"meeting_id": "81517877578", "start_time": "2026-10-16T15:00:52Z",
                       "video_files": [
                           {"id": "video", "file_type": "MP4", "download_url": "https://example.test/video"},
