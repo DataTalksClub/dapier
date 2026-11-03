@@ -298,20 +298,76 @@ def cmd_sheet_values(args):
     """All tabs of a spreadsheet, or one A1 range, as CSV (Sheets API, read-only GET)."""
     import csv
     import io
+
     base = f"https://sheets.googleapis.com/v4/spreadsheets/{args.id}"
-    ranges = [args.range] if args.range else [
-        s["properties"]["title"]
-        for s in request(base, {"fields": "sheets.properties.title"})["sheets"]]
-    for rng in ranges:
-        values = request(f"{base}/values/{urllib.parse.quote(rng, safe='')}").get("values", [])
+    if args.range:
+        ranges = [(args.range, args.range)]
+        filenames = {args.range: _safe_sheet_filename(args.range)}
+    else:
+        titles = [
+            sheet["properties"]["title"]
+            for sheet in request(base, {"fields": "sheets.properties.title"}).get("sheets", [])
+        ]
+        if not titles:
+            raise ApiError("The spreadsheet has no tabs.")
+        ranges = [(title, "'" + title.replace("'", "''") + "'") for title in titles]
+        filenames = _sheet_filenames_for_export(titles) if args.out_dir else {}
+
+    render_options = {
+        "valueRenderOption": "UNFORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING",
+    }
+    for label, rng in ranges:
+        values = request(
+            f"{base}/values/{urllib.parse.quote(rng, safe='')}", render_options,
+        ).get("values", [])
         buf = io.StringIO()
-        csv.writer(buf).writerows(values)
+        csv.writer(buf).writerows(
+            [_sheet_cell_text(cell) for cell in row] for row in values
+        )
         if args.out_dir:
-            safe = re.sub(r"[^A-Za-z0-9._-]+", "_", rng)
-            write_out(os.path.join(args.out_dir, f"{safe}.csv"), buf.getvalue().encode())
+            write_out(os.path.join(args.out_dir, f"{filenames[label]}.csv"),
+                      buf.getvalue().encode("utf-8"))
         else:
-            print(f"# {rng}")
+            print(f"# {label}")
             sys.stdout.write(buf.getvalue())
+
+
+def _sheet_cell_text(value):
+    """Match the old Sheets reader's ``String(cell)`` CSV contract."""
+    if value is None:
+        return ""
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)
+
+
+def _safe_sheet_filename(title):
+    """Keep the existing readable filename convention for one tab."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", title)
+
+
+def _sheet_filenames_for_export(titles):
+    """Validate unique CSV identities for DataOps' filename-derived tab key."""
+    groups = {}
+    for title in titles:
+        filename = _safe_sheet_filename(title)
+        groups.setdefault(filename.casefold(), (filename, []))[1].append(title)
+
+    collisions = [group for group in groups.values() if len(group[1]) > 1]
+    if collisions:
+        detail = "; ".join(
+            f"{filename}.csv: {', '.join(repr(title) for title in titles)}"
+            for filename, titles in collisions
+        )
+        raise ApiError(
+            "worksheet titles collide after CSV filename sanitization; "
+            f"no CSV files were written: {detail}"
+        )
+
+    return {title: _safe_sheet_filename(title) for title in titles}
 
 
 def build_parser():

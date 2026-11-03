@@ -182,6 +182,22 @@ $PULL "drive alexey.s.grigoriev" drive sheet <sheet-id> --out-dir .tmp/google-pu
 $PULL "drive datatalks" drive sheet <sheet-id> --range "Sheet1!A1:D50"
 ```
 
+`drive sheet` writes one CSV per tab using unformatted cell values and
+spreadsheet-formatted date/time strings. This preserves numeric amounts that
+the sheet displays with rounding or separators and keeps dates in the format
+the sheet shows. Filenames keep the existing sanitized tab-name convention.
+When two titles would map to the same filename, `drive sheet --out-dir` fails
+before reading cell values or writing any CSV. DataOps uses the filename as
+the tab identity, so adding a suffix could make a tab look new to bookkeeping.
+`drive export <sheet-id>` remains the Drive export path for existing
+single-file consumers and exports only the first tab.
+
+The synthetic Dapier-to-DataOps regression is repeatable with
+`python3 .agents/skills/google-data-pull/run_dataops_contract.py`. It checks
+out DataOps PR 307 at its pinned consumer commit, mocks the Sheets API, and
+runs the generated two-tab CSV through DataOps' dry-run path. Update the pin
+only after reviewing a changed PR head.
+
 Use the Drive connection of an account that can see the file. Many DataTalks
 files are shared with both accounts. If one connection returns 404 for a
 file, try the other one.
