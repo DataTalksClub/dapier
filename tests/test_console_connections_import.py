@@ -89,7 +89,7 @@ def _admin(monkeypatch, table):
 
 def test_the_admin_import_route_imports_a_zoom_webhook(monkeypatch):
     from src.dapier.connections import importing
-    from tests.test_zoom import setup as setup_webhook
+    from test_zoom import setup as setup_webhook
 
     table, secrets = setup_webhook(monkeypatch)
     admin_routes = _admin(monkeypatch, table)
@@ -114,7 +114,7 @@ def test_the_admin_import_route_rejects_an_invalid_body(monkeypatch):
 
 def test_the_admin_import_route_maps_import_failures(monkeypatch):
     from src.dapier.connections import importing
-    from tests.test_zoom import setup as setup_webhook
+    from test_zoom import setup as setup_webhook
 
     table, _ = setup_webhook(monkeypatch)
     admin_routes = _admin(monkeypatch, table)
