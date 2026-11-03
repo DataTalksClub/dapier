@@ -18,6 +18,10 @@ Resources:
               - ecr:BatchGetImage
               - ecr:GetDownloadUrlForLayer
             Resource: !Sub arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/dapier-html-renderer
+          - Effect: Allow
+            Action:
+              - lambda:GetFunction
+            Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-HtmlRendererFunction-*
 
   CloudFormationDeployRendererImageAccess:
     Type: AWS::IAM::Policy
