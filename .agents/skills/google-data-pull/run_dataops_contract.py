@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 
-DATAOPS_PR307_HEAD = "5de43419c7e1ce890f4e11e083c68a9cf76e9ec6"
+DATAOPS_PR307_HEAD = "7453c5d8c69ec44e065ed3b53b424458637bb2f1"
 DATAOPS_REPO = "https://github.com/DataTalksClub/dataops.git"
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DRY_RUN_TEST = (

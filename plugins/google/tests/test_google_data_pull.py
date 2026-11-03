@@ -28,7 +28,7 @@ RENDER_OPTIONS = {
     "valueRenderOption": "UNFORMATTED_VALUE",
     "dateTimeRenderOption": "FORMATTED_STRING",
 }
-DATAOPS_PR307_SHA = "5de43419c7e1ce890f4e11e083c68a9cf76e9ec6"
+DATAOPS_PR307_SHA = "7453c5d8c69ec44e065ed3b53b424458637bb2f1"
 DATAOPS_CLI_ENV = "DAPIER_DATAOPS_CLI_DIR"
 BOOKKEEPING_HEADERS = [
     "Date sent", "Date paid", "Provider", "What", "Price, $", "Price, EUR",
