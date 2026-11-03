@@ -79,6 +79,26 @@ jobs:
           role-to-assume: arn:aws:iam::817685572750:role/dapier-github-actions-deploy
           role-session-name: dapier-deploy
           aws-region: ${{ env.AWS_REGION }}
+      - name: Capture renderer ECR recovery evidence (read-only)
+        run: |
+          echo "Current dapier stack status:"
+          aws cloudformation describe-stacks --stack-name dapier \
+            --query 'Stacks[0].StackStatus' --output text
+          echo "Configured renderer image URI parameter:"
+          aws cloudformation describe-stacks --stack-name dapier \
+            --query "Stacks[0].Parameters[?ParameterKey=='HtmlRendererImageUri'].ParameterValue | [0]" \
+            --output text
+          echo "HtmlRendererFunction UPDATE_FAILED stack events:"
+          aws cloudformation describe-stack-events --stack-name dapier \
+            --query "StackEvents[?LogicalResourceId=='HtmlRendererFunction' && ResourceStatus=='UPDATE_FAILED'].[Timestamp,ResourceStatusReason]" \
+            --output json
+          echo "Current HtmlRendererFunction ECR image URI:"
+          aws lambda get-function \
+            --function-name arn:aws:lambda:eu-west-1:817685572750:function:dapier-HtmlRendererFunction-s5wWD6uc7J6v \
+            --query 'Code.ImageUri' --output text
+          echo "Live dapier-html-renderer repository policy before repair:"
+          aws ecr get-repository-policy --registry-id 817685572750 \
+            --repository-name dapier-html-renderer --query policyText --output text
       - run: make layer
       - run: sam build --config-env sandbox
       - name: Deploy renderer ECR access policy stack
@@ -141,6 +161,15 @@ jobs:
             fi
           fi
       - run: scripts/deploy.sh
+      - name: Verify deployed stack status
+        run: |
+          status=$(aws cloudformation describe-stacks --stack-name dapier \
+            --query 'Stacks[0].StackStatus' --output text)
+          echo "StackStatus: $status"
+          case "$status" in
+            UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE) ;;
+            *) echo "Unexpected dapier stack status: $status"; exit 1 ;;
+          esac
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
       - name: Inspect YouTube renewal infrastructure (read-only)
         run: bash scripts/inspect-youtube-renewal.sh
