@@ -16,6 +16,12 @@ _GPULL_PATH = (Path(__file__).resolve().parents[3]
 _SPEC = importlib.util.spec_from_file_location("google_data_pull", _GPULL_PATH)
 gpull = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(gpull)
+_CONTRACT_PATH = _GPULL_PATH.with_name("run_dataops_contract.py")
+_CONTRACT_SPEC = importlib.util.spec_from_file_location(
+    "run_dataops_contract", _CONTRACT_PATH,
+)
+contract = importlib.util.module_from_spec(_CONTRACT_SPEC)
+_CONTRACT_SPEC.loader.exec_module(contract)
 
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets/synthetic-sheet"
 RENDER_OPTIONS = {
@@ -93,6 +99,17 @@ def test_all_tabs_export_raw_numbers_formatted_dates_and_blank_cells(
 def test_sheet_csv_text_serializes_boolean_cells_as_lowercase():
     assert gpull._sheet_cell_text(True) == "true"
     assert gpull._sheet_cell_text(False) == "false"
+
+
+def test_dataops_contract_harness_rejects_zero_selected_tests():
+    empty_selection_output = (
+        "✔ test/bookkeeping.test.mjs (4ms)\n"
+        "ℹ tests 1\nℹ pass 1\nℹ fail 0\n"
+    )
+    with pytest.raises(RuntimeError, match="DataOps dry-run test did not run"):
+        contract.require_test_selected(
+            empty_selection_output, contract.DRY_RUN_TEST,
+        )
 
 
 def test_sanitized_tab_filename_collisions_fail_before_any_csv_is_written(

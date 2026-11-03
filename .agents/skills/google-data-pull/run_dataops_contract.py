@@ -11,6 +11,7 @@ import os
 import shutil
 import shlex
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -19,13 +20,33 @@ DATAOPS_PR307_HEAD = "5de43419c7e1ce890f4e11e083c68a9cf76e9ec6"
 DATAOPS_REPO = "https://github.com/DataTalksClub/dataops.git"
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DRY_RUN_TEST = (
-    "CSV pull dry-run preserves raw amount precision and formatted dates end to end"
+    "CSV importer dry-run contract preserves raw amount precision and formatted dates"
 )
 
 
 def run(args, *, cwd, env=None):
     print("$ " + shlex.join(str(part) for part in args), flush=True)
-    subprocess.run(args, cwd=cwd, env=env, check=True)
+    result = subprocess.run(
+        args, cwd=cwd, env=env, check=False, text=True, capture_output=True,
+    )
+    if result.stdout:
+        print(result.stdout, end="", flush=True)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr, flush=True)
+    if result.returncode:
+        raise subprocess.CalledProcessError(
+            result.returncode, args, output=result.stdout, stderr=result.stderr,
+        )
+    return result.stdout + result.stderr
+
+
+def require_test_selected(output, expected_test):
+    """Fail if Node only reports the test file and filtered out every test."""
+    if expected_test not in output:
+        raise RuntimeError(
+            "DataOps dry-run test did not run; expected its test title in Node "
+            f"output: {expected_test!r}"
+        )
 
 
 def main():
@@ -86,10 +107,12 @@ def main():
             NODE_OPTIONS=f"--import {temp_preload}",
             DAPIER_TEST_TMP=str(scratch),
         )
-        run([
-            "node", "--test", f"--test-name-pattern={DRY_RUN_TEST}",
+        node_output = run([
+            "node", "--test", "--test-reporter=spec",
+            f"--test-name-pattern={DRY_RUN_TEST}",
             "test/bookkeeping.test.mjs",
         ], cwd=cli, env=node_env)
+        require_test_selected(node_output, DRY_RUN_TEST)
 
         pytest_env = dict(
             os.environ,
