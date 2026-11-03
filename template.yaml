@@ -1208,6 +1208,9 @@ Resources:
             Action:
               - ecr:BatchGetImage
               - ecr:GetDownloadUrlForLayer
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-*
           - Sid: AllowDapierDeploymentRoleImageAccess
             Effect: Allow
             Principal:

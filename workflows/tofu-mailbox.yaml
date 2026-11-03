@@ -43,6 +43,15 @@ actions:
                   + " are empty. Set them with: dapier storage set"
                     " tofu-mailbox <name> <value>"
               )
+          _url_output = ((steps.get("get-url") or {}).get("output") or {})
+          _webhook_url = str(_url_output.get("value") or "").strip()
+          if _webhook_url and not _webhook_url.lower().startswith(("http://", "https://")):
+              raise ValueError(
+                  "tofu-mailbox is misconfigured: storage key webhook_url must be "
+                  "an http:// or https:// URL (check that webhook_url and "
+                  "webhook_token are not swapped). Correct it with: dapier storage "
+                  "set tofu-mailbox webhook_url <http(s)-URL>"
+              )
 
       sender = input.get("sender") or {}
       from_addr = input.get("from") or (sender.get("header") if isinstance(sender, dict) else str(sender))
