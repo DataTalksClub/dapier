@@ -309,15 +309,19 @@ CONFLICT_RECOVERY_TIMEOUT_SECONDS = 10.0
 
 def _prior_staged_rendered(route, message_id, filename, content_type="application/pdf",
                            source_data=None, *, source_hash=None, body_sha256=None,
-                           kind="rendered-email-pdf", first_only=False):
+                           kind="rendered-email-pdf", allow_legacy_candidates=False,
+                           first_only=False):
     """Discover rendered-PDF objects already staged for ``(route, message_id)``
-    in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the same
-    message/document (same message_id, same ``kind``, and matching source or
-    content hash).
+    in DATAOPS_EMAIL_DOCUMENTS_BUCKET that match the message/document's
+    stable source or content hash. In conflict recovery, metadata-free legacy
+    byte-keyed objects may also be returned after a stable source candidate
+    exists, but only when their deterministic key matches this exact identity.
 
     Prefers direct key lookups (stable keys for current/legacy source_hash and
     the direct byte-derived key when ``body_sha256`` is known) before falling
-    back to a count- and time-bounded prefix scan.
+    back to a count- and time-bounded prefix scan. Legacy fallback is enabled
+    only for explicit run replays, where DataOps decides whether it is the
+    already-filed manifest.
     """
     bucket = os.environ.get("DATAOPS_EMAIL_DOCUMENTS_BUCKET")
     if not bucket or not route or not message_id:
@@ -334,12 +338,14 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
 
     direct_rel_keys = []
     stable_full_keys = set()
+    corroborating_full_keys = set()
     for sh in hashes:
         rel = _stable_transfer_key(route, message_id, kind, filename, sh)
         full = _safe_staging_key(f"{STAGING_PREFIX}{rel}")
         if rel not in direct_rel_keys:
             direct_rel_keys.append(rel)
         stable_full_keys.add(full)
+        corroborating_full_keys.add(full)
 
     sha_hex = ""
     if body_sha256:
@@ -410,10 +416,17 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
         item for item in items
         if isinstance(item.get("Key"), str) and item["Key"].endswith(safe_suffix)
     ]
+    corroborating_uris = {
+        f"s3://{bucket}/{key}" for key in corroborating_full_keys
+    }
+    has_corroborating_stable = allow_legacy_candidates and any(
+        candidate["storageUri"] in corroborating_uris for candidate in candidates
+    )
     matching_items.sort(key=lambda item: (
         str(item.get("LastModified") or ""), item.get("Key") or "",
     ))
     probes = 0
+    pending_legacy = []
     for item in matching_items:
         if time.monotonic() >= deadline or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
             break
@@ -437,6 +450,8 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
                 "sizeBytes": len(body),
                 "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
             })
+            if uri in corroborating_uris:
+                has_corroborating_stable = True
             if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
                 return candidates
             continue
@@ -495,6 +510,43 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
             })
             if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
                 return candidates
+        elif allow_legacy_candidates and not meta_source_hash:
+            # Before stable staging, the key included the render bytes and
+            # had no source_hash metadata. Accept it only during explicit run
+            # replay recovery, after the current source has a stable staged
+            # object. Recompute the key from this object's bytes and the full
+            # route/message/kind identity; unrelated files with the same
+            # filename do not block or qualify for recovery.
+            legacy_rel = _email_transfer_key_for_digest(
+                route, message_id, kind, 0, filename,
+                content_type, f"sha256:{sha256_hex}", sha256_hex)
+            if _safe_staging_key(f"{STAGING_PREFIX}{legacy_rel}") == full_key:
+                pending_legacy.append((full_key, uri, body))
+
+    if has_corroborating_stable:
+        for full_key, uri, body in pending_legacy:
+            if time.monotonic() >= deadline or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+                break
+            if uri in seen_uris:
+                continue
+            if body is None:
+                try:
+                    body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
+                except Exception as exc:
+                    if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
+                        continue
+                    raise
+            seen_uris.add(uri)
+            candidates.append({
+                "kind": kind,
+                "storageUri": uri,
+                "filename": filename,
+                "contentType": content_type,
+                "sizeBytes": len(body),
+                "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
+            })
+            if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
+                return candidates
     return candidates
 
 
@@ -503,10 +555,11 @@ def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=
     in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the same
     message/document (same route, message_id, kind, and content hash).
 
-    Legacy byte-keyed candidates without source-hash metadata are excluded:
-    the same message ID and filename do not prove that a PDF belongs to the
-    current email body. An unresolved 409 remains a source conflict instead
-    of re-submitting an unverifiable prior artifact.
+    Legacy byte-keyed candidates without source-hash metadata are considered
+    only for an explicit run replay, after a stable candidate for the replayed
+    source exists. A candidate must also recompute to the exact legacy key for
+    this route, message ID, kind, filename, content type, and bytes. DataOps
+    remains the final arbiter: an unresolved 409 remains a source conflict.
     """
     if _is_leads_action(action) or not isinstance(event, dict) or event.get("connector") == "dropbox":
         return None
@@ -537,10 +590,17 @@ def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=
     filename = str(current.get("filename") or action.get("filename") or "invoice-email.pdf")
     content_type = str(current.get("contentType") or "application/pdf")
     body_sha256 = str(data.get("checksum") or current.get("checksum") or "")
+    # runs.replay_event injects the recorded trigger with a fresh replay-* ID
+    # and correlation_id. Restrict metadata-free legacy recovery to that
+    # explicit replay path; a new delivery with a reused Message-ID must fail
+    # closed when its email source differs.
+    event_id = str(event.get("id") or "")
+    is_run_replay = event_id.startswith("replay-") and bool(event.get("correlation_id"))
     candidates = _prior_staged_rendered(
         route, message_id, filename, content_type,
         source_data, source_hash=_source_hash(source_data),
-        body_sha256=body_sha256, kind=kind, first_only=False)
+        body_sha256=body_sha256, kind=kind,
+        allow_legacy_candidates=is_run_replay, first_only=False)
     deadline = time.monotonic() + CONFLICT_RECOVERY_TIMEOUT_SECONDS
     attempts = 0
     for cand in candidates:

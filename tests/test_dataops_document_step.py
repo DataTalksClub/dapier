@@ -756,8 +756,14 @@ def test_worker_timeout_covers_the_render_wait():
     assert batch_size == 1
 
 
-def test_replay_of_legacy_filing_without_source_hash_fails_closed():
-    """A body-byte legacy object cannot prove identity for a stable message ID."""
+def test_run_replay_recovers_legacy_filing_after_stable_stage_conflicts():
+    """A pre-stable filing is recovered by probing its exact legacy key.
+
+    The run replay carries the recorded source event with a fresh replay ID.
+    A stable staged copy corroborates that identity, while DataOps decides
+    whether the legacy manifest is the existing duplicate. Unrelated files
+    with the same default filename must not suppress that candidate.
+    """
     import io
     import urllib.error
     from unittest.mock import patch
@@ -765,6 +771,11 @@ def test_replay_of_legacy_filing_without_source_hash_fails_closed():
     from src.dapier.engine.actions import dataops
 
     fake = _FakeStagingS3()
+    replay_event = {
+        **EVENT,
+        "id": "replay-a7f685e4-cec4-4719-a866-add8a9b24e8a",
+        "correlation_id": EVENT["id"],
+    }
     filed_bytes = b"%PDF-1.4 render filed at 08:53Z"
     filed_sha = hashlib.sha256(filed_bytes).hexdigest()
     legacy_key = dataops._email_transfer_key(
@@ -775,6 +786,17 @@ def test_replay_of_legacy_filing_without_source_hash_fails_closed():
     fake.put_object(
         Bucket="staging", Key="transfer/" + legacy_key, Body=filed_bytes,
         Metadata={"sha256": filed_sha},
+    )
+    foreign_bytes = b"%PDF other invoice using the default filename"
+    foreign_sha = hashlib.sha256(foreign_bytes).hexdigest()
+    foreign_key = dataops._email_transfer_key(
+        "invoice", "other-message", "rendered-email-pdf", 0,
+        "invoice-email.pdf", foreign_bytes, "application/pdf",
+        "sha256:" + foreign_sha,
+    )
+    fake.put_object(
+        Bucket="staging", Key="transfer/" + foreign_key, Body=foreign_bytes,
+        Metadata={"sha256": foreign_sha},
     )
     spurious_bytes = b"%PDF-1.4 spurious render staged by the failed replay"
     spurious_sha = hashlib.sha256(spurious_bytes).hexdigest()
@@ -819,14 +841,14 @@ def test_replay_of_legacy_filing_without_source_hash_fails_closed():
          patch("src.dapier.engine.actions.base._connected_connection",
                return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
          patch("src.dapier.engine.actions.base._json_request", side_effect=fake_request):
-        with pytest.raises(ValueError, match="DataOps source conflict"):
-            run_dataops(intake_action, EVENT, steps=RENDER_STEPS)
+        result = run_dataops(intake_action, replay_event, steps=RENDER_STEPS)
 
+    assert result == {"status": "duplicate", "invoices": [{"id": "inv-1"}]}
     assert seen[0]["documents"][0]["storageUri"].endswith(spurious_key)
-    assert all(post["documents"][0]["storageUri"] != filed["documents"][0]["storageUri"]
-               for post in seen)
-    assert len(seen) == 1
-    assert len(fake.objects) == 2
+    assert seen[1] == filed
+    assert all(foreign_key not in post["documents"][0]["storageUri"] for post in seen)
+    assert len(seen) == 2
+    assert len(fake.objects) == 3
 
 
 def test_recovery_never_uses_legacy_pdf_for_changed_email_body():
