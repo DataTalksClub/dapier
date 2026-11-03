@@ -195,7 +195,9 @@ single-file consumers and exports only the first tab.
 The synthetic Dapier-to-DataOps regression is repeatable with
 `python3 .agents/skills/google-data-pull/run_dataops_contract.py`. It checks
 out DataOps PR 307 at its pinned consumer commit, mocks the Sheets API, and
-runs the generated two-tab CSV through DataOps' dry-run path. Update the pin
+runs the generated two-tab CSV through DataOps' dry-run path. The harness also
+checks that Node reports the expected dry-run test title, so a stale name
+filter cannot pass after selecting zero tests. Update the pin and test title
 only after reviewing a changed PR head.
 
 Use the Drive connection of an account that can see the file. Many DataTalks
