@@ -415,6 +415,31 @@ def test_bot_mailbox_guard_missing_storage_keys(workflow_id, route):
         assert workflow_id in str(exc)
 
 
+@pytest.mark.parametrize("workflow_id,route", [
+    ("dev-mailbox", "dev"),
+    ("tofu-mailbox", "tofu"),
+    ("orin-mailbox", "orin"),
+])
+@pytest.mark.parametrize("bad_url", ["crsr_test-not-a-real-secret", "ftp://example.invalid/hook"])
+def test_bot_mailbox_guard_rejects_non_http_webhook_url(workflow_id, route, bad_url):
+    """A credential key or other scheme cannot reach the webhook URL slot."""
+    _, wf = _load(workflow_id)
+    code_action = next(a for a in wf["actions"] if a.get("type") == "code")
+
+    event = {
+        "connector": "email",
+        "data": {"from": "a@example.com", "subject": "hi", "body": {"text": "hi"}},
+    }
+    steps = {
+        "get-url": {"status": "completed", "output": {"key": "webhook_url", "value": bad_url, "found": True}},
+        "get-token": {"status": "completed", "output": {"key": "webhook_token", "value": "test-token", "found": True}},
+    }
+    with pytest.raises(RuntimeError, match="webhook_url.*http:// or https:// URL") as exc_info:
+        run_code(code_action, event, steps=steps)
+    assert workflow_id in str(exc_info.value)
+    assert bad_url not in str(exc_info.value)
+
+
 def test_dev_mailbox_guard_missing_storage_keys():
     """Unprovisioned webhook_url/webhook_token fail fast with a clear error.
 
