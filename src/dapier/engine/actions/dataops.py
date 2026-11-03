@@ -248,6 +248,41 @@ def _already_staged(key):
     return f"s3://{bucket}/{full}", body, f"sha256:{hashlib.sha256(body).hexdigest()}"
 
 
+def _stage_document_first_write(key, body, content_type, checksum, source_hash):
+    """Create a stable rendered-document object without replacing its first bytes.
+
+    Concurrent replays can both miss the initial lookup. S3's conditional
+    write makes the first staged render win; a losing writer reuses the bytes
+    and checksum already stored at that identity key.
+    """
+    bucket = os.environ["DATAOPS_EMAIL_DOCUMENTS_BUCKET"]
+    full = _safe_staging_key(f"{STAGING_PREFIX}{key}")
+    digest = checksum.split(":", 1)[1] if checksum.startswith("sha256:") else checksum
+    metadata = {"sha256": digest}
+    if source_hash:
+        metadata["source_hash"] = source_hash
+    uri = f"s3://{bucket}/{full}"
+    s3 = _s3()
+    for attempt in range(3):
+        try:
+            s3.put_object(
+                Bucket=bucket, Key=full, Body=body, ContentType=content_type,
+                Metadata=metadata, ServerSideEncryption="AES256", IfNoneMatch="*",
+            )
+            return uri, body, f"sha256:{digest}"
+        except Exception as exc:
+            code = _s3_error_code(exc)
+            if code not in ("PreconditionFailed", "412", "ConditionalRequestConflict", "409"):
+                raise
+            existing = _already_staged(key)
+            if existing is not None:
+                return existing
+            if code in ("ConditionalRequestConflict", "409") and attempt < 2:
+                continue
+            raise
+    raise RuntimeError(f"could not stage rendered document at s3://{bucket}/{full}")
+
+
 def _email_transfer_key_for_digest(route, message_id, kind, index, filename, content_type, checksum, body_digest):
     identity = [route.lower(), message_id.strip(), kind, index, filename,
                 content_type, checksum, body_digest]
@@ -274,8 +309,7 @@ CONFLICT_RECOVERY_TIMEOUT_SECONDS = 10.0
 
 def _prior_staged_rendered(route, message_id, filename, content_type="application/pdf",
                            source_data=None, *, source_hash=None, body_sha256=None,
-                           kind="rendered-email-pdf", allow_corroborated_legacy=True,
-                           first_only=False):
+                           kind="rendered-email-pdf", first_only=False):
     """Discover rendered-PDF objects already staged for ``(route, message_id)``
     in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the same
     message/document (same message_id, same ``kind``, and matching source or
@@ -300,16 +334,12 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
 
     direct_rel_keys = []
     stable_full_keys = set()
-    corroborating_full_keys = set()
     for sh in hashes:
         rel = _stable_transfer_key(route, message_id, kind, filename, sh)
         full = _safe_staging_key(f"{STAGING_PREFIX}{rel}")
         if rel not in direct_rel_keys:
             direct_rel_keys.append(rel)
         stable_full_keys.add(full)
-        corroborating_full_keys.add(full)
-        att_rel = _stable_transfer_key(route, message_id, "attachment", filename, sh)
-        corroborating_full_keys.add(_safe_staging_key(f"{STAGING_PREFIX}{att_rel}"))
 
     sha_hex = ""
     if body_sha256:
@@ -380,15 +410,10 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
         item for item in items
         if isinstance(item.get("Key"), str) and item["Key"].endswith(safe_suffix)
     ]
-    has_corroborating_stable = allow_corroborated_legacy and any(
-        item["Key"] in corroborating_full_keys for item in matching_items
-    )
     matching_items.sort(key=lambda item: (
         str(item.get("LastModified") or ""), item.get("Key") or "",
     ))
     probes = 0
-    has_foreign_key = False
-    pending_legacy = []
     for item in matching_items:
         if time.monotonic() >= deadline or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
             break
@@ -415,8 +440,6 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
             if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
                 return candidates
             continue
-        if full_key in corroborating_full_keys:
-            continue
         if probes >= STAGING_SCAN_MAX_PROBES:
             break
         probes += 1
@@ -442,40 +465,18 @@ def _prior_staged_rendered(route, message_id, filename, content_type="applicatio
                 if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
                     continue
                 raise
-        rel = _email_transfer_key_for_digest(
-            route, message_id, kind, 0, filename,
-            content_type, f"sha256:{sha256_hex}", sha256_hex)
-        if _safe_staging_key(f"{STAGING_PREFIX}{rel}") != full_key:
-            has_foreign_key = True
-            continue
-        if (sha_hex and sha256_hex == sha_hex) or (meta_source_hash and meta_source_hash in hashes):
-            if body is None:
-                try:
-                    body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
-                except Exception as exc:
-                    if _s3_error_code(exc) in ("NoSuchKey", "404", "NotFound"):
-                        continue
-                    raise
-            seen_uris.add(uri)
-            candidates.append({
-                "kind": kind,
-                "storageUri": uri,
-                "filename": filename,
-                "contentType": content_type,
-                "sizeBytes": len(body),
-                "checksum": f"sha256:{hashlib.sha256(body).hexdigest()}",
-            })
-            if first_only or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
-                return candidates
-        elif not meta_source_hash:
-            pending_legacy.append((full_key, uri, body))
-
-    if has_corroborating_stable and not has_foreign_key:
-        for full_key, uri, body in pending_legacy:
-            if time.monotonic() >= deadline or len(candidates) >= CONFLICT_RECOVERY_MAX_CANDIDATES:
-                break
-            if uri in seen_uris:
-                continue
+        matches_source = False
+        if meta_source_hash in hashes:
+            source_rel = _stable_transfer_key(
+                route, message_id, kind, filename, meta_source_hash)
+            matches_source = _safe_staging_key(f"{STAGING_PREFIX}{source_rel}") == full_key
+        matches_bytes = False
+        if sha_hex and sha256_hex == sha_hex:
+            rel = _email_transfer_key_for_digest(
+                route, message_id, kind, 0, filename,
+                content_type, f"sha256:{sha256_hex}", sha256_hex)
+            matches_bytes = _safe_staging_key(f"{STAGING_PREFIX}{rel}") == full_key
+        if matches_source or matches_bytes:
             if body is None:
                 try:
                     body = s3.get_object(Bucket=bucket, Key=full_key)["Body"].read()
@@ -502,16 +503,10 @@ def _recover_rendered_conflict(url, body, action, event, *, steps=None, headers=
     in DATAOPS_EMAIL_DOCUMENTS_BUCKET that provably represent the same
     message/document (same route, message_id, kind, and content hash).
 
-    Corroborated legacy byte-keyed candidates are allowed here: a delivery
-    first accepted before the stable-key scheme was deployed was staged under
-    a key derived from its render bytes, so no byte-identical or
-    metadata-carried candidate can exist for it (the 2026-11-02 replays of
-    the 05:09Z/06:57Z filings). The corroboration gate in
-    _prior_staged_rendered still accepts a legacy candidate only when a
-    stable-keyed object for this exact email identity exists, and DataOps
-    remains the final arbiter: every recovery POST carries the current
-    envelope, and DataOps compares the full manifest hash, so a genuinely
-    changed email still returns 409 and the conflict is re-raised.
+    Legacy byte-keyed candidates without source-hash metadata are excluded:
+    the same message ID and filename do not prove that a PDF belongs to the
+    current email body. An unresolved 409 remains a source conflict instead
+    of re-submitting an unverifiable prior artifact.
     """
     if _is_leads_action(action) or not isinstance(event, dict) or event.get("connector") == "dropbox":
         return None
@@ -615,8 +610,9 @@ def _email_intake_body(action, event, *, steps=None):
             else:
                 key = _stable_transfer_key(route, message_id, "rendered-email-pdf", filename, sh)
                 body = base._s3_body(output)
-                checksum = f"sha256:{data['checksum']}"
-                storage_uri = _stage_document(key, body, content_type, checksum)
+                checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
+                storage_uri, body, checksum = _stage_document_first_write(
+                    key, body, content_type, checksum, sh)
                 documents.append({
                     "kind": "rendered-email-pdf",
                     "storageUri": storage_uri,
@@ -694,10 +690,14 @@ def _step_document(ref, route, message_id, action, steps, source_hash=None, sour
         key = _stable_transfer_key(route, message_id, kind, filename, source_hash)
     body = _await_document(document, output.get("job_id"), ref)
     checksum = f"sha256:{hashlib.sha256(body).hexdigest()}"
-    storage_uri = _stage_document(
-        key or _email_transfer_key(route, message_id, kind, 0, filename,
-                                   body, "application/pdf", checksum),
-        body, "application/pdf", checksum)
+    if key:
+        storage_uri, body, checksum = _stage_document_first_write(
+            key, body, "application/pdf", checksum, source_hash)
+    else:
+        storage_uri = _stage_document(
+            _email_transfer_key(route, message_id, kind, 0, filename,
+                                body, "application/pdf", checksum),
+            body, "application/pdf", checksum)
     return {
         "kind": kind,
         "storageUri": storage_uri,

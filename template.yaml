@@ -862,7 +862,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt EventQueue.Arn
-            BatchSize: 10
+            BatchSize: 1  # Worker records are serial; a render wait may take 180 seconds.
             FunctionResponseTypes: [ReportBatchItemFailures]
 
   # Standalone (not inline) because schedule rules are created and deleted at
