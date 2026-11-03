@@ -144,6 +144,10 @@ class _NoSuchKey(Exception):
     response = {"Error": {"Code": "NoSuchKey"}}
 
 
+class _PreconditionFailed(Exception):
+    response = {"Error": {"Code": "PreconditionFailed"}}
+
+
 RENDER_STEPS = {"route.else.render-pdf": {"output": {
     "job_id": "ev1:invoice-intake:render-pdf",
     "output": {"bucket": "artifacts", "key": "invoice-body/ev1.pdf"}}}}
@@ -171,19 +175,23 @@ def test_render_output_arriving_late_is_awaited():
 
 
 class _FakeStagingS3:
-    """In-memory staging bucket: put_object stores, get_object/head/list replay."""
+    """In-memory S3 semantics for staging writes, reads, heads and listings."""
     def __init__(self):
         self.objects = {}
         self.meta = {}
         self._tick = 0
+        self.put_conditions = []
 
-    def put_object(self, Bucket, Key, Body, Metadata=None, **_):
+    def put_object(self, Bucket, Key, Body, Metadata=None, IfNoneMatch=None, **_):
+        self.put_conditions.append(IfNoneMatch)
+        if IfNoneMatch == "*" and (Bucket, Key) in self.objects:
+            raise _PreconditionFailed()
         self._tick += 1
-        self.objects.setdefault((Bucket, Key), Body)
-        self.meta.setdefault((Bucket, Key), {
+        self.objects[(Bucket, Key)] = Body
+        self.meta[(Bucket, Key)] = {
             "Metadata": dict(Metadata or {}),
             "LastModified": f"2026-11-02T08:51:{self._tick:02d}Z",
-        })
+        }
 
     def get_object(self, Bucket, Key):
         if (Bucket, Key) not in self.objects:
@@ -210,6 +218,31 @@ def _manifest(fake, render_bytes, event, steps, action):
          patch.object(dataops, "_s3", return_value=fake), \
          patch.object(dataops.base, "_s3_body", return_value=render_bytes):
         return dataops._email_intake_body(action, event, steps=steps)
+
+
+def test_concurrent_render_staging_preserves_the_first_written_bytes():
+    from src.dapier.engine.actions import dataops
+
+    fake = _FakeStagingS3()
+    key = "email/stable-id/invoice-email.pdf"
+    source_hash = "a" * 64
+    first_bytes = b"first render"
+    first_checksum = "sha256:" + hashlib.sha256(first_bytes).hexdigest()
+    later_bytes = b"concurrent rerender"
+    later_checksum = "sha256:" + hashlib.sha256(later_bytes).hexdigest()
+
+    with patch.dict("os.environ", {"DATAOPS_EMAIL_DOCUMENTS_BUCKET": "staging"}), \
+         patch.object(dataops, "_s3", return_value=fake):
+        first = dataops._stage_document_first_write(
+            key, first_bytes, "application/pdf", first_checksum, source_hash)
+        concurrent = dataops._stage_document_first_write(
+            key, later_bytes, "application/pdf", later_checksum, source_hash)
+
+    assert first == (f"s3://staging/transfer/{key}", first_bytes, first_checksum)
+    assert concurrent == first
+    assert fake.objects[("staging", f"transfer/{key}")] == first_bytes
+    assert fake.meta[("staging", f"transfer/{key}")]["Metadata"]["source_hash"] == source_hash
+    assert fake.put_conditions == ["*", "*"]
 
 
 def test_rerendered_document_step_submits_the_same_manifest():
@@ -382,11 +415,8 @@ def test_replay_attachment_restaging_keeps_same_rendered_manifest():
     assert first["documents"] == second["documents"]
 
 
-def test_replay_reuses_legacy_byte_keyed_rendered_pdf():
-    """Messages first accepted before a771da4 were staged under the
-    byte-derived _email_transfer_key. Even if a later failed replay staged a
-    second render under a newer key, _prior_staged_rendered selects the
-    oldest staged object (matching DataOps first-write-wins)."""
+def test_replay_does_not_reuse_legacy_pdf_without_source_identity_metadata():
+    """A byte-derived legacy key does not prove which email body produced it."""
     from src.dapier.engine.actions import dataops
     fake = _FakeStagingS3()
     first_bytes = b"%PDF-1.4 original accepted render at 08:51Z"
@@ -413,15 +443,22 @@ def test_replay_reuses_legacy_byte_keyed_rendered_pdf():
     )
 
     intake_action = {**RENDER_ACTION, "filename": "invoice-email.pdf"}
-    manifest = _manifest(fake, b"%PDF-1.4 third render", EVENT, RENDER_STEPS, intake_action)
+    render = b"%PDF-1.4 third render"
+    manifest = _manifest(fake, render, EVENT, RENDER_STEPS, intake_action)
+    stable_rel = dataops._stable_transfer_key(
+        "invoice", "msg-1", "rendered-email-pdf", "invoice-email.pdf",
+        dataops._source_hash(EVENT["data"]),
+    )
     assert manifest["documents"] == [{
         "kind": "rendered-email-pdf",
-        "storageUri": f"s3://staging/transfer/{legacy_rel}",
+        "storageUri": f"s3://staging/transfer/{stable_rel}",
         "filename": "invoice-email.pdf",
         "contentType": "application/pdf",
-        "sizeBytes": len(first_bytes),
-        "checksum": first_checksum,
+        "sizeBytes": len(render),
+        "checksum": "sha256:" + hashlib.sha256(render).hexdigest(),
     }]
+    assert fake.objects[("staging", f"transfer/{legacy_rel}")] == first_bytes
+    assert fake.objects[("staging", f"transfer/{stable_rel}")] == render
 
 
 def test_rendered_409_recovers_by_trying_remaining_staged_candidates():
@@ -713,20 +750,14 @@ def test_worker_timeout_covers_the_render_wait():
     timeout = int(re.search(r"Timeout: (\d+)", worker).group(1))
     queue = text.split("  EventQueue:\n", 1)[1]
     visibility = int(re.search(r"VisibilityTimeout: (\d+)", queue).group(1))
+    batch_size = int(re.search(r"BatchSize: (\d+)", worker).group(1))
     assert timeout >= 180 + 60
     assert visibility >= timeout
+    assert batch_size == 1
 
 
-def test_replay_of_legacy_filing_reconciles_to_the_filed_manifest():
-    """2026-11-02 AC3 live case: a message first accepted under the byte
-    derived key (before the stable-key scheme) cannot be re-delivered
-    byte-identically because renders are not deterministic. The intake reuse
-    path submits the failed replay's stable-keyed copy, DataOps rejects it
-    (409), and recovery may now reconcile with the corroborated legacy
-    original: its key recomputes only from route, message_id, kind,
-    filename, content_type and the object's own bytes, and DataOps accepts
-    the POST because the full manifest (envelope + document) matches the
-    first filing exactly. No content is replaced and nothing is re-staged."""
+def test_replay_of_legacy_filing_without_source_hash_fails_closed():
+    """A body-byte legacy object cannot prove identity for a stable message ID."""
     import io
     import urllib.error
     from unittest.mock import patch
@@ -788,22 +819,18 @@ def test_replay_of_legacy_filing_reconciles_to_the_filed_manifest():
          patch("src.dapier.engine.actions.base._connected_connection",
                return_value={"provider": "dataops", "url": "https://ops.example.com"}), \
          patch("src.dapier.engine.actions.base._json_request", side_effect=fake_request):
-        result = run_dataops(intake_action, EVENT, steps=RENDER_STEPS)
+        with pytest.raises(ValueError, match="DataOps source conflict"):
+            run_dataops(intake_action, EVENT, steps=RENDER_STEPS)
 
-    assert result == {"status": "duplicate", "invoices": [{"id": "inv-1"}]}
-    # seen[0] is the intake build POST (the spurious stable-keyed copy DataOps
-    # rejects); seen[1] is the recovery POST that reconciles to the filing.
     assert seen[0]["documents"][0]["storageUri"].endswith(spurious_key)
-    assert seen[1] == filed
+    assert all(post["documents"][0]["storageUri"] != filed["documents"][0]["storageUri"]
+               for post in seen)
+    assert len(seen) == 1
     assert len(fake.objects) == 2
 
 
-def test_recovery_of_legacy_filing_still_conflicts_when_email_changed():
-    """Review finding A still holds: recovery may now try the corroborated
-    legacy original, but DataOps arbitrates on the full manifest, so a
-    genuinely changed email under the same (route, message_id) still fails
-    with 'DataOps source conflict' - the recovery POST carries the changed
-    envelope, DataOps 409s it, and no stale candidate masks the conflict."""
+def test_recovery_never_uses_legacy_pdf_for_changed_email_body():
+    """Recovery must not turn a changed body into success by resubmitting old bytes."""
     import io
     import urllib.error
     from unittest.mock import patch
@@ -826,7 +853,6 @@ def test_recovery_of_legacy_filing_still_conflicts_when_email_changed():
         **EVENT,
         "data": {
             **EVENT["data"],
-            "subject": "Altered Stripe receipt for 9999 EUR",
             "body": {"html": {"content_type": "text/html", "size": 10, "value": "<p>9999</p>"}},
         },
     }
@@ -876,7 +902,8 @@ def test_recovery_of_legacy_filing_still_conflicts_when_email_changed():
         with pytest.raises(ValueError, match="DataOps source conflict"):
             run_dataops(intake_action, changed_event, steps=RENDER_STEPS)
 
-    assert len(seen) == 2
-    assert seen[0]["documents"][0]["storageUri"].endswith(changed_key)
-    assert seen[1]["documents"][0]["storageUri"].endswith(legacy_key)
-    assert seen[1]["subject"] == "Altered Stripe receipt for 9999 EUR"
+    assert len(seen) == 1
+    assert all(post["documents"][0]["storageUri"].endswith(changed_key) for post in seen)
+    assert all(post["documents"][0]["storageUri"] != "s3://staging/transfer/" + legacy_key
+               for post in seen)
+    assert seen[0]["subject"] == EVENT["data"]["subject"]
