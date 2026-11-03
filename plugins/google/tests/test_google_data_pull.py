@@ -90,6 +90,11 @@ def test_all_tabs_export_raw_numbers_formatted_dates_and_blank_cells(
     assert value_calls == [RENDER_OPTIONS, RENDER_OPTIONS]
 
 
+def test_sheet_csv_text_serializes_boolean_cells_as_lowercase():
+    assert gpull._sheet_cell_text(True) == "true"
+    assert gpull._sheet_cell_text(False) == "false"
+
+
 def test_sanitized_tab_filename_collisions_fail_before_any_csv_is_written(
         tmp_path, monkeypatch):
     calls = []
