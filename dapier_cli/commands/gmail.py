@@ -7,6 +7,8 @@ JSON API. Nothing here talks to Google directly.
 """
 
 import base64
+import hashlib
+import tempfile
 import mimetypes
 import os
 import sys
@@ -170,31 +172,72 @@ def _decode_attachment(value):
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
+def _download_attachment(api_url, message_id, attachment_id, account, target, debug):
+    """Bounded API responses; replace the output only after complete integrity checks."""
+    params = {"chunk_size": 1024 * 1024}
+    if account:
+        params["account"] = account
+    path = BASE + f"/messages/{message_id}/attachments/{attachment_id}"
+    offset, expected_size, expected_sha = 0, None, None
+    digest = hashlib.sha256()
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=os.path.dirname(os.path.abspath(target)), delete=False) as handle:
+            temporary = handle.name
+            while True:
+                blob = api.call(api_url, "GET", path + "?" + urlencode(params), debug=debug)
+                content = _decode_attachment(blob.get("data_b64"))
+                if blob.get("chunked"):
+                    size, sha = blob.get("size"), blob.get("sha256")
+                    if not isinstance(size, int) or size < 0 or not isinstance(sha, str) or len(sha) != 64:
+                        raise api.ApiError("Attachment chunk has invalid integrity metadata")
+                    if expected_size is None:
+                        expected_size, expected_sha = size, sha
+                    if (size, sha) != (expected_size, expected_sha):
+                        raise api.ApiError("Attachment changed during download")
+                    if (blob.get("offset") != offset or blob.get("chunk_size") != len(content)
+                            or len(content) != min(1024 * 1024, size - offset)):
+                        raise api.ApiError("Attachment chunk offset or size mismatch")
+                    following = blob.get("next_offset")
+                    if following is not None and (not content or following != offset + len(content)):
+                        raise api.ApiError("Attachment chunk did not advance")
+                else:
+                    if offset:
+                        raise api.ApiError("Attachment chunk protocol changed during download")
+                    # A small attachment from a previous server release remains readable.
+                    expected_size, expected_sha = blob.get("size", len(content)), None
+                    following = None
+                handle.write(content)
+                digest.update(content)
+                offset += len(content)
+                if following is None:
+                    break
+                params["offset"] = following
+            if offset != expected_size or (expected_sha and digest.hexdigest() != expected_sha):
+                raise api.ApiError("Attachment size or SHA256 verification failed")
+        os.replace(temporary, target)
+        temporary = None
+        return offset
+    finally:
+        if temporary is not None:
+            os.unlink(temporary)
+
+
 def _save_all_attachments(api_url, message, directory, account, debug):
     os.makedirs(directory, exist_ok=True)
-    params = {"account": account} if account else None
     for item in message.get("attachments") or []:
         attachment_id = item.get("attachment_id")
         if not attachment_id:
             continue
-        blob = api.call(api_url, "GET", BASE + f"/messages/{message['id']}"
-                        f"/attachments/{attachment_id}"
-                        + ("?" + urlencode(params) if params else ""), debug=debug)
-        data = _decode_attachment(blob.get("data_b64"))
         filename = item.get("filename") or f"attachment-{attachment_id}"
-        with open(os.path.join(directory, os.path.basename(filename)), "wb") as handle:
-            handle.write(data)
+        _download_attachment(api_url, message["id"], attachment_id, account,
+                             os.path.join(directory, os.path.basename(filename)), debug)
 
 
 def gmail_attachment(api_url, message_id, attachment_id, account=None, out=None, debug=False):
-    params = {"account": account} if account else None
-    blob = api.call(api_url, "GET", BASE + f"/messages/{message_id}/attachments/{attachment_id}"
-                    + ("?" + urlencode(params) if params else ""), debug=debug)
-    data = _decode_attachment(blob.get("data_b64"))
     target = out or f"attachment-{attachment_id}"
-    with open(target, "wb") as handle:
-        handle.write(data)
-    print(f"saved {len(data)} bytes to {target}")
+    size = _download_attachment(api_url, message_id, attachment_id, account, target, debug)
+    print(f"saved {size} bytes to {target}")
     return 0
 
 

@@ -19,6 +19,7 @@ original threadId are set from the replied-to message's headers.
 """
 
 import base64
+import hashlib
 import re
 from email.utils import getaddresses
 from urllib.parse import quote, urlencode
@@ -238,18 +239,45 @@ def get_message(account, message_id, include_html=False):
     return _message_view(data, include_text=True, include_html=include_html)
 
 
-def get_attachment(account, message_id, attachment_id):
+ATTACHMENT_CHUNK_BYTES = 1024 * 1024
+INLINE_ATTACHMENT_BYTES = 4 * 1024 * 1024
+
+
+def get_attachment(account, message_id, attachment_id, *, offset=0, chunk_size=None):
+    try:
+        offset = int(offset)
+        chunk_size = int(chunk_size) if chunk_size is not None else None
+    except (ValueError, TypeError):
+        raise GmailOpsError("offset and chunk_size must be integers") from None
+    if offset < 0 or (chunk_size is not None and not 1 <= chunk_size <= ATTACHMENT_CHUNK_BYTES):
+        raise GmailOpsError("offset must be nonnegative; chunk_size must be 1..1048576")
+    if offset and chunk_size is None:
+        raise GmailOpsError("offset requires chunk_size")
     _connection_id, _connection, token = _connection_and_token(account)
 
     data = _call(
         token, "GET",
         f"/users/me/messages/{quote(str(message_id), safe='')}"
         f"/attachments/{quote(str(attachment_id), safe='')}")
-    return {
-        "attachment_id": data.get("attachmentId") or attachment_id,
-        "size": int(data.get("size") or 0),
-        "data_b64": data.get("data") or "",
-    }
+    encoded = data.get("data") or ""
+    content = _b64url_decode(encoded)
+    size = len(content)
+    if int(data.get("size") or 0) != size:
+        raise GmailOpsError("Gmail attachment size does not match its content", status=502)
+    result = {"attachment_id": data.get("attachmentId") or attachment_id,
+              "size": size, "data_b64": encoded}
+    if chunk_size is None:
+        if size > INLINE_ATTACHMENT_BYTES:
+            raise GmailOpsError("Large attachment requires chunk_size; update the Dapier CLI", status=413)
+        return result
+    if offset > size:
+        raise GmailOpsError("offset exceeds attachment size")
+    part = content[offset:offset + chunk_size]
+    return {**result, "data_b64": base64.urlsafe_b64encode(part).decode("ascii"),
+            "chunked": True, "offset": offset, "chunk_size": len(part),
+            "next_offset": offset + len(part) if offset + len(part) < size else None,
+            "sha256": hashlib.sha256(content).hexdigest()}
+
 
 
 def list_threads(account, query=None, max_results=DEFAULT_PAGE_SIZE, page_token=None):

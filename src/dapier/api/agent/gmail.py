@@ -89,7 +89,10 @@ def get_attachment_api(event, message_id, attachment_id):
     if error:
         return error
     try:
-        payload = gmail_ops.get_attachment(_account(event), message_id, attachment_id)
+        query = event.get("queryStringParameters") or {}
+        payload = gmail_ops.get_attachment(_account(event), message_id, attachment_id,
+                                           offset=query.get("offset", 0),
+                                           chunk_size=query.get("chunk_size"))
     except (gmail_ops.GmailOpsError, GoogleAccountError) as exc:
         return _error(exc)
     _audit(_account(event) or "gmail", "gmail.get_attachment", subject)
