@@ -127,8 +127,18 @@ def _request(method, url, token, payload, *, transport=None):
             method, url, headers=headers, body=body, timeout=15,
         )
     except Exception as exc:
+        # urllib's transport raises HTTPError for non-2xx instead of
+        # returning the status; recover it so provider errors surface with
+        # their own status and redacted detail, not just the exception name.
+        status = getattr(exc, "code", None)
+        if not isinstance(status, int):
+            raise DiscoveryError(
+                f"provider request unreachable: {type(exc).__name__}", status=502) from None
+        raw = exc.read() if hasattr(exc, "read") else b""
+        detail = _error_detail(status, raw)
         raise DiscoveryError(
-            f"provider request unreachable: {type(exc).__name__}", status=502) from None
+            f"provider returned HTTP {status}{': ' + detail if detail else ''}",
+            status=502) from None
     detail = ""
     if status >= 300:
         detail = _error_detail(status, raw)

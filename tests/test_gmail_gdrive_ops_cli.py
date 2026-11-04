@@ -12,6 +12,7 @@ never touches Google or tokens itself.
 import base64
 import email
 import email.policy
+import io
 import json
 from urllib.parse import unquote_plus
 
@@ -496,6 +497,27 @@ def test_gdrive_restore_untrashes(google_world, gdrive_provider):
     body = gdrive_provider.calls[-1]["payload"]
     assert body == {"trashed": False}
     assert payload["trashed"] is False
+
+
+def test_provider_httperror_recovers_status_and_detail(google_world, monkeypatch):
+    """Production urllib raises HTTPError on non-2xx; the provider layer
+    recovers the status/body so 403s carry the scope hint (not the
+    exception name). The real provider._request runs — only the transport
+    is faked."""
+    import urllib.error
+
+    def raising_transport(method, url, *, headers, body, timeout=15):
+        raise urllib.error.HTTPError(url, 403, "Forbidden", {},
+                                     io.BytesIO(json.dumps(
+                                         {"error": {"message": "Insufficient Permission"}}).encode()))
+
+    monkeypatch.setattr(gdrive_ops.provider, "_default_transport", raising_transport)
+    with pytest.raises(gdrive_ops.GDriveOpsError) as denied:
+        gdrive_ops.list_files(ACCOUNT_A)
+    assert denied.value.status == 403
+    assert "Insufficient Permission" in str(denied.value)
+    assert "edit --scopes" in str(denied.value)
+    assert "HTTPError" not in str(denied.value)
 
 
 def test_gdrive_folder_create_and_download_errors(google_world, gdrive_provider):
