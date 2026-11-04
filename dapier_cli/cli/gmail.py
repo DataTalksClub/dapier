@@ -123,11 +123,13 @@ def register(sub):
     dcreate = draft_sp.add_parser("create", help="Create a draft (attachments supported)")
     _recipient_args(dcreate)
     _common_message(dcreate)
+    dcreate.add_argument("--html-file", help="Read HTML body from a UTF-8 file (or stdin with -); may accompany --file/--text")
 
     dupdate = draft_sp.add_parser("update", help="Replace a draft's content")
     dupdate.add_argument("draft_id")
     _recipient_args(dupdate, required=False)
     _common_message(dupdate)
+    dupdate.add_argument("--html-file", help="Read HTML body from a UTF-8 file (or stdin with -); replaces the draft body")
 
     dlist = draft_sp.add_parser("list", help="List drafts")
     dlist.add_argument("--account", required=True)
@@ -139,6 +141,7 @@ def register(sub):
     dget.add_argument("draft_id")
     dget.add_argument("--account", required=True)
     dget.add_argument("--json", action="store_true")
+    dget.add_argument("--html", action="store_true", help="Print the HTML body instead of plain text")
 
     ddelete = draft_sp.add_parser("delete", help="Delete a draft")
     ddelete.add_argument("draft_id")
@@ -222,7 +225,8 @@ def _run_draft(args, api_url, account, debug):
         return c.gmail_draft_list(api_url, account=account, as_json=args.json, debug=debug,
                                   max_results=args.max, page_token=args.page_token)
     if name == "get":
-        return c.gmail_draft_get(api_url, args.draft_id, account=account, as_json=args.json, debug=debug)
+        return c.gmail_draft_get(api_url, args.draft_id, account=account, as_json=args.json,
+                                  include_html=args.html, debug=debug)
     if name == "delete":
         return c.gmail_draft_delete(api_url, args.draft_id, account=account, debug=debug)
     if name == "send":
@@ -230,12 +234,12 @@ def _run_draft(args, api_url, account, debug):
     if name == "create":
         return c.gmail_draft_create(api_url, account=account, to=args.to, cc=args.cc,
                                     bcc=args.bcc, subject=args.subject, text=args.text,
-                                    file=args.file, attach=args.attach, as_json=args.json,
+                                    file=args.file, attach=args.attach, html_file=args.html_file, as_json=args.json,
                                     preview=getattr(args, "preview", False), debug=debug)
     if name == "update":
         return c.gmail_draft_update(api_url, args.draft_id, account=account, to=args.to,
                                     cc=args.cc, bcc=args.bcc, subject=args.subject,
-                                    text=args.text, file=args.file, attach=args.attach,
+                                    text=args.text, file=args.file, attach=args.attach, html_file=args.html_file,
                                     as_json=args.json,
                                     preview=getattr(args, "preview", False), debug=debug)
     return 2

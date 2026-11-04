@@ -169,3 +169,28 @@ def test_mkdir_entrypoint_forwards_preview_without_api_call(monkeypatch, capsys)
     assert gdrive.run(args, 'http://api', False) == 0
     assert json.loads(capsys.readouterr().out)['would_send'] == {
         'account': ACCOUNT_A, 'name': 'Example', 'parent_id': 'PARENT'}
+
+
+def test_draft_html_preview_and_stdin_validation(monkeypatch, tmp_path, capsys):
+    import io
+    import json
+    import pytest
+    from dapier_cli.cli import build_parser, gmail as cli
+    from dapier_cli.commands import gmail as cmd
+
+    monkeypatch.setattr(cmd.api, "call", lambda *a, **k: pytest.fail("preview cannot call API"))
+    html_file = tmp_path / "body.html"
+    html_file.write_text("<p>Hello</p>", encoding="utf-8")
+    args = build_parser().parse_args(["gmail", "draft", "create", "--account", ACCOUNT_A,
+        "--to", "peer@example.com", "--file", "-", "--html-file", str(html_file), "--preview"])
+    monkeypatch.setattr(cmd.sys, "stdin", io.StringIO("Plain body"))
+    cli.run(args, "http://api", False)
+    body = json.loads(capsys.readouterr().out)["would_send"]
+    assert body["text"] == "Plain body" and body["html"] == "<p>Hello</p>"
+    args.file, args.html_file = None, "-"
+    monkeypatch.setattr(cmd.sys, "stdin", io.StringIO("<p>stdin</p>"))
+    cli.run(args, "http://api", False)
+    assert json.loads(capsys.readouterr().out)["would_send"]["html"] == "<p>stdin</p>"
+    args.file = "-"
+    with pytest.raises(cmd.api.ApiError, match="cannot both read stdin"):
+        cli.run(args, "http://api", False)
