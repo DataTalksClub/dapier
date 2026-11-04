@@ -348,7 +348,8 @@ def gmail_draft_list(api_url, account=None, as_json=False, debug=False,
     return 0
 
 
-def gmail_draft_get(api_url, draft_id, account=None, as_json=False, debug=False):
+def gmail_draft_get(api_url, draft_id, account=None, as_json=False, debug=False,
+                     include_html=False):
     params = {"account": account} if account else None
     data = api.call(api_url, "GET", BASE + f"/drafts/{draft_id}"
                     + ("?" + urlencode(params) if params else ""), debug=debug)
@@ -360,9 +361,10 @@ def gmail_draft_get(api_url, draft_id, account=None, as_json=False, debug=False)
     if data.get("cc"):
         print(f"Cc:      {data.get('cc')}")
     print(f"Subject: {data.get('subject') or '(no subject)'}")
-    if data.get("text"):
+    body = data.get("html") if include_html else data.get("text")
+    if body:
         print()
-        print(data["text"])
+        print(body)
     return 0
 
 
@@ -382,7 +384,9 @@ def gmail_draft_send(api_url, draft_id, account=None, as_json=False, debug=False
     return 0
 
 
-def _draft_body(account, to, cc, bcc, subject, text, file, attach):
+def _draft_body(account, to, cc, bcc, subject, text, file, attach, html_file=None):
+    if file == "-" and html_file == "-":
+        raise api.ApiError("--file and --html-file cannot both read stdin")
     body = {"to": to, "subject": subject, "attachments": _attachments(attach)}
     if account:
         body["account"] = account
@@ -393,16 +397,18 @@ def _draft_body(account, to, cc, bcc, subject, text, file, attach):
     text = _body_text(text, file)
     if text:
         body["text"] = text
+    if html_file:
+        body["html"] = _body_text(None, html_file)
     return body
 
 
 def gmail_draft_create(api_url, account=None, to=None, cc=None, bcc=None,
                        subject=None, text=None, file=None, attach=None,
-                       as_json=False, preview=False, debug=False):
+                       as_json=False, preview=False, debug=False, html_file=None):
     if preview:
-        return preview_body(_draft_body(account, to, cc, bcc, subject, text, file, attach))
+        return preview_body(_draft_body(account, to, cc, bcc, subject, text, file, attach, html_file))
     data = api.call(api_url, "POST", BASE + "/drafts",
-                    body=_draft_body(account, to, cc, bcc, subject, text, file, attach),
+                    body=_draft_body(account, to, cc, bcc, subject, text, file, attach, html_file),
                     debug=debug)
     if as_json:
         print_json(data)
@@ -414,13 +420,13 @@ def gmail_draft_create(api_url, account=None, to=None, cc=None, bcc=None,
 
 def gmail_draft_update(api_url, draft_id, account=None, to=None, cc=None,
                        bcc=None, subject=None, text=None, file=None, attach=None,
-                       as_json=False, preview=False, debug=False):
+                       as_json=False, preview=False, debug=False, html_file=None):
     if preview:
-        return preview_body(_draft_body(account, to, cc, bcc, subject, text, file, attach))
+        return preview_body(_draft_body(account, to, cc, bcc, subject, text, file, attach, html_file))
     params = {"account": account} if account else None
     data = api.call(api_url, "PUT", BASE + f"/drafts/{draft_id}"
                     + ("?" + urlencode(params) if params else ""),
-                    body=_draft_body(account, to, cc, bcc, subject, text, file, attach),
+                    body=_draft_body(account, to, cc, bcc, subject, text, file, attach, html_file),
                     debug=debug)
     if as_json:
         print_json(data)

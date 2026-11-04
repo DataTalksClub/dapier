@@ -185,12 +185,14 @@ def _draft_view(data):
     message = data.get("message") if isinstance(data.get("message"), dict) else {}
     payload = message.get("payload") if isinstance(message.get("payload"), dict) else {}
     headers = _headers_of(payload)
+    text, html = _part_texts(payload)
     return {
         "id": data.get("id"),
         "message_id": message.get("id"),
         "thread_id": message.get("threadId"),
         **headers,
-        "text": _part_texts(payload)[0],
+        "text": text,
+        "html": html,
         "attachments": _attachments_of(payload),
     }
 

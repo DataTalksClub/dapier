@@ -665,3 +665,76 @@ def test_drive_metadata_update_uses_standard_endpoint(google_world, gdrive_provi
     gdrive_provider.on("PATCH", "/drive/v3/files/f1", {"id": "f1", "name": "Renamed"})
     assert gdrive_ops.update(ACCOUNT_A, "f1", name="Renamed")["name"] == "Renamed"
     assert "/upload/" not in gdrive_provider.calls[-1]["url"]
+
+
+@pytest.mark.parametrize("operation", ["create", "update"])
+@pytest.mark.parametrize("with_plain", [False, True])
+def test_draft_html_file_cli_through_api_preserves_mime(
+        google_world, gmail_provider, monkeypatch, tmp_path, capsys, operation, with_plain):
+    from dapier_cli.cli import build_parser, gmail as cli
+    from dapier_cli.commands import gmail as cmd
+    from urllib.parse import urlsplit, parse_qs
+
+    html = "<table><tr><td>Amount</td><td>12.34 EUR</td></tr></table>"
+    html_file = tmp_path / "body.html"
+    html_file.write_text(html, encoding="utf-8")
+    plain_file = tmp_path / "body.txt"
+    plain_file.write_text("Amount: 12.34 EUR", encoding="utf-8")
+    attachment = tmp_path / "report.pdf"
+    attachment.write_bytes(b"%PDF-synthetic")
+    _operator_gate(monkeypatch, gmail_api, "gmail." + operation + "_draft")
+    gmail_provider.on("GET", "/users/me/profile", {"emailAddress": ACCOUNT_A})
+    gmail_provider.on("GET", "/drafts/d1", {
+        "id": "d1", "message": {"threadId": "t1", "payload": {"headers": [
+            {"name": "To", "value": "peer@example.com"}]}}})
+    gmail_provider.on("POST" if operation == "create" else "PUT", "/drafts",
+                      {"id": "d1"})
+
+    def call(api_url, method, path, body=None, debug=False):
+        parsed = urlsplit(path)
+        event = {"body": json.dumps(body), "queryStringParameters": {
+            k: v[0] for k, v in parse_qs(parsed.query).items()}}
+        response = gmail_api.route_gmail(event, method, parsed.path)
+        assert response["statusCode"] == 200, response
+        return json.loads(response["body"])
+
+    monkeypatch.setattr(cmd.api, "call", call)
+    argv = ["gmail", "draft", operation] + (["d1"] if operation == "update" else [])
+    argv += ["--account", ACCOUNT_A, "--to", "peer@example.com", "--html-file", str(html_file),
+             "--attach", str(attachment)]
+    if with_plain:
+        argv += ["--file", str(plain_file)]
+    assert cli.run(build_parser().parse_args(argv), "http://api", False) == 0
+    raw = gmail_provider.calls[-1]["payload"]["message"]["raw"]
+    message = email.message_from_bytes(base64.urlsafe_b64decode(raw), policy=email.policy.default)
+    assert message.get_body(preferencelist=("html",)).get_content().strip() == html
+    assert list(message.iter_attachments())[0].get_content() == b"%PDF-synthetic"
+    if with_plain:
+        assert message.get_body(preferencelist=("plain",)).get_content().strip() == "Amount: 12.34 EUR"
+        assert any(part.get_content_type() == "multipart/alternative" for part in message.walk())
+    assert not any("/messages/send" in c["url"] for c in gmail_provider.calls)
+    assert all(c["token"] == "token-google-a" for c in gmail_provider.calls)
+
+
+def test_draft_get_api_and_cli_return_html_without_write(
+        google_world, gmail_provider, monkeypatch, capsys):
+    from dapier_cli.commands import gmail as cmd
+    from dapier_cli.cli import build_parser, gmail as cli
+
+    html = "<p>Full <strong>HTML</strong> body</p>"
+    gmail_provider.on("GET", "/drafts/d1", {"id": "d1", "message": {"id": "m1",
+        "payload": {"mimeType": "text/html", "body": {
+            "data": base64.urlsafe_b64encode(html.encode()).decode()}}}})
+    _operator_gate(monkeypatch, gmail_api, "gmail.get_draft")
+    response = gmail_api.route_gmail({"queryStringParameters": {"account": ACCOUNT_A}},
+                                    "GET", "/api/agent/gmail/drafts/d1")
+    assert response["statusCode"] == 200
+    data = json.loads(response["body"])
+    assert data["id"] == "d1" and data["message_id"] == "m1" and data["html"] == html
+    monkeypatch.setattr(cmd.api, "call", lambda *a, **k: data)
+    for flag in ("--html", "--json"):
+        cli.run(build_parser().parse_args(["gmail", "draft", "get", "d1", "--account", ACCOUNT_A, flag]),
+                "http://api", False)
+        output = capsys.readouterr().out
+        assert html in output
+    assert all(c["method"] == "GET" for c in gmail_provider.calls)
