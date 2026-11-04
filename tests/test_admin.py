@@ -46,6 +46,27 @@ def begin_oidc(monkeypatch, claims):
     return login.auth_callback(event)
 
 
+def test_oidc_login_requests_only_the_signin_scope_set(monkeypatch):
+    # Sign-in is identity-only: Google blocks unverified apps whose authorize
+    # request reaches for sensitive/restricted scopes, so the login start must
+    # keep asking for exactly openid/email/profile against the shared-auth
+    # client — never connection scopes.
+    from urllib.parse import parse_qs, urlparse
+
+    configure_oidc(monkeypatch)
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
+    start = login.auth_login(request("GET", "/auth/login"))
+
+    assert start["statusCode"] == 302
+    location = urlparse(start["headers"]["location"])
+    assert (location.scheme, location.netloc, location.path) == \
+        ("https", "auth.example.test", "/oauth2/authorize")
+    query = parse_qs(location.query)
+    assert query["scope"] == ["openid email profile"]
+    assert query["client_id"] == ["dapier-client"]
+    assert query["redirect_uri"] == ["https://dapier.example.test/auth/callback"]
+
+
 def test_oidc_login_uses_pkce_and_google_identity_creates_session(monkeypatch):
     # Cognito emits the mapped Google attribute as the string "true", not a boolean.
     callback = begin_oidc(monkeypatch, {
