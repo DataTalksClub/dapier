@@ -78,20 +78,20 @@ def gmail_accounts(api_url, as_json=False, debug=False):
 
 
 def gmail_search(api_url, query, account=None, max_results=25, label=None,
-                 page_token=None, debug=False):
+                 page_token=None, as_json=False, debug=False):
     return _list_messages(api_url, query=query, account=account,
                           max_results=max_results, label=label,
-                          page_token=page_token, debug=debug)
+                          page_token=page_token, as_json=as_json, debug=debug)
 
 
 def gmail_list(api_url, account=None, max_results=25, label=None,
-               page_token=None, debug=False):
+               page_token=None, as_json=False, debug=False):
     return _list_messages(api_url, query=None, account=account,
                           max_results=max_results, label=label,
-                          page_token=page_token, debug=debug)
+                          page_token=page_token, as_json=as_json, debug=debug)
 
 
-def _list_messages(api_url, query, account, max_results, label, page_token, debug):
+def _list_messages(api_url, query, account, max_results, label, page_token, as_json, debug):
     params = {"max": int(max_results)}
     if query:
         params["q"] = query
@@ -103,6 +103,9 @@ def _list_messages(api_url, query, account, max_results, label, page_token, debu
         params["page_token"] = page_token
     data = api.call(api_url, "GET", BASE + "/messages?" + urlencode(params), debug=debug)
     messages = data.get("messages") or []
+    if as_json:
+        print_json(data)
+        return 0
     print(f"{'ID':<20} {'FROM':<32} {'DATE':<26} SUBJECT")
     for item in messages:
         print(f"{str(item.get('id') or ''):<20} "
@@ -162,6 +165,11 @@ def gmail_read(api_url, message_id, account=None, include_html=False, as_json=Fa
     return 0
 
 
+def _decode_attachment(value):
+    value = str(value or "")
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
 def _save_all_attachments(api_url, message, directory, account, debug):
     os.makedirs(directory, exist_ok=True)
     params = {"account": account} if account else None
@@ -172,7 +180,7 @@ def _save_all_attachments(api_url, message, directory, account, debug):
         blob = api.call(api_url, "GET", BASE + f"/messages/{message['id']}"
                         f"/attachments/{attachment_id}"
                         + ("?" + urlencode(params) if params else ""), debug=debug)
-        data = base64.b64decode(blob.get("data_b64") or "")
+        data = _decode_attachment(blob.get("data_b64"))
         filename = item.get("filename") or f"attachment-{attachment_id}"
         with open(os.path.join(directory, os.path.basename(filename)), "wb") as handle:
             handle.write(data)
@@ -182,7 +190,7 @@ def gmail_attachment(api_url, message_id, attachment_id, account=None, out=None,
     params = {"account": account} if account else None
     blob = api.call(api_url, "GET", BASE + f"/messages/{message_id}/attachments/{attachment_id}"
                     + ("?" + urlencode(params) if params else ""), debug=debug)
-    data = base64.b64decode(blob.get("data_b64") or "")
+    data = _decode_attachment(blob.get("data_b64"))
     target = out or f"attachment-{attachment_id}"
     with open(target, "wb") as handle:
         handle.write(data)
@@ -281,8 +289,6 @@ def gmail_send(api_url, account=None, to=None, cc=None, bcc=None, subject=None,
         "subject": subject,
         "attachments": _attachments(attach),
     }
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
     if cc:
@@ -292,6 +298,8 @@ def gmail_send(api_url, account=None, to=None, cc=None, bcc=None, subject=None,
     text = _body_text(text, file)
     if text:
         body["text"] = text
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + "/send", body=body, debug=debug)
     _print_sent(data, as_json)
     return 0
@@ -299,23 +307,29 @@ def gmail_send(api_url, account=None, to=None, cc=None, bcc=None, subject=None,
 
 def gmail_reply(api_url, message_id, account=None, reply_all=False, text=None,
                 file=None, attach=None, draft=False, as_json=False, preview=False,
-                debug=False):
+                debug=False, to=None, cc=None, bcc=None):
     body = {"message_id": message_id, "reply_all": bool(reply_all),
             "draft": bool(draft), "attachments": _attachments(attach)}
-    if preview:
-        return preview_body(body)
+    for name, value in (("to", to), ("cc", cc), ("bcc", bcc)):
+        if value is not None:
+            body[name] = value
     if account:
         body["account"] = account
     text = _body_text(text, file)
     if text:
         body["text"] = text
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + "/reply", body=body, debug=debug)
     _print_sent(data, as_json)
     return 0
 
 
-def gmail_draft_list(api_url, account=None, as_json=False, debug=False):
-    params = {}
+def gmail_draft_list(api_url, account=None, as_json=False, debug=False,
+                     max_results=25, page_token=None):
+    params = {"max": max_results}
+    if page_token:
+        params["page_token"] = page_token
     if account:
         params["account"] = account
     data = api.call(api_url, "GET", BASE + "/drafts?" + urlencode(params), debug=debug)
@@ -329,6 +343,8 @@ def gmail_draft_list(api_url, account=None, as_json=False, debug=False):
               f"{str(item.get('to') or ''):<36} "
               f"{str(item.get('subject') or '(no subject)')[:60]}")
     print(f"({data.get('count') or 0} drafts)")
+    if data.get("next_page_token"):
+        print(f"next page: --page-token {data['next_page_token']}")
     return 0
 
 
@@ -388,6 +404,9 @@ def gmail_draft_create(api_url, account=None, to=None, cc=None, bcc=None,
     data = api.call(api_url, "POST", BASE + "/drafts",
                     body=_draft_body(account, to, cc, bcc, subject, text, file, attach),
                     debug=debug)
+    if as_json:
+        print_json(data)
+        return 0
     print(f"ok: draft {data.get('id')} created "
           f"({'send it: dapier gmail draft send ' + str(data.get('id'))})")
     return 0
@@ -403,5 +422,8 @@ def gmail_draft_update(api_url, draft_id, account=None, to=None, cc=None,
                     + ("?" + urlencode(params) if params else ""),
                     body=_draft_body(account, to, cc, bcc, subject, text, file, attach),
                     debug=debug)
+    if as_json:
+        print_json(data)
+        return 0
     print(f"ok: draft {data.get('id')} updated")
     return 0

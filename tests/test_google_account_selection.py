@@ -77,8 +77,8 @@ def test_resolve_by_id_email_and_fragment(two_accounts):
 
 
 def test_omitted_account_single_connected_resolves(two_accounts):
-    # drive has exactly one connected account: no --account needed
-    assert google_accounts.resolve_account("drive", None) == "google-a"
+    with pytest.raises(google_accounts.GoogleAccountError, match="--account is required"):
+        google_accounts.resolve_account("drive", None)
 
 
 def test_omitted_account_multiple_is_rejected(two_accounts):
@@ -113,7 +113,7 @@ def test_disconnected_duplicate_never_shadows_connected(monkeypatch):
     monkeypatch.setattr(google_accounts, "_tables", lambda: (object(), object()))
     monkeypatch.setattr(google_accounts.connections, "_scan_all", lambda table: conns)
     # the connected sign-in wins when it is the only connected match
-    assert google_accounts.resolve_account("gmail", None) == "google-b"
+    assert google_accounts.resolve_account("gmail", "alexey@gmail.com") == "google-b"
 
 
 def test_no_accounts_is_a_clear_error(monkeypatch):

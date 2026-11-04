@@ -196,7 +196,8 @@ def reply_api(event):
             reply_all=bool(body.get("reply_all")),
             text=body.get("text"), html=body.get("html"),
             attachments=body.get("attachments"),
-            draft=bool(body.get("draft")))
+            draft=bool(body.get("draft")), to=body.get("to"),
+            cc=body.get("cc"), bcc=body.get("bcc"))
     except (gmail_ops.GmailOpsError, GoogleAccountError) as exc:
         return _error(exc)
     _audit(payload.get("account") or "gmail",

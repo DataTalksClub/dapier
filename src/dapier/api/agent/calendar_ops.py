@@ -125,23 +125,17 @@ def _bounded_window(time_min, time_max):
     start = _parse_moment(time_min, "time_min")
     end = _parse_moment(time_max, "time_max")
     try:
-        fmt = "%Y-%m-%d" if ("T" not in start and "T" not in end) else None
-        if fmt:
-            lower = datetime.strptime(start, fmt)
-            upper = datetime.strptime(end, fmt)
-        else:
-            _start = start[:-1] + "+00:00" if start.endswith("Z") else start
-            _end = end[:-1] + "+00:00" if end.endswith("Z") else end
-            lower = datetime.fromisoformat(_start)
-            upper = datetime.fromisoformat(_end)
+        lower = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        upper = datetime.fromisoformat(end.replace("Z", "+00:00"))
+        if lower.tzinfo is None or upper.tzinfo is None:
+            raise ValueError("timezone missing")
     except ValueError:
-        lower, upper = None, None
-    if lower and upper:
-        if lower >= upper:
-            raise CalendarOpsError("time_min must come before time_max")
-        if upper - lower > timedelta(days=MAX_WINDOW_DAYS):
-            raise CalendarOpsError(
-                f"the window exceeds {MAX_WINDOW_DAYS} days; narrow time_min/time_max")
+        raise CalendarOpsError("time_min/time_max must be RFC3339 datetimes with timezone offsets") from None
+    if lower >= upper:
+        raise CalendarOpsError("time_min must come before time_max")
+    if upper - lower > timedelta(days=MAX_WINDOW_DAYS):
+        raise CalendarOpsError(
+            f"the window exceeds {MAX_WINDOW_DAYS} days; narrow time_min/time_max")
     return start, end
 
 
@@ -281,7 +275,7 @@ def freebusy(account, calendar_ids=None, time_min=None, time_max=None):
 
 def _event_body(summary=None, start=None, end=None, timezone_name=None,
                 description=None, location=None, attendees=None, recurrence=None,
-                reminders=None, attachments=None, all_day=False, payload=None):
+                reminders=None, attachments=None, all_day=False, payload=None, partial=False):
     """The event resource: a reviewed raw payload, or structured fields."""
     if payload is not None:
         if any((summary, start, end, description, location, attendees, recurrence,
@@ -291,20 +285,18 @@ def _event_body(summary=None, start=None, end=None, timezone_name=None,
         if not isinstance(payload, dict) or not payload:
             raise CalendarOpsError("event payload must be a non-empty JSON object")
         return payload
-    if not summary:
-        raise CalendarOpsError("a summary is required")
-    if not start or not end:
-        raise CalendarOpsError("start and end are required (ISO 8601)")
-    if all_day:
-        start_block = {"date": str(start)[:10]}
-        end_block = {"date": str(end)[:10]}
-    else:
-        start_block = {"dateTime": str(start)}
-        end_block = {"dateTime": str(end)}
-        if timezone_name:
-            start_block["timeZone"] = timezone_name
-            end_block["timeZone"] = timezone_name
-    body = {"summary": summary, "start": start_block, "end": end_block}
+    if not partial and (not summary or not start or not end):
+        raise CalendarOpsError("summary, start and end are required")
+    body = {}
+    if summary is not None:
+        body["summary"] = summary
+    for key, value in (("start", start), ("end", end)):
+        if value is not None:
+            _parse_moment(value, key)
+            block = {"date" if all_day else "dateTime": str(value)}
+            if timezone_name and not all_day:
+                block["timeZone"] = timezone_name
+            body[key] = block
     if description:
         body["description"] = description
     if location:
@@ -322,13 +314,15 @@ def _event_body(summary=None, start=None, end=None, timezone_name=None,
             for entry in attachments
             if isinstance(entry, dict) and str(entry.get("file_url") or entry.get("fileUrl") or "").strip()
         ]
+    if not body:
+        raise CalendarOpsError("update needs at least one field")
     return body
 
 
 def create_event(account, calendar_id=DEFAULT_CALENDAR_ID, send_updates="none", **fields):
     _connection_id, _connection, token = _connection_and_token(account)
     body = _event_body(**fields)
-    params = {"sendUpdates": _check_send_updates(send_updates)}
+    params = {"sendUpdates": _check_send_updates(send_updates), "supportsAttachments": "true"}
     data = _call(token, "POST", _events_url(calendar_id, "", params), body)
     return _event_view(data)
 
@@ -338,8 +332,8 @@ def update_event(account, event_id, calendar_id=DEFAULT_CALENDAR_ID, send_update
     """PATCH one event; only the given structured fields change (a reviewed
     raw payload replaces via the same PATCH semantics)."""
     _connection_id, _connection, token = _connection_and_token(account)
-    body = _event_body(**fields)
-    params = {"sendUpdates": _check_send_updates(send_updates)}
+    body = _event_body(partial=True, **fields)
+    params = {"sendUpdates": _check_send_updates(send_updates), "supportsAttachments": "true"}
     url = _events_url(calendar_id, f"/{quote(str(event_id), safe='')}", params)
     data = _call(token, "PATCH", url, body)
     return _event_view(data)

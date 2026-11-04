@@ -314,6 +314,7 @@ def test_gmail_draft_create_update_send_delete(google_world, gmail_provider):
     assert draft["id"] == "d1"
     assert gmail_provider.calls[-1]["payload"]["message"]["raw"]
 
+    gmail_provider.on("GET", "/drafts/d1", {"id": "d1", "message": {"threadId": "t2"}})
     gmail_provider.on("PUT", "/drafts/d1", {"id": "d1", "message": {"id": "m2"}})
     updated = gmail_ops.update_draft(ACCOUNT_A, "d1", to="a@b.c", subject="Inv2", text="new")
     assert updated["id"] == "d1"
@@ -627,3 +628,40 @@ def test_route_gdrive_dispatch_and_audit(google_world, gdrive_provider, monkeypa
 
 
 # --- CLI thin clients ------------------------------------------------------------
+
+
+def test_edit_reply_draft_retains_thread_headers_and_attachment(google_world, gmail_provider):
+    headers = _ORIGINAL_FULL["payload"]["headers"] + [
+        {"name": "In-Reply-To", "value": "<orig@corp.com>"}]
+    gmail_provider.on("GET", "/drafts/reply1", {
+        "id": "reply1", "message": {"threadId": "t1", "payload": {"headers": headers}}})
+    gmail_provider.on("GET", "/users/me/profile", {"emailAddress": ACCOUNT_B})
+    gmail_provider.on("PUT", "/drafts/reply1", {"id": "reply1"})
+    gmail_ops.update_draft(ACCOUNT_B, "reply1", to=None, text="Edited ü", attachments=[{
+        "filename": "report.bin", "content_b64": base64.b64encode(b"\xff\x00").decode()}])
+    sent = gmail_provider.calls[-1]["payload"]["message"]
+    assert sent["threadId"] == "t1"
+    message = email.message_from_bytes(base64.urlsafe_b64decode(sent["raw"]), policy=email.policy.default)
+    assert message["In-Reply-To"] == "<orig@corp.com>"
+    assert message["References"] == "<prev@corp.com>"
+    assert message["Subject"] == "Quarterly plan"
+    assert list(message.iter_attachments())[0].get_content() == b"\xff\x00"
+    assert all(c["token"] == "token-google-b" for c in gmail_provider.calls)
+
+
+def test_reply_all_handles_named_addresses_without_disclosing_bcc(google_world, gmail_provider):
+    original = json.loads(json.dumps(_ORIGINAL_FULL))
+    original["payload"]["headers"] += [
+        {"name": "To", "value": '"Self, A" <a@gmail.com>, "Peer, P" <peer@corp.com>'},
+        {"name": "Bcc", "value": "hidden@corp.com"}]
+    gmail_provider.on("GET", "/messages/m1?format=full", original)
+    gmail_provider.on("GET", "/users/me/profile", {"emailAddress": ACCOUNT_A})
+    gmail_provider.on("POST", "/messages/send", {"id": "sent"})
+    result = gmail_ops.reply(ACCOUNT_A, "m1", reply_all=True, text="OK")
+    assert result["reply_to"] == ["careers@corp.com", "peer@corp.com", "watcher@corp.com"]
+
+
+def test_drive_metadata_update_uses_standard_endpoint(google_world, gdrive_provider):
+    gdrive_provider.on("PATCH", "/drive/v3/files/f1", {"id": "f1", "name": "Renamed"})
+    assert gdrive_ops.update(ACCOUNT_A, "f1", name="Renamed")["name"] == "Renamed"
+    assert "/upload/" not in gdrive_provider.calls[-1]["url"]

@@ -8,13 +8,13 @@ GROUPS = ("gdrive",)
 EPILOG = """examples:
   dapier gdrive accounts                          # list Google accounts serving Drive
   dapier gdrive list --account me@gmail.com --max 20
-  dapier gdrive search "name contains 'invoice'"
-  dapier gdrive download FILE_ID --out ./report.pdf
-  dapier gdrive upload ./notes.txt --name notes.txt --folder FOLDER_ID
-  dapier gdrive share FILE_ID --role reader --with user --email peer@example.com
-  dapier gdrive trash FILE_ID                     # recoverable; --permanent destroys
---account takes the verified email or the connection id; when several Google
-accounts serve Drive it is required, and an ambiguous fragment is rejected.
+  dapier gdrive search "name contains 'invoice'" --account me@gmail.com
+  dapier gdrive download FILE_ID --out ./report.pdf --account me@gmail.com
+  dapier gdrive upload ./notes.txt --name notes.txt --folder FOLDER_ID --account me@gmail.com
+  dapier gdrive share FILE_ID --role reader --with user --email peer@example.com --account me@gmail.com
+  dapier gdrive trash FILE_ID --account me@gmail.com  # recoverable; --permanent destroys
+--account is required on every operation except accounts; use the verified
+email or connection id. Ambiguous fragments are rejected.
 Google-native docs export on download (doc/slide → PDF, sheet → CSV,
 drawing → PNG; override with --export-mime)."""
 
@@ -40,7 +40,7 @@ def register(sub):
     acc.add_argument("--json", action="store_true")
 
     def account_arg(x):
-        x.add_argument("--account")
+        x.add_argument("--account", required=True)
 
     listing = sp.add_parser("list", help="List files, newest first")
     listing.add_argument("--query", default=None, help="Extra Drive query, e.g. name contains 'x'")

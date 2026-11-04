@@ -9,16 +9,16 @@ GROUPS = ("calendar",)
 EPILOG = """examples:
   dapier calendar accounts                        # list Google accounts serving Calendar
   dapier calendar calendars --account me@gmail.com
-  dapier calendar events --time-min 2026-11-04T00:00:00Z --time-max 2026-11-11T00:00:00Z
+  dapier calendar events --time-min 2026-11-04T00:00:00Z --time-max 2026-11-11T00:00:00Z --account me@gmail.com
   dapier calendar freebusy --calendar primary --calendar work@group.calendar.google.com \\
       --time-min 2026-11-04T00:00:00Z --time-max 2026-11-05T00:00:00Z
   dapier calendar create --summary "Sync" --start 2026-11-05T09:00:00Z \\
       --end 2026-11-05T10:00:00Z --attendee peer@example.com
-  dapier calendar create ... --send-updates all   # default none: no guest email
-  dapier calendar create ... --preview            # review the JSON, then run without --preview
-  dapier calendar delete EVENT_ID
---account takes the verified email or the connection id; when several Google
-accounts serve Calendar it is required. Event windows are bounded
+  dapier calendar create ... --send-updates all --account me@gmail.com  # default none: no guest email
+  dapier calendar create ... --preview --account me@gmail.com  # review the JSON, then run without --preview
+  dapier calendar delete EVENT_ID --account me@gmail.com
+--account is required on every operation except accounts; use the verified
+email or connection id. Event windows are bounded
 (<= 366 days). Writes never invite guests unless --send-updates says so;
 --preview prints the exact request body without sending anything."""
 
@@ -28,7 +28,7 @@ COMMANDS = ("accounts", "calendars", "events", "event", "freebusy",
 
 def _write_args(p):
     p.add_argument("--calendar", default=None, help="Calendar id (default primary)")
-    p.add_argument("--account")
+    p.add_argument("--account", required=True)
     p.add_argument("--summary", default=None)
     p.add_argument("--start", default=None, help="ISO 8601 start (or date for all-day)")
     p.add_argument("--end", default=None, help="ISO 8601 end (or date for all-day)")
@@ -66,7 +66,7 @@ def register(sub):
     acc.add_argument("--json", action="store_true")
 
     def base_args(x):
-        x.add_argument("--account")
+        x.add_argument("--account", required=True)
 
     cals = sp.add_parser("calendars", help="List the account's calendars")
     base_args(cals)
@@ -108,7 +108,7 @@ def register(sub):
     delete = sp.add_parser("delete", help="Delete an event (guests notified per --send-updates)")
     delete.add_argument("event_id")
     delete.add_argument("--calendar", default=None)
-    delete.add_argument("--account")
+    delete.add_argument("--account", required=True)
     delete.add_argument("--send-updates", default="none",
                         choices=["all", "externalOnly", "none"])
     delete.add_argument("--json", action="store_true")
