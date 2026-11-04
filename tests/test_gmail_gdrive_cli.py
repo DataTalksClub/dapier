@@ -155,3 +155,17 @@ def test_cli_requires_account_for_each_service():
                     ['gdrive', 'list'], ['calendar', 'calendars']):
         with pytest.raises(SystemExit):
             build_parser().parse_args(command)
+
+
+def test_mkdir_entrypoint_forwards_preview_without_api_call(monkeypatch, capsys):
+    import json
+    from dapier_cli.cli import build_parser, gdrive
+    from dapier_cli import api
+    def unexpected(*args, **kwargs):
+        raise AssertionError('preview must never call the API')
+    monkeypatch.setattr(api, 'call', unexpected)
+    args = build_parser().parse_args(['gdrive', 'mkdir', 'Example', '--parent', 'PARENT',
+                                      '--account', ACCOUNT_A, '--preview'])
+    assert gdrive.run(args, 'http://api', False) == 0
+    assert json.loads(capsys.readouterr().out)['would_send'] == {
+        'account': ACCOUNT_A, 'name': 'Example', 'parent_id': 'PARENT'}

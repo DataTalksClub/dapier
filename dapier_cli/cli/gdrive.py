@@ -188,5 +188,5 @@ def run(args, api_url, debug, child=None):
                                 as_json=as_json, debug=debug)
     if args.command == "mkdir":
         return c.gdrive_mkdir(api_url, args.name, account=account, parent=args.parent,
-                              as_json=as_json, debug=debug)
+                              as_json=as_json, preview=args.preview, debug=debug)
     return 2
