@@ -31,7 +31,7 @@ MAX_PAGE_SIZE = 200
 
 FILE_FIELDS = ("id,name,mimeType,size,createdTime,modifiedTime,webViewLink,"
                "iconLink,trashed,parents,owners(displayName,emailAddress),"
-               "capabilities(canEdit,canShare),extension,fullFileExtension")
+               "capabilities(canEdit,canShare),fileExtension,fullFileExtension")
 
 # Google-native mime → default export target (the download/export fallbacks).
 EXPORT_DEFAULTS = {
@@ -140,11 +140,28 @@ def _multipart_body(metadata, content, boundary):
     return head + content + f"\r\n--{boundary}--\r\n".encode("utf-8")
 
 
+def _transport(method, url, token, body=None, *, timeout=15, headers=None):
+    """One raw transport call: (status, bytes). urllib raises HTTPError for
+    non-2xx; recovered to its status/body so provider errors keep their
+    detail (the fake transports tests inject already return statuses)."""
+    call_headers = {"authorization": f"Bearer {token}"}
+    call_headers.update(headers or {})
+    try:
+        return provider._default_transport(method, url, headers=call_headers,
+                                           body=body, timeout=timeout)
+    except Exception as exc:
+        status = getattr(exc, "code", None)
+        if not isinstance(status, int):
+            raise GDriveOpsError(
+                f"Drive request unreachable: {type(exc).__name__}", status=502) from None
+        raw = exc.read() if hasattr(exc, "read") else b""
+        return status, raw
+
+
 def _upload_call(token, method, url, metadata, content=None):
     """One multipart upload (uploadType=multipart) through the transport."""
     boundary = "dapier-drive-multipart"
     headers = {
-        "authorization": f"Bearer {token}",
         "content-type": f"multipart/related; boundary={boundary}",
     }
     if content is None:
@@ -152,12 +169,7 @@ def _upload_call(token, method, url, metadata, content=None):
         headers["content-type"] = "application/json"
     else:
         body = _multipart_body(metadata, content, boundary)
-    try:
-        status, raw = provider._default_transport(method, url, headers=headers,
-                                                  body=body, timeout=30)
-    except Exception as exc:
-        raise GDriveOpsError(
-            f"Drive upload unreachable: {type(exc).__name__}", status=502) from None
+    status, raw = _transport(method, url, token, body, timeout=30, headers=headers)
     if status >= 300:
         detail = provider._error_detail(status, raw)
         raise GDriveOpsError(
@@ -227,13 +239,7 @@ def download(account, file_id, export_mime=None):
         url = f"{DRIVE_FILES_URL}/{quoted}/export?" + urlencode({"mimeType": target})
     else:
         url = f"{DRIVE_FILES_URL}/{quoted}?alt=media&supportsAllDrives=true"
-    headers = {"authorization": f"Bearer {token}"}
-    try:
-        status, raw = provider._default_transport("GET", url, headers=headers,
-                                                  body=None, timeout=60)
-    except Exception as exc:
-        raise GDriveOpsError(
-            f"Drive download unreachable: {type(exc).__name__}", status=502) from None
+    status, raw = _transport("GET", url, token, timeout=60)
     if status >= 300:
         detail = provider._error_detail(status, raw)
         raise GDriveOpsError(
@@ -333,13 +339,7 @@ def trash(account, file_id, permanent=False):
     quoted = quote(str(file_id), safe='')
     if permanent:
         url = f"{DRIVE_FILES_URL}/{quoted}?supportsAllDrives=true"
-        headers = {"authorization": f"Bearer {token}"}
-        try:
-            status, raw = provider._default_transport("DELETE", url, headers=headers,
-                                                      body=None, timeout=15)
-        except Exception as exc:
-            raise GDriveOpsError(
-                f"Drive delete unreachable: {type(exc).__name__}", status=502) from None
+        status, raw = _transport("DELETE", url, token)
         if status >= 300:
             detail = provider._error_detail(status, raw)
             raise GDriveOpsError(f"Drive delete failed: HTTP {status}{': ' + detail if detail else ''}",
