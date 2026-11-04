@@ -77,38 +77,38 @@ uv run dapier runs events list --limit 10
 # Gmail over a stored Google connection (token stays server-side)
 uv run dapier gmail accounts                       # Google accounts: email + connection id
 uv run dapier gmail search "from:boss is:unread" --account me@gmail.com
-uv run dapier gmail read MSG_ID --save-attachments ./att
+uv run dapier gmail read MSG_ID --save-attachments ./att --account me@gmail.com
 uv run dapier gmail send --to a@b.c --subject Hi --file body.txt --attach r.pdf --account me@gmail.com
-uv run dapier gmail reply MSG_ID --draft --text "On it"     # reply draft, thread preserved
-uv run dapier gmail reply MSG_ID --all --text "Thanks all"  # direct reply-all send
-uv run dapier gmail draft create --to a@b.c --subject S --text ... --attach inv.pdf
-uv run dapier gmail draft send DRAFT_ID
-uv run dapier gmail mark MSG_ID --read --archive
+uv run dapier gmail reply MSG_ID --draft --text "On it" --account me@gmail.com  # reply draft, thread preserved
+uv run dapier gmail reply MSG_ID --all --text "Thanks all" --account me@gmail.com  # direct reply-all send
+uv run dapier gmail draft create --to a@b.c --subject S --text ... --attach inv.pdf --account me@gmail.com
+uv run dapier gmail draft send DRAFT_ID --account me@gmail.com
+uv run dapier gmail mark MSG_ID --read --archive --account me@gmail.com
 
 # Google Drive over a stored Google connection
 uv run dapier gdrive accounts
 uv run dapier gdrive list --account me@gmail.com --max 20
-uv run dapier gdrive download FILE_ID --out ./out.pdf      # native docs export (PDF/CSV/PNG)
-uv run dapier gdrive upload ./f.txt --name f.txt --folder FOL_ID
-uv run dapier gdrive share FILE_ID --role writer --with user --email p@x.y
-uv run dapier gdrive trash FILE_ID                          # --permanent destroys
-uv run dapier gdrive restore FILE_ID
+uv run dapier gdrive download FILE_ID --out ./out.pdf --account me@gmail.com  # native docs export (PDF/CSV/PNG)
+uv run dapier gdrive upload ./f.txt --name f.txt --folder FOL_ID --account me@gmail.com
+uv run dapier gdrive share FILE_ID --role writer --with user --email p@x.y --account me@gmail.com
+uv run dapier gdrive trash FILE_ID --account me@gmail.com  # --permanent destroys
+uv run dapier gdrive restore FILE_ID --account me@gmail.com
 
 # Google Calendar (guest email only ever via --send-updates; default none)
 uv run dapier calendar calendars --account me@gmail.com
-uv run dapier calendar events --time-min 2026-11-04T00:00:00Z --time-max 2026-11-11T00:00:00Z
-uv run dapier calendar freebusy --calendar primary --time-min ... --time-max ...
+uv run dapier calendar events --time-min 2026-11-04T00:00:00Z --time-max 2026-11-11T00:00:00Z --account me@gmail.com
+uv run dapier calendar freebusy --calendar primary --time-min ... --time-max ... --account me@gmail.com
 uv run dapier calendar create --summary Sync --start 2026-11-05T09:00:00Z \
     --end 2026-11-05T10:00:00Z --attendee peer@example.com --preview   # review first
-uv run dapier calendar create ... --send-updates all        # actually invite
-uv run dapier calendar update EVENT_ID --summary Renamed --calendar primary
+uv run dapier calendar create ... --send-updates all --account me@gmail.com  # actually invite
+uv run dapier calendar update EVENT_ID --summary Renamed --calendar primary --account me@gmail.com
 ```
 
-With several Google accounts connected, `--account` (verified email or
-connection id) is required on `gmail`/`gdrive`/`calendar` operations;
+`--account` (verified email or connection id) is required even with one
+connected account on `gmail`/`gdrive`/`calendar` operations;
 ambiguous or missing selections are rejected with the candidate list.
 Insufficient-scope operations fail with the provider's 403 plus a
-`dapier connections edit --scopes` hint. Write verbs accept `--preview`
+`dapier connections edit --scopes` hint. Composition, selected Drive writes, and Calendar writes accept `--preview`
 to print the exact request body without sending; calendar event windows
 are bounded (≤ 366 days) and guests are only emailed via `--send-updates`.
 
