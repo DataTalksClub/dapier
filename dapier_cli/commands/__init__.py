@@ -28,3 +28,6 @@ from .emails import *
 from .typefully import *
 from .slack import *
 from .gdocs import *
+from .gmail import *
+from .gdrive import *
+from .calendar import *
