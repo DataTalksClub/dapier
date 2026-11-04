@@ -123,8 +123,9 @@ def test_shared_sign_in_shows_once_with_compact_references():
                     "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly",
                                        "https://www.googleapis.com/auth/drive.readonly"]}]
     register = _render(connections)['#connection-register']['innerHTML']
-    assert register.count('class="service-account"') == 1
-    assert register.count('class="service-account service-ref"') == 1
+    rows = re.findall(r'<li class="([^"]*\bservice-account\b[^"]*)"', register)
+    assert len(rows) == 2
+    assert sum("service-ref" in row.split() for row in rows) == 1
     assert 'Same sign-in as Gmail' in register
     assert 'Same sign-in also covers Drive' in register
     assert 'class="service-share"' not in register
