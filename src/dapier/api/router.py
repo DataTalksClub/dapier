@@ -75,6 +75,7 @@ def _static(path):
         "/assets/js/workflow-names.js": ("js/workflow-names.js", "text/javascript; charset=utf-8"),
         "/assets/js/catalog-labels.js": ("js/catalog-labels.js", "text/javascript; charset=utf-8"),
         "/assets/js/ui.js": ("js/ui.js", "text/javascript; charset=utf-8"),
+        "/assets/js/views/google-tools.js": ("js/views/google-tools.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/connections.js": ("js/views/connections.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/credentials.js": ("js/views/credentials.js", "text/javascript; charset=utf-8"),
         "/assets/js/views/oauth-clients.js": ("js/views/oauth-clients.js", "text/javascript; charset=utf-8"),

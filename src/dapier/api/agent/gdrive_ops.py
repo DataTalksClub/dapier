@@ -282,14 +282,19 @@ def update(account, file_id, name=None, content_b64=None, mime_type=None):
         metadata["name"] = str(name).strip()
     if mime_type:
         metadata["mimeType"] = mime_type
-    content = _b64_decode(content_b64) if content_b64 else None
+    content = _b64_decode(content_b64) if content_b64 is not None else None
     if content is None and not metadata:
         raise GDriveOpsError("update needs a new name and/or content")
     quoted = quote(str(file_id), safe="")
     url = (f"{DRIVE_UPLOAD_URL}/{quoted}?" + urlencode({
         "uploadType": "multipart", "supportsAllDrives": "true",
         "fields": FILE_FIELDS}))
-    data = _upload_call(token, "PATCH", url, metadata, content)
+    if content is None:
+        url = f"{DRIVE_FILES_URL}/{quoted}?" + urlencode({
+            "supportsAllDrives": "true", "fields": FILE_FIELDS})
+        data = _call(token, "PATCH", url, metadata)
+    else:
+        data = _upload_call(token, "PATCH", url, metadata, content)
     return _file_view(data)
 
 

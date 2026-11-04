@@ -337,7 +337,7 @@ def test_calendar_cli_parser():
                                 "--start", "2026-11-05T09:00:00Z",
                                 "--end", "2026-11-05T10:00:00Z",
                                 "--attendee", "a@b.c", "--recurse", "RRULE:FREQ=DAILY",
-                                "--send-updates", "all", "--preview"])
+                                "--send-updates", "all", "--preview", "--account", ACCOUNT_A])
     assert create.send_updates == "all" and create.preview
     assert create.attendee == ["a@b.c"]
 
@@ -355,3 +355,31 @@ def test_preview_masks_attachment_bytes(monkeypatch, tmp_path, capsys):
     assert rc == 0 and parsed["preview"] is True
     assert "<9 bytes>" in parsed["would_send"]["attachments"][0]["content_b64"]
     assert "AAEB" not in out  # the bytes themselves never print
+
+
+def test_calendar_partial_update_and_attachments(calendar_world, cal_provider):
+    cal_provider.on("PATCH", "/events/e1?", {"id": "e1", "summary": "Renamed"})
+    calendar_ops.update_event(ACCOUNT_A, "e1", summary="Renamed")
+    assert cal_provider.calls[-1]["payload"] == {"summary": "Renamed"}
+    assert "supportsAttachments=true" in cal_provider.calls[-1]["url"]
+
+
+@pytest.mark.parametrize("lower,upper", [
+    ("2026-11-01", "2026-11-02"),
+    ("2026-11-01T09:00:00", "2026-11-02T09:00:00Z"),
+])
+def test_calendar_window_requires_timezone(lower, upper):
+    with pytest.raises(calendar_ops.CalendarOpsError, match="timezone"):
+        calendar_ops._bounded_window(lower, upper)
+
+
+def test_calendar_cli_maps_payload_and_timezone_to_api(monkeypatch):
+    from dapier_cli.commands import calendar
+    calls = []
+    monkeypatch.setattr(calendar.api, 'call', lambda *a, **k: calls.append(k) or {})
+    calendar.calendar_write('http://api', 'POST', account=ACCOUNT_A,
+                            fields={'payload': {'summary': 'reviewed'}})
+    assert calls[-1]['body']['event'] == {'summary': 'reviewed'}
+    calendar.calendar_write('http://api', 'POST', account=ACCOUNT_A,
+                            fields={'timezone_name': 'Europe/Berlin'})
+    assert calls[-1]['body']['timezone'] == 'Europe/Berlin'

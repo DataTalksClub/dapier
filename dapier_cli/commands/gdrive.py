@@ -112,7 +112,7 @@ def gdrive_download(api_url, file_id, account=None, out=None, export_mime=None,
                     + _account_params(account, {"export_mime": export_mime} if export_mime else None),
                     debug=debug)
     data_bytes = base64.b64decode(data.get("data_b64") or "")
-    target = out or data.get("name") or f"drive-{file_id}"
+    target = out or os.path.basename(data.get("name") or "") or f"drive-{file_id}"
     with open(target, "wb") as handle:
         handle.write(data_bytes)
     print(f"saved {len(data_bytes)} bytes to {target} "
@@ -130,12 +130,12 @@ def gdrive_upload(api_url, path, name=None, account=None, folder=None, mime=None
         "mime_type": mime or mimetypes.guess_type(filename)[0]
         or "application/octet-stream",
     }
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
     if folder:
         body["folder_id"] = folder
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + "/files", body=body, debug=debug)
     if as_json:
         print_json(data)
@@ -151,10 +151,6 @@ def gdrive_update(api_url, file_id, account=None, name=None, file=None, mime=Non
     body = {}
     if preview and not (name or file or mime):
         raise api.ApiError("update needs a new name and/or --file content to preview")
-    if file:
-        body["content_b64"] = base64.b64encode(_read_bytes(file)).decode("ascii")
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
     if name:
@@ -163,6 +159,8 @@ def gdrive_update(api_url, file_id, account=None, name=None, file=None, mime=Non
         body["mime_type"] = mime
     if file:
         body["content_b64"] = base64.b64encode(_read_bytes(file)).decode("ascii")
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "PATCH", BASE + f"/files/{file_id}"
                     + _account_params(account), body=body, debug=debug)
     if as_json:
@@ -175,10 +173,10 @@ def gdrive_update(api_url, file_id, account=None, name=None, file=None, mime=Non
 def gdrive_copy(api_url, file_id, account=None, name=None, as_json=False, preview=False,
                 debug=False):
     body = {"account": account} if account else {}
-    if preview:
-        return preview_body(body)
     if name:
         body["name"] = name
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + f"/files/{file_id}/copy"
                     + _account_params(account), body=body, debug=debug)
     if as_json:
@@ -191,14 +189,14 @@ def gdrive_copy(api_url, file_id, account=None, name=None, as_json=False, previe
 def gdrive_move(api_url, file_id, account=None, add_folder=None, remove_folder=None,
                 as_json=False, preview=False, debug=False):
     body = {}
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
     if add_folder:
         body["add_parent"] = add_folder
     if remove_folder:
         body["remove_parent"] = remove_folder
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + f"/files/{file_id}/move"
                     + _account_params(account), body=body, debug=debug)
     if as_json:
@@ -211,12 +209,12 @@ def gdrive_move(api_url, file_id, account=None, add_folder=None, remove_folder=N
 def gdrive_share(api_url, file_id, account=None, role="reader", share_type="user",
                  email=None, as_json=False, preview=False, debug=False):
     body = {"role": role, "share_type": share_type}
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
     if email:
         body["email_address"] = email
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + f"/files/{file_id}/share"
                     + _account_params(account), body=body, debug=debug)
     if as_json:
@@ -231,10 +229,10 @@ def gdrive_share(api_url, file_id, account=None, role="reader", share_type="user
 def gdrive_trash(api_url, file_id, account=None, permanent=False, as_json=False,
                  preview=False, debug=False):
     body = {"permanent": bool(permanent)}
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + f"/files/{file_id}/trash"
                     + _account_params(account), body=body, debug=debug)
     if as_json:
@@ -250,12 +248,12 @@ def gdrive_trash(api_url, file_id, account=None, permanent=False, as_json=False,
 def gdrive_mkdir(api_url, name, account=None, parent=None, as_json=False, preview=False,
                  debug=False):
     body = {"name": name}
-    if preview:
-        return preview_body(body)
     if account:
         body["account"] = account
     if parent:
         body["parent_id"] = parent
+    if preview:
+        return preview_body(body)
     data = api.call(api_url, "POST", BASE + "/folders", body=body, debug=debug)
     if as_json:
         print_json(data)

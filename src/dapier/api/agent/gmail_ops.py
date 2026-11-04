@@ -20,6 +20,7 @@ original threadId are set from the replied-to message's headers.
 
 import base64
 import re
+from email.utils import getaddresses
 from urllib.parse import quote, urlencode
 
 from ...connections import discovery as provider
@@ -189,6 +190,8 @@ def _draft_view(data):
         "message_id": message.get("id"),
         "thread_id": message.get("threadId"),
         **headers,
+        "text": _part_texts(payload)[0],
+        "attachments": _attachments_of(payload),
     }
 
 
@@ -348,9 +351,9 @@ def _parse_addresses(value):
     if value in (None, "", []):
         return []
     if isinstance(value, str):
-        return [address.strip() for address in value.split(",") if address.strip()]
+        return [address for _name, address in getaddresses([value]) if address]
     if isinstance(value, (list, tuple)):
-        return [str(item).strip() for item in value if str(item).strip()]
+        return [address for _name, address in getaddresses([str(item) for item in value]) if address]
     raise GmailOpsError("recipients must be a string or list of addresses")
 
 
@@ -366,6 +369,12 @@ def _compose(token, *, to, cc=None, bcc=None, subject, text=None, html=None,
                            _parse_addresses(bcc), [], subject, text or "", html or "",
                            _attachments_b64(attachments), "", in_reply_to=in_reply_to,
                            references=references)
+    for part, spec in zip(message.iter_attachments(), attachments or []):
+        mime = spec.get("mime_type")
+        if mime:
+            if not re.fullmatch(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+", str(mime)):
+                raise GmailOpsError("attachment MIME type must be type/subtype")
+            part.set_type(mime)
     return _b64url_encode(message.as_bytes())
 
 
@@ -381,7 +390,7 @@ def send(account, *, to, cc=None, bcc=None, subject=None, text=None, html=None,
 
 
 def reply(account, message_id, *, reply_all=False, text=None, html=None,
-          attachments=None, draft=False):
+          attachments=None, draft=False, to=None, cc=None, bcc=None):
     """Reply to one message in its thread: recipients from Reply-To/From
     (reply-all adds the original To+Cc minus the account itself), ``Re:``
     subject, In-Reply-To/References from the original, and the original
@@ -396,13 +405,14 @@ def reply(account, message_id, *, reply_all=False, text=None, html=None,
     reply_address = headers.get("reply-to") or headers.get("from") or ""
     recipients = _parse_addresses(reply_address)
     if reply_all:
-        everyone = _parse_addresses(headers.get("to")) + _parse_addresses(headers.get("cc")) \
-            + _parse_addresses(headers.get("bcc"))
+        everyone = _parse_addresses(headers.get("to")) + _parse_addresses(headers.get("cc"))
         seen = {address.lower() for address in recipients}
         for address in everyone:
             if address.lower() not in seen and address.lower() != sender.lower():
                 recipients.append(address)
                 seen.add(address.lower())
+    if to is not None:
+        recipients = _parse_addresses(to)
     if not recipients:
         raise GmailOpsError("the original message names no reply address", status=502)
     subject = headers.get("subject") or "(no subject)"
@@ -411,7 +421,7 @@ def reply(account, message_id, *, reply_all=False, text=None, html=None,
     message_id_header = (headers.get("message-id") or "").strip()
     references = " ".join(part for part in
                           (headers.get("references") or "", message_id_header) if part.strip())
-    raw = _compose(token, to=", ".join(recipients), subject=subject, text=text,
+    raw = _compose(token, to=", ".join(recipients), cc=cc, bcc=bcc, subject=subject, text=text,
                    html=html, attachments=attachments,
                    in_reply_to=message_id_header or None,
                    references=references or None)
@@ -439,13 +449,26 @@ def create_draft(account, *, to, cc=None, bcc=None, subject=None, text=None,
 
 def update_draft(account, draft_id, *, to, cc=None, bcc=None, subject=None,
                  text=None, html=None, attachments=None):
-    """Full replace of one draft's content (drafts.update)."""
-    _connection_id, _connection, token = _connection_and_token(account)
+    """Replace draft content while retaining its reply thread and headers.
 
-    raw = _compose(token, to=to, cc=cc, bcc=bcc, subject=subject or "(no subject)",
-                   text=text, html=html, attachments=attachments)
-    data = _call(token, "PUT", f"/users/me/drafts/{quote(str(draft_id), safe='')}",
-                 {"message": {"raw": raw}})
+    Body and attachments are a full replacement; omitted recipients and
+    subject retain their stored values so a reply draft stays a reply.
+    """
+    _connection_id, _connection, token = _connection_and_token(account)
+    path = f"/users/me/drafts/{quote(str(draft_id), safe='')}"
+    stored = _call(token, "GET", path)
+    message = stored.get("message") or {}
+    headers = _headers_of(message.get("payload") or {})
+    raw = _compose(token, to=to if to is not None else headers.get("to"),
+                   cc=cc if cc is not None else headers.get("cc"),
+                   bcc=bcc if bcc is not None else headers.get("bcc"),
+                   subject=subject if subject is not None else headers.get("subject", "(no subject)"),
+                   text=text, html=html, attachments=attachments,
+                   in_reply_to=headers.get("in-reply-to"), references=headers.get("references"))
+    replacement = {"raw": raw}
+    if message.get("threadId"):
+        replacement["threadId"] = message["threadId"]
+    data = _call(token, "PUT", path, {"message": replacement})
     return _draft_view(data)
 
 

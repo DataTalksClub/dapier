@@ -21,7 +21,7 @@ def _account_params(account, extra=None):
     params = dict(extra or {})
     if account:
         params["account"] = account
-    return "?" + urlencode(params) if params else {}
+    return "?" + urlencode(params) if params else ""
 
 
 def calendar_accounts(api_url, as_json=False, debug=False):
@@ -143,7 +143,8 @@ def calendar_freebusy(api_url, account=None, calendar_ids=None, time_min=None,
 
 
 def _write_body(account, calendar, send_updates, fields):
-    body = {key: value for key, value in (fields or {}).items() if value}
+    body = {({"timezone_name": "timezone", "payload": "event"}.get(key, key)): value
+            for key, value in (fields or {}).items() if value is not None and value != []}
     if account:
         body["account"] = account
     if calendar:

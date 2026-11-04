@@ -26,7 +26,7 @@ def test_cli_nouns_register():
     up = parser.parse_args(["gdrive", "upload", "f.txt", "--name", "f.txt",
                             "--account", ACCOUNT_A])
     assert up.path == "f.txt"
-    reply = parser.parse_args(["gmail", "reply", "M1", "--all", "--draft", "--file", "-"])
+    reply = parser.parse_args(["gmail", "reply", "M1", "--all", "--draft", "--file", "-", "--account", ACCOUNT_A])
     assert reply.reply_all and reply.draft and reply.file == "-"
 
 
@@ -100,3 +100,72 @@ def test_gdrive_cli_calls_agent_api_without_google(monkeypatch, tmp_path):
     assert calls[3]["body"]["permanent"] is True
 
 
+
+
+def test_gmail_urlsafe_attachment_download(monkeypatch, tmp_path):
+    from dapier_cli.commands import gmail
+    binary = b'\xfb\xff\xfe\x00'
+    monkeypatch.setattr(gmail.api, 'call', lambda *a, **k: {
+        'data_b64': base64.urlsafe_b64encode(binary).decode().rstrip('=')})
+    target = tmp_path / 'attachment.bin'
+    gmail.gmail_attachment('http://api', 'M', 'A', account=ACCOUNT_A, out=str(target))
+    assert target.read_bytes() == binary
+
+
+def test_gmail_search_json_and_draft_pagination(monkeypatch, capsys):
+    import json
+    from dapier_cli.commands import gmail
+    calls = []
+    def call(*args, **kwargs):
+        calls.append(args)
+        return {'messages': [], 'drafts': [], 'next_page_token': 'next'}
+    monkeypatch.setattr(gmail.api, 'call', call)
+    gmail.gmail_search('http://api', 'is:unread', account=ACCOUNT_A, as_json=True)
+    assert json.loads(capsys.readouterr().out)['next_page_token'] == 'next'
+    gmail.gmail_draft_list('http://api', account=ACCOUNT_A, max_results=10, page_token='p')
+    assert 'max=10' in calls[-1][2] and 'page_token=p' in calls[-1][2]
+
+
+def test_previews_include_all_write_fields_and_never_call_api(monkeypatch, tmp_path, capsys):
+    import json
+    from dapier_cli.commands import gmail, gdrive
+    def unexpected(*args, **kwargs):
+        raise AssertionError('preview must not call the API')
+    monkeypatch.setattr(gmail.api, 'call', unexpected)
+    body_file = tmp_path / 'body.txt'
+    body_file.write_text('Body ü')
+    gmail.gmail_send('http://api', account=ACCOUNT_A, to='peer@corp.com', cc='copy@corp.com',
+                     subject='Subject', file=str(body_file), preview=True)
+    body = json.loads(capsys.readouterr().out)['would_send']
+    assert body['account'] == ACCOUNT_A and body['text'] == 'Body ü'
+    assert body['cc'] == 'copy@corp.com'
+    gdrive.gdrive_move('http://api', 'F', account=ACCOUNT_A, add_folder='NEW', remove_folder='OLD', preview=True)
+    body = json.loads(capsys.readouterr().out)['would_send']
+    assert body == {'account': ACCOUNT_A, 'add_parent': 'NEW', 'remove_parent': 'OLD'}
+    gdrive.gdrive_update('http://api', 'F', account=ACCOUNT_A, name='new', file=str(body_file), preview=True)
+    body = json.loads(capsys.readouterr().out)['would_send']
+    assert body['name'] == 'new' and body['account'] == ACCOUNT_A
+    assert body['content_b64'].endswith('bytes>')
+
+
+def test_cli_requires_account_for_each_service():
+    import pytest
+    from dapier_cli.cli import build_parser
+    for command in (['gmail', 'list'], ['gmail', 'draft', 'send', 'D'],
+                    ['gdrive', 'list'], ['calendar', 'calendars']):
+        with pytest.raises(SystemExit):
+            build_parser().parse_args(command)
+
+
+def test_mkdir_entrypoint_forwards_preview_without_api_call(monkeypatch, capsys):
+    import json
+    from dapier_cli.cli import build_parser, gdrive
+    from dapier_cli import api
+    def unexpected(*args, **kwargs):
+        raise AssertionError('preview must never call the API')
+    monkeypatch.setattr(api, 'call', unexpected)
+    args = build_parser().parse_args(['gdrive', 'mkdir', 'Example', '--parent', 'PARENT',
+                                      '--account', ACCOUNT_A, '--preview'])
+    assert gdrive.run(args, 'http://api', False) == 0
+    assert json.loads(capsys.readouterr().out)['would_send'] == {
+        'account': ACCOUNT_A, 'name': 'Example', 'parent_id': 'PARENT'}

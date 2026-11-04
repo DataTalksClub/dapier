@@ -5,8 +5,7 @@ One Google sign-in backs Gmail, Drive, Docs and Sheets at once, so the
 its connection id, or a unique fragment of either. The resolver here is the
 single gate every ``/api/agent/gmail/*`` and ``/api/agent/gdrive/*``
 operation goes through — it picks exactly one connection and never silently
-switches accounts: an omitted ``--account`` resolves only when exactly one
-connected account serves the service, an ambiguous fragment is an error
+switches accounts: an omitted ``--account`` is rejected, an ambiguous fragment is an error
 that names the candidates, and every error lists the accounts that exist so
 the operator can re-run with an explicit choice.
 """
@@ -68,9 +67,8 @@ def resolve_account(service_id, account=None):
 
     ``account`` (the CLI's ``--account``) matches a connection id exactly,
     a verified email exactly (case-insensitive), or a unique fragment of
-    email/title. Without it, exactly one connected account must serve the
-    service — with several, the choice is the operator's and the error
-    names them. Raises GoogleAccountError on anything ambiguous.
+    email/title. Without it, the request is rejected and the error names the
+    available accounts. Raises GoogleAccountError on anything ambiguous.
     """
     accounts = list_accounts(service_id)
     connected = [view for view in accounts if view.get("status") == connections.STATUS_CONNECTED]
@@ -80,8 +78,6 @@ def resolve_account(service_id, account=None):
             f"No Google connection grants {service_id}; connect one first "
             "(dapier connections create)", accounts=accounts)
     if account is None or not str(account).strip():
-        if len(candidates) == 1:
-            return candidates[0]["connection_id"]
         raise GoogleAccountError(
             "--account is required: "
             + str(len(candidates)) + " Google accounts serve "

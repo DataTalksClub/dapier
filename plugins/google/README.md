@@ -268,16 +268,16 @@ destroys), `restore` (un-trash), `mkdir`.
 required, ≤ 366 days), `event`, `freebusy`, and `create`/`update`/`delete`
 (summary/start/end, timezone, attendees, `--recurse` RRULEs, reminder
 overrides, attachment links, all-day form, or a reviewed JSON event
-resource via `--event-file`). Guest email is never accidental: every write
-carries Google's `sendUpdates` and defaults to `none` — invitations only
-go out when `--send-updates all|externalOnly` is named.
+resource via `--event-file`). Every write carries Google's `sendUpdates` and defaults to `none`; use
+`--send-updates all|externalOnly` to request guest notifications. Google may
+still send certain emails even with `none`; see its API documentation.
 
-Write verbs on all three nouns take `--preview`: print the exact JSON
+Composition, Drive upload/copy/move/share/trash/mkdir, and Calendar write verbs take `--preview`: print the exact JSON
 request body (attachment/file payloads shown as sizes, not bytes) and
 exit — nothing is sent until the command is re-run without `--preview`.
 
 **Account selection:** every operation takes `--account <email-or-connection-id>`.
-With several Google accounts the choice is required; an omitted or
+The choice is required even with one account; an omitted or
 ambiguous selection is rejected with the candidate list — the CLI never
 silently defaults a write to the wrong account.
 
@@ -711,3 +711,48 @@ video or Slack notification.
 Renewal runs every four days, leaving one day of margin against the observed
 five-day hub lease. The renewal Lambda reads the four live workflow/trigger
 tables with scoped read-only permissions.
+
+### Google CLI follow-up behavior
+
+Every operation except `accounts` requires `--account EMAIL_OR_CONNECTION_ID`,
+even with one connected account. Gmail `list` and `search` support `--json`;
+`draft list --max N --page-token TOKEN` exposes bounded draft pagination.
+
+`gmail reply MESSAGE_ID --draft --account EMAIL --text "Reply" --attach file.pdf`
+creates a reply draft. Edit it with
+`gmail draft update DRAFT_ID --account EMAIL --file revised.txt --attach revised.pdf`;
+its thread, reply headers, recipients and subject are retained unless replaced.
+Draft body and attachments are replaced in full; include every attachment you
+want to keep. `draft get --json` includes text and attachment metadata.
+`gmail reply MESSAGE_ID --account EMAIL --file reply.txt` sends directly;
+`gmail draft send DRAFT_ID --account EMAIL` sends an existing draft. Reply-all
+uses parsed To/Cc addresses and excludes the sender account and Bcc recipients.
+
+Calendar updates accept partial fields, e.g.
+`calendar update EVENT_ID --account EMAIL --summary "New title"`. Windows
+require RFC3339 timestamps with timezone offsets; all-day event resources still
+use dates. Reviewed JSON goes through `--event-file FILE` (or `-` for stdin).
+Attachment links set the provider's supportsAttachments flag. The CLI passes
+`sendUpdates=none` by default; choose `--send-updates all|externalOnly` to request
+notifications. Google's notification behavior still applies; do not treat
+`none` as a guarantee that Google can never send any email.
+
+Previews show supplied account, body and other parameters; binary content is
+represented by its size. Drive metadata-only updates use the standard files
+endpoint; content updates support replacing a file with an empty file.
+
+Limits: files and attachments travel as base64 JSON through the API and must fit
+its request/response limits; resumable large-file uploads are not implemented.
+Drive sharing creates a permission; permission listing, editing and removal are
+not exposed yet. Raw Gmail `.eml` and multi-tab Sheets CSV export remain in the
+read-only `google-data-pull/gpull.py` helper.
+
+Provider references: [Gmail threading](https://developers.google.com/workspace/gmail/api/guides/threads),
+[Drive metadata updates](https://developers.google.com/workspace/drive/api/guides/manage-uploads),
+[Calendar attachment and notification parameters](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).
+
+The console exposes these same operations from **Connections → Google tools**.
+Choose a service and operation, fill in IDs and JSON parameters, attach local
+files when applicable, then Preview or Fetch/Apply. The selected connection ID
+is fixed for the request. Admin routes pass session, CSRF and role checks before
+calling the same handlers as the agent API; provider logic is shared.
