@@ -242,6 +242,52 @@ and the console/CLI pickers: `spreadsheets`, `files`, `folders` (Drive folders),
 trimmed and each row keeps its spreadsheet row number), and `labels` (the
 Gmail labels of the connection, behind the Gmail trigger's query picker).
 
+## Operator CLI: `dapier gmail` and `dapier gdrive`
+
+The workflows engine is not the only way to touch the connected Google
+accounts: the `dapier gmail` and `dapier gdrive` nouns are operator
+surfaces over `/api/agent/gmail/*` and `/api/agent/gdrive/*` (the same
+`/api/agent/*` routes the CLI's other nouns use; the connection token
+stays server-side, and every route is operator-gated and audited).
+
+`gmail` covers: `accounts` (the Google accounts serving Gmail, with
+verified email + connection id), `search`/`list`/`read`/`attachment`
+(messages, threads, headers, bodies, attachments), `labels`, `mark`
+(read/unread/archive/trash/label), `send` (direct, with attachments),
+`reply` (direct send **or** `--draft` reply draft, with attachments,
+correct `In-Reply-To`/`References`/subject/thread), and `draft`
+(create/update with attachments, list/get/delete, `draft send`).
+`gdrive` covers: `accounts`, `list`/`search`/`meta`, `download`
+(export: Google-native docs → PDF/CSV/PNG, override with `--export-mime`),
+`upload` (file or stdin), `update` (rename and/or replace content),
+`copy`, `move`, `share` (permissions), `trash` (recoverable; `--permanent`
+destroys), `restore` (un-trash), `mkdir`.
+
+`calendar` covers: `accounts`, `calendars` (the account's calendar list),
+`events` (list/search in a **bounded** window — `--time-min`/`--time-max`
+required, ≤ 366 days), `event`, `freebusy`, and `create`/`update`/`delete`
+(summary/start/end, timezone, attendees, `--recurse` RRULEs, reminder
+overrides, attachment links, all-day form, or a reviewed JSON event
+resource via `--event-file`). Guest email is never accidental: every write
+carries Google's `sendUpdates` and defaults to `none` — invitations only
+go out when `--send-updates all|externalOnly` is named.
+
+Write verbs on all three nouns take `--preview`: print the exact JSON
+request body (attachment/file payloads shown as sizes, not bytes) and
+exit — nothing is sent until the command is re-run without `--preview`.
+
+**Account selection:** every operation takes `--account <email-or-connection-id>`.
+With several Google accounts the choice is required; an omitted or
+ambiguous selection is rejected with the candidate list — the CLI never
+silently defaults a write to the wrong account.
+
+**Scopes are honored, never widened:** reads ride `gmail.readonly` /
+`drive.readonly`-class grants, sends need `gmail.send`, drafts and label
+changes need `gmail.modify` (or `gmail.compose`/`gmail.labels`), and Drive
+writes need a writable Drive scope. A connection without the scope fails
+with Gmail/Drive's own 403 plus a hint to widen the grant via
+`dapier connections edit --scopes` and reconnect.
+
 ### Calendar, YouTube, and other accounts
 
 - Create **Google Calendar → Create new** in the console. It requests
