@@ -67,6 +67,31 @@ def test_oidc_login_requests_only_the_signin_scope_set(monkeypatch):
     assert query["redirect_uri"] == ["https://dapier.example.test/auth/callback"]
 
 
+def test_signin_entrypoints_parity(monkeypatch):
+    # Console sign-in and the CLI loopback login are the two DTC sign-in
+    # entrypoints; both must present the identical identity-only request to
+    # the shared auth server (scope, response type, PKCE, authorize path).
+    # The Google connections consent is deliberately different — its grant is
+    # connection_grant_scopes() (see test_oauth_flow.py), never these scopes.
+    from urllib.parse import parse_qs, urlparse
+
+    import dapier_cli.auth as cli_auth
+
+    assert cli_auth.SCOPES == "openid email profile"
+    assert cli_auth.authorize_url(
+        "https://auth.example.test", "cli-id", cli_auth.REDIRECT_URI,
+        "st", "nn", "ch",
+    ).startswith("https://auth.example.test/oauth2/authorize?")
+
+    configure_oidc(monkeypatch)
+    monkeypatch.setattr(session, "_credentials", lambda: {"password": "session-secret"})
+    start = login.auth_login(request("GET", "/auth/login"))
+    query = parse_qs(urlparse(start["headers"]["location"]).query)
+    assert query["scope"] == [cli_auth.SCOPES]
+    assert query["response_type"] == ["code"]
+    assert query["code_challenge_method"] == ["S256"]
+
+
 def test_oidc_login_uses_pkce_and_google_identity_creates_session(monkeypatch):
     # Cognito emits the mapped Google attribute as the string "true", not a boolean.
     callback = begin_oidc(monkeypatch, {
