@@ -79,3 +79,21 @@ def test_google_tools_browser_preview_and_shared_request():
         assert body['draft'] is True and body['message_id'] == 'm1'
         assert body['attachments'][0]['content_b64'] == '/wA='
         browser.close()
+
+
+def test_google_tools_opens_for_paged_connection_outside_overview():
+    pytest.importorskip('playwright.sync_api')
+    from playwright.sync_api import sync_playwright
+    from test_console_boot import console_server, _chromium
+    with console_server() as origin, sync_playwright() as playwright:
+        browser = _chromium(playwright)
+        page = browser.new_page()
+        page.route('**/api/admin/connections?*', lambda route: route.fulfill(json={
+            'connections': [{'connection_id': 'paged-google', 'provider': 'google',
+                             'status': 'connected', 'verified_account_id': 'paged@example.com',
+                             'granted_scopes': ['https://www.googleapis.com/auth/gmail.readonly']}]}))
+        page.goto(origin + '/connections')
+        page.locator('.connection-google-tools').first.click()
+        page.locator('#google-tools-dialog').wait_for(state='visible')
+        assert 'paged@example.com' in page.locator('#google-tools-dialog').inner_text()
+        browser.close()

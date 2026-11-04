@@ -902,7 +902,7 @@ function renderConnectionsNow(connections) {
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
   $$('.connection-google-tools').forEach((button) => button.addEventListener('click', () => {
-    const connection = ((state.data || {}).connections || []).find((c) => c.connection_id === button.dataset.connection);
+    const connection = connections.find((c) => c.connection_id === button.dataset.connection);
     if (connection) openGoogleTools(connection);
   }));
   bindConnectButtons();
