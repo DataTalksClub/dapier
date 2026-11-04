@@ -321,8 +321,23 @@ def route(event, method, path):
         return http._operator_error_500(event, exc, traceback_text=traceback.format_exc())
 
 
+def _route_google(event, method, path, operator_payload, operator_subject):
+    """Console aliases use the same Google operation handlers as the CLI."""
+    if not re.match(r"^/api/admin/(gmail|gdrive|calendar)/", path):
+        return None
+    console_event = {**event, "_console_google_payload": operator_payload,
+                     "_console_google_subject": operator_subject}
+    agent_path = path.replace("/api/admin/", "/api/agent/", 1)
+    for router in (agent.gmail.route_gmail, agent.gdrive.route_gdrive,
+                   agent.calendar.route_calendar):
+        response = router(console_event, method, agent_path)
+        if response is not None:
+            return response
+    return None
+
+
 def _route_domains(event, method, path, operator_payload, operator_subject):
-    for router in (_route_overview_runs, _route_usage_errors, _route_inbox,
+    for router in (_route_google, _route_overview_runs, _route_usage_errors, _route_inbox,
                    _route_connections, _route_grants_tokens, _route_ops_email,
                    _route_storage, _route_triggers, _route_connection_tokens):
         response = router(event, method, path, operator_payload, operator_subject)

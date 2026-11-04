@@ -5,6 +5,7 @@ import { $, $$, notice, serviceMark, whenMenusClosed, openWhenReady } from '../u
 import { api } from '../api.js';
 import { escapeHtml, formatTimestamp, statusLine } from '../format.js';
 import { refresh } from './overview.js';
+import { openGoogleTools } from './google-tools.js';
 
 /* Keep ids, labels, providers, connectionId, and default scopes in lockstep
    with src/dapier/connections/services.py — tests/test_connection_services.py
@@ -900,6 +901,10 @@ function renderConnectionsNow(connections) {
   }));
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
+  $$('.connection-google-tools').forEach((button) => button.addEventListener('click', () => {
+    const connection = ((state.data || {}).connections || []).find((c) => c.connection_id === button.dataset.connection);
+    if (connection) openGoogleTools(connection);
+  }));
   bindConnectButtons();
   bindOAuthLinks();
 }
@@ -988,7 +993,9 @@ function accountActions(connection, { unfinished = false, title } = {}) {
   const manage = `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
   const test = connection.provider === 'llm'
     ? `<button class="dk-button dk-button--secondary dk-button--sm connection-test" data-connection="${id}" type="button">Test</button>` : '';
-  return { html: remove + next + test + manage, many: Boolean(remove || next || test) };
+  const tools = connection.provider === 'google'
+    ? `<button class="dk-button dk-button--secondary dk-button--sm connection-google-tools" data-connection="${id}" type="button">Google tools</button>` : '';
+  return { html: remove + next + test + tools + manage, many: Boolean(remove || next || test || tools) };
 }
 
 /* Another service's view of a shared sign-in: the account, Details, status,

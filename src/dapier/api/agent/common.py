@@ -173,6 +173,14 @@ def require_operator(event, action):
     the audit action recorded on a denial. A DTC identity passes the same
     operator allowlist the console gate applies; API tokens pass only
     through their grants."""
+    # Set only by the admin dispatcher after its session, CSRF and role gates.
+    console = event.get("_console_google_payload")
+    if console is not None:
+        subject = event["_console_google_subject"]
+        if actors.action_allowed(console, action):
+            return subject, None
+        audit.emit("unknown", action, subject, outcome="denied-not-operator")
+        return None, _json_response(403, {"error": "Not available for this role"})
     subject, error = authenticate(event)
     if error:
         return None, error
