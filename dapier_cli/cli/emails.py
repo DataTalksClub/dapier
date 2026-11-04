@@ -1,19 +1,35 @@
 """The `dapier emails` noun: inbound addresses and per-address sender policy."""
 
+import argparse
+
 from .. import commands
 from .runs import OUTCOME_HELP
 
 GROUPS = ("emails",)
 
+EPILOG = """`emails` covers Dapier's own inbound dtcdev addresses only (workflow
+trigger routes; `received` lists inbox receipts). It does not search Gmail.
+
+To search Gmail, use the google-data-pull skill from the repo root:
+  python3 .agents/skills/google-data-pull/gpull.py --as "gmail datatalks" --agent admin-os gmail list --q "from:example.com newer_than:30d"
+See .agents/skills/google-data-pull/SKILL.md for accounts and pagination."""
+
 
 def register(sub):
-    emails_p = sub.add_parser("emails", help="Email addresses that start a flow")
+    emails_p = sub.add_parser(
+        "emails",
+        help="Inbound dtcdev addresses that start a flow (not Gmail)",
+        description="Inbound dtcdev addresses and per-address sender policy. "
+                    "This noun does not touch Gmail.",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     emails_sub = emails_p.add_subparsers(dest="command", required=True)
     emails_sub.add_parser("list", help="List email addresses")
     emails_show = emails_sub.add_parser("show", help="Show one email address")
     emails_show.add_argument("name")
     emails_received = emails_sub.add_parser(
-        "received", help="Recent received emails and what happened to each (the Emails page list)")
+        "received", help="Recent dtcdev inbox receipts and what happened to each (the Emails page list)")
     emails_received.add_argument("--outcome", help=OUTCOME_HELP)
     emails_received.add_argument("--limit", type=int, default=25)
     emails_received.add_argument("--next", dest="next_token",

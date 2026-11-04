@@ -1,18 +1,33 @@
 """The `dapier slack` noun: find users, open DMs, export history."""
 
+import argparse
+
 from .. import commands
 
 GROUPS = ("slack",)
 DEFAULT_CONNECTION_ID = "slack-alexey"
 
+SLACK_EPILOG = """examples:
+  dapier slack find-user "Mikhail" --connection slack-alexey
+  dapier slack find-user mikhail@example.com
+  dapier slack dm-export "Mikhail" --limit 200"""
+
 
 def register(sub):
     p = sub.add_parser(
         "slack",
-        help="Slack user lookup and DM/history export (uses stored connection server-side)")
+        help="Slack user lookup and DM/history export (uses stored connection server-side)",
+        epilog=SLACK_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     sub_p = p.add_subparsers(dest="command", required=True)
 
-    find_user = sub_p.add_parser("find-user", help="Find workspace users by name, handle, email, or id")
+    find_user = sub_p.add_parser(
+        "find-user",
+        help="Find workspace users by name, handle, email, or id",
+        epilog=SLACK_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     find_user.add_argument("query")
     find_user.add_argument("--connection", default=DEFAULT_CONNECTION_ID,
                            help="Connection id (default slack-alexey)")
