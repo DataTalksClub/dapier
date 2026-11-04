@@ -30,8 +30,15 @@ jobs:
         with:
           python-version: '3.12'
       - uses: aws-actions/setup-sam@v2
+      # Avoid the slow Azure archive without changing APT trust policy.
+      - name: Configure bounded Ubuntu dependency downloads
+        run: sudo python scripts/configure-ci-apt.py
+      - name: Install Chromium system dependencies
+        timeout-minutes: 10
+        run: uv run --with playwright python -m playwright install-deps chromium
       - name: Install Chromium for the console boot test
-        run: uv run --with playwright python -m playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: uv run --with playwright python -m playwright install chromium
       - run: make test
       - uses: actions/setup-node@v4
         with:
