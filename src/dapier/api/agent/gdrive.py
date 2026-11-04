@@ -100,9 +100,13 @@ def upload_api(event):
     if body is None:
         return _json_response(400, {"error": "Invalid JSON body"})
     try:
-        payload = gdrive_ops.upload(
-            _account(event, body), body.get("name"), body.get("content_b64"),
-            mime_type=body.get("mime_type"), folder_id=body.get("folder_id"))
+        if body.get("upload_mode") == "resumable":
+            payload = gdrive_ops.start_upload(_account(event, body), body.get("name"), body.get("size"),
+                mime_type=body.get("mime_type"), folder_id=body.get("folder_id"))
+        else:
+            payload = gdrive_ops.upload(
+                _account(event, body), body.get("name"), body.get("content_b64"),
+                mime_type=body.get("mime_type"), folder_id=body.get("folder_id"))
     except (gdrive_ops.GDriveOpsError, GoogleAccountError) as exc:
         return _error(exc)
     _audit(payload.get("id") or "gdrive", "gdrive.upload", subject)

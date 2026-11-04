@@ -1,14 +1,18 @@
 """Implementation of the `dapier gdrive` commands: a thin client over
 ``/api/agent/gdrive/*``. Files move as base64 inside the JSON bodies (the
 API has no binary channel); the connection token stays server-side and
-nothing here talks to Google directly.
+large uploads use a scoped Google resumable session URL, never an OAuth token.
 """
 
 import base64
+import hashlib
+import json
+import urllib.error
+import urllib.request
 import mimetypes
 import os
 import sys
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from .. import api
 from .shared import preview_body, print_json
@@ -120,6 +124,82 @@ def gdrive_download(api_url, file_id, account=None, out=None, export_mime=None,
     return 0
 
 
+LARGE_UPLOAD_BYTES = 1024 * 1024
+
+
+class _NoUploadRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _session_request(url, content, headers):
+    request = urllib.request.Request(url, data=content, method="PUT", headers=headers)
+    try:
+        with urllib.request.build_opener(_NoUploadRedirect).open(request, timeout=60) as response:
+            return response.status, response.read(), response.headers
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read(), exc.headers
+    except (OSError, TimeoutError):
+        return 0, b"", {}
+
+
+def _upload_session(url, content, mime_type):
+    parsed = urlsplit(str(url or ""))
+    if (parsed.scheme != "https" or parsed.netloc != "www.googleapis.com"
+            or parsed.path != "/upload/drive/v3/files" or parsed.fragment
+            or "upload_id=" not in parsed.query):
+        raise api.ApiError("Invalid Drive upload session")
+    total, offset, uncertain = len(content), 0, 0
+    for _ in range((total + LARGE_UPLOAD_BYTES - 1) // LARGE_UPLOAD_BYTES + 6):
+        end = min(offset + LARGE_UPLOAD_BYTES, total)
+        status, raw, headers = _session_request(url, content[offset:end], {
+            "Content-Type": mime_type, "Content-Length": str(end - offset),
+            "Content-Range": f"bytes {offset}-{end - 1}/{total}"})
+        if status == 0 or status >= 500:
+            uncertain += 1
+            # Query the SAME session before deciding whether any bytes need repeating.
+            status, raw, headers = _session_request(url, b"", {
+                "Content-Length": "0", "Content-Range": f"bytes */{total}"})
+            if uncertain > 2 or status == 0 or status >= 500:
+                raise api.ApiError("Drive upload outcome uncertain; no new file was retried")
+        if status in (200, 201):
+            try:
+                result = json.loads(raw)
+            except (ValueError, TypeError):
+                raise api.ApiError("Drive upload returned invalid completion metadata") from None
+            if (str(result.get("size")) != str(total)
+                    or result.get("md5Checksum") != hashlib.md5(content).hexdigest()
+                    or not result.get("id")):
+                raise api.ApiError("Drive upload size or checksum verification failed")
+            return result["id"]
+        if status in (404, 410):
+            raise api.ApiError("Drive upload session expired; no new file was retried")
+        if status != 308:
+            raise api.ApiError(f"Drive upload failed (HTTP {status}); session URL redacted")
+        import re
+        match = re.fullmatch(r"bytes=0-(\d+)", headers.get("Range", ""))
+        acknowledged = int(match.group(1)) + 1 if match else 0
+        if acknowledged < offset or acknowledged > end or acknowledged >= total:
+            raise api.ApiError("Drive upload returned an invalid acknowledged range")
+        if acknowledged == offset and uncertain == 0:
+            raise api.ApiError("Drive upload made no progress")
+        offset = acknowledged
+    raise api.ApiError("Drive upload exceeded its bounded retry limit")
+
+
+def _large_upload(api_url, body, content, debug):
+    initiation = {k: v for k, v in body.items() if k != "content_b64"}
+    initiation.update(upload_mode="resumable", size=len(content))
+    session = api.call(api_url, "POST", BASE + "/files", body=initiation, debug=debug)
+    file_id = _upload_session(session.get("upload_url"), content, body["mime_type"])
+    # Resolve completion through the same explicitly selected account.
+    data = api.call(api_url, "GET", BASE + f"/files/{file_id}" + _account_params(body.get("account")), debug=debug)
+    if (data.get("id") != file_id or data.get("size") != len(content)
+            or data.get("md5_checksum") != hashlib.md5(content).hexdigest()):
+        raise api.ApiError("Drive upload account readback or integrity verification failed")
+    return data
+
+
 def gdrive_upload(api_url, path, name=None, account=None, folder=None, mime=None,
                   as_json=False, preview=False, debug=False):
     filename = name or os.path.basename(path if path != "-" else "stdin-upload")
@@ -136,7 +216,8 @@ def gdrive_upload(api_url, path, name=None, account=None, folder=None, mime=None
         body["folder_id"] = folder
     if preview:
         return preview_body(body)
-    data = api.call(api_url, "POST", BASE + "/files", body=body, debug=debug)
+    data = (_large_upload(api_url, body, content, debug) if len(content) > LARGE_UPLOAD_BYTES
+            else api.call(api_url, "POST", BASE + "/files", body=body, debug=debug))
     if as_json:
         print_json(data)
         return 0

@@ -209,7 +209,7 @@ def test_gmail_get_message_includes_body_and_attachments(google_world, gmail_pro
     assert view["attachments"][0]["attachment_id"] == "att1"
 
     gmail_provider.on("GET", "/messages/m1/attachments/att1",
-                      {"attachmentId": "att1", "size": 4, "data": data})
+                      {"attachmentId": "att1", "size": 5, "data": data})
     blob = gmail_ops.get_attachment(ACCOUNT_A, "m1", "att1")
     assert base64.b64decode(blob["data_b64"]) == base64.b64decode(data)
 
@@ -738,3 +738,125 @@ def test_draft_get_api_and_cli_return_html_without_write(
         output = capsys.readouterr().out
         assert html in output
     assert all(c["method"] == "GET" for c in gmail_provider.calls)
+
+
+@pytest.mark.parametrize("save_all", [False, True])
+def test_large_attachment_cli_api_bounded_integrity(google_world, gmail_provider, monkeypatch, tmp_path, save_all):
+    import hashlib
+    from urllib.parse import urlsplit, parse_qs
+    from dapier_cli.commands import gmail as cmd
+    content = (bytes(range(256)) * 19877)[:5088311]
+    assert len(content) == 5088311
+    gmail_provider.on("GET", "/messages/m1/attachments/a1", {
+        "size": len(content), "data": base64.urlsafe_b64encode(content).decode()})
+    _operator_gate(monkeypatch, gmail_api, "gmail.get_attachment")
+    sizes, offsets = [], []
+    def call(api_url, method, path, **kwargs):
+        parsed = urlsplit(path)
+        query = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+        assert query["account"] == ACCOUNT_A
+        offsets.append(int(query.get("offset", 0)))
+        response = gmail_api.route_gmail({"queryStringParameters": query}, method, parsed.path)
+        assert response["statusCode"] == 200
+        assert len(json.dumps(response).encode()) < 6 * 1024 * 1024
+        result = json.loads(response["body"])
+        assert result["sha256"] == hashlib.sha256(content).hexdigest()
+        sizes.append(result["chunk_size"])
+        return result
+    monkeypatch.setattr(cmd.api, "call", call)
+    target = tmp_path / "large.zip"
+    if save_all:
+        cmd._save_all_attachments("http://api", {"id": "m1", "attachments": [
+            {"attachment_id": "a1", "filename": "large.zip"}]}, str(tmp_path), ACCOUNT_A, False)
+    else:
+        cmd.gmail_attachment("http://api", "m1", "a1", account=ACCOUNT_A, out=str(target))
+    assert target.read_bytes() == content
+    assert offsets == [0, 1048576, 2097152, 3145728, 4194304]
+    assert sum(sizes) == len(content)
+    assert all(c["token"] == "token-google-a" for c in gmail_provider.calls)
+    legacy = gmail_api.route_gmail({"queryStringParameters": {"account": ACCOUNT_A}},
+        "GET", "/api/agent/gmail/messages/m1/attachments/a1")
+    assert legacy["statusCode"] == 413 and "data_b64" not in json.loads(legacy["body"])
+
+
+@pytest.mark.parametrize("query", [{"offset": "-1", "chunk_size": "1024"},
+    {"chunk_size": "1048577"}, {"chunk_size": "bad"}, {"offset": "1"}])
+def test_attachment_invalid_range_fails_before_provider(monkeypatch, query):
+    monkeypatch.setattr(gmail_ops, "_connection_and_token", lambda *a: pytest.fail("invalid range before auth"))
+    with pytest.raises(gmail_ops.GmailOpsError):
+        gmail_ops.get_attachment(ACCOUNT_A, "m", "a", **query)
+
+
+def test_drive_resumable_api_metadata_only(google_world, monkeypatch):
+    from contextlib import contextmanager
+    seen = []
+    @contextmanager
+    def open_request(request, timeout):
+        seen.append(request)
+        yield type("Response", (), {"status": 200, "headers": {
+            "Location": "https://www.googleapis.com/upload/drive/v3/files?upload_id=synthetic"}})()
+    monkeypatch.setattr(gdrive_ops.urllib.request, "build_opener", lambda *a: type("Opener", (), {"open": staticmethod(open_request)})())
+    _operator_gate(monkeypatch, gdrive_api, "gdrive.upload")
+    response = gdrive_api.route_gdrive({"body": json.dumps({"account": ACCOUNT_A,
+        "upload_mode": "resumable", "size": 5088311, "name": "synthetic.zip", "folder_id": "folder"})},
+        "POST", "/api/agent/gdrive/files")
+    assert response["statusCode"] == 200
+    request = seen[0]
+    assert json.loads(request.data) == {"name": "synthetic.zip", "mimeType": "application/octet-stream", "parents": ["folder"]}
+    assert request.get_header("Authorization") == "Bearer token-google-a"
+    assert request.get_header("X-upload-content-length") == "5088311"
+    assert len(request.data) < 1000
+
+
+def test_legacy_two_megabyte_attachment_contract_unchanged(google_world, gmail_provider):
+    content = b"a" * (2 * 1024 * 1024)
+    encoded = base64.urlsafe_b64encode(content).decode()
+    gmail_provider.on("GET", "/messages/m/attachments/a", {"size": len(content), "data": encoded})
+    assert gmail_ops.get_attachment(ACCOUNT_A, "m", "a") == {
+        "attachment_id": "a", "size": len(content), "data_b64": encoded}
+
+
+def test_large_drive_cli_api_init_provider_and_account_readback(
+        google_world, gdrive_provider, monkeypatch, tmp_path, capsys):
+    import hashlib
+    from contextlib import contextmanager
+    from urllib.parse import urlsplit, parse_qs
+    from dapier_cli.commands import gdrive as cmd
+    content = b"synthetic" * 570000
+    path = tmp_path / "synthetic.zip"
+    path.write_bytes(content)
+    md5 = hashlib.md5(content).hexdigest()
+    gdrive_provider.on("GET", "/files/file1", {"id": "file1", "name": "synthetic.zip",
+        "size": str(len(content)), "md5Checksum": md5})
+    _operator_gate(monkeypatch, gdrive_api, "gdrive.upload")
+    @contextmanager
+    def open_request(request, timeout):
+        assert request.get_method() == "POST"
+        assert request.get_header("Authorization") == "Bearer token-google-a"
+        assert json.loads(request.data)["parents"] == ["folder"]
+        assert len(request.data) < 1000
+        yield type("Response", (), {"status": 200, "headers": {
+            "Location": "https://www.googleapis.com/upload/drive/v3/files?upload_id=synthetic-private"}})()
+    monkeypatch.setattr(gdrive_ops.urllib.request, "build_opener", lambda *a: type("Opener", (), {"open": staticmethod(open_request)})())
+    def native(api_url, method, path, body=None, **kwargs):
+        parsed = urlsplit(path)
+        query = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+        if method == "POST":
+            assert "content_b64" not in body and body["size"] == len(content)
+        response = gdrive_api.route_gdrive({"body": json.dumps(body), "queryStringParameters": query}, method, parsed.path)
+        assert response["statusCode"] == 200
+        return json.loads(response["body"])
+    transferred = bytearray()
+    def transfer(url, part, headers):
+        assert "Authorization" not in headers
+        transferred.extend(part)
+        if len(transferred) == len(content):
+            return 200, json.dumps({"id": "file1", "size": str(len(content)), "md5Checksum": md5}).encode(), {}
+        return 308, b"", {"Range": f"bytes=0-{len(transferred)-1}"}
+    monkeypatch.setattr(cmd.api, "call", native)
+    monkeypatch.setattr(cmd, "_session_request", transfer)
+    cmd.gdrive_upload("http://api", str(path), account=ACCOUNT_A, folder="folder", as_json=True)
+    assert bytes(transferred) == content
+    result = json.loads(capsys.readouterr().out)
+    assert result["id"] == "file1" and result["md5_checksum"] == md5
+    assert all(call["token"] == "token-google-a" for call in gdrive_provider.calls)

@@ -60,7 +60,7 @@ def test_gmail_cli_calls_agent_api_without_google(monkeypatch, tmp_path):
     cmd.gmail_attachment("http://api", "M1", "ATT1", account=ACCOUNT_A,
                          out=str(tmp_path / "out.bin"))
     assert calls[3]["path"] == ("/api/agent/gmail/messages/M1/attachments/ATT1?"
-                                + urlencode({"account": ACCOUNT_A}))
+                                + urlencode({"chunk_size": 1024 * 1024, "account": ACCOUNT_A}))
 
 
 def test_gdrive_cli_calls_agent_api_without_google(monkeypatch, tmp_path):
@@ -194,3 +194,102 @@ def test_draft_html_preview_and_stdin_validation(monkeypatch, tmp_path, capsys):
     args.file = "-"
     with pytest.raises(cmd.api.ApiError, match="cannot both read stdin"):
         cli.run(args, "http://api", False)
+
+
+import pytest
+
+
+@pytest.mark.parametrize("damage", ["changed", "truncated", "offset", "digest", "stalled", "protocol"])
+def test_attachment_failure_keeps_existing_destination(monkeypatch, tmp_path, damage):
+    import hashlib
+    from dapier_cli.commands import gmail as cmd
+    content = b"a" * 1048576 + b"last"
+    expected = hashlib.sha256(content).hexdigest()
+    calls = []
+    def call(*a, **k):
+        index = len(calls)
+        calls.append(index)
+        part = content[:1048576] if index == 0 else content[1048576:]
+        blob = {"chunked": True, "offset": 0 if index == 0 else 1048576,
+            "size": len(content), "sha256": expected, "chunk_size": len(part),
+            "data_b64": base64.urlsafe_b64encode(part).decode(),
+            "next_offset": 1048576 if index == 0 else None}
+        if index == 1:
+            if damage == "changed": blob["sha256"] = "0" * 64
+            if damage == "offset": blob["offset"] = 0
+            if damage == "digest": blob["data_b64"] = base64.b64encode(b"oops").decode()
+            if damage == "truncated": blob["data_b64"] = ""
+            if damage == "stalled": blob["next_offset"] = 1048576
+            if damage == "protocol": blob = {"data_b64": base64.b64encode(part).decode()}
+        return blob
+    monkeypatch.setattr(cmd.api, "call", call)
+    target = tmp_path / "existing.zip"
+    target.write_bytes(b"keep")
+    with pytest.raises(cmd.api.ApiError):
+        cmd.gmail_attachment("http://api", "m", "a", account=ACCOUNT_A, out=str(target))
+    assert target.read_bytes() == b"keep"
+    assert list(tmp_path.iterdir()) == [target]
+
+
+@pytest.mark.parametrize("uncertain", [False, True])
+def test_large_drive_upload_no_binary_lambda_ingress(monkeypatch, tmp_path, uncertain, capsys):
+    import hashlib
+    import json
+    from dapier_cli.commands import gdrive as cmd
+    content = b"synthetic" * 570000
+    target = tmp_path / "large.zip"
+    target.write_bytes(content)
+    md5 = hashlib.md5(content).hexdigest()
+    capability = "https://www.googleapis.com/upload/drive/v3/files?upload_id=synthetic-private"
+    native, chunks = [], []
+    def api_call(api_url, method, path, body=None, **kwargs):
+        native.append((method, path, body))
+        if method == "POST":
+            assert "content_b64" not in body and body["size"] == len(content)
+            assert body["account"] == ACCOUNT_A and body["folder_id"] == "FOLDER"
+            return {"upload_url": capability}
+        assert "account=" in path
+        return {"id": "file1", "name": "large.zip", "size": len(content), "md5_checksum": md5}
+    def session(url, part, headers):
+        assert url == capability and "Authorization" not in headers
+        chunks.append((part, headers))
+        if uncertain and len(chunks) == 1:
+            return 503, b"", {}
+        if headers["Content-Range"].startswith("bytes */"):
+            return 308, b"", {"Range": "bytes=0-1048575"}
+        end = int(headers["Content-Range"].split("-")[1].split("/")[0])
+        if end + 1 == len(content):
+            return 200, json.dumps({"id": "file1", "size": str(len(content)), "md5Checksum": md5}).encode(), {}
+        return 308, b"", {"Range": f"bytes=0-{end}"}
+    monkeypatch.setattr(cmd.api, "call", api_call)
+    monkeypatch.setattr(cmd, "_session_request", session)
+    cmd.gdrive_upload("http://api", str(target), account=ACCOUNT_A, folder="FOLDER", as_json=True)
+    assert len(native) == 2 and native[0][0] == "POST" and native[1][0] == "GET"
+    assert "upload_id" not in capsys.readouterr().out
+    if uncertain:
+        assert chunks[1][1]["Content-Range"] == f"bytes */{len(content)}"
+    else:
+        assert b"".join(c[0] for c in chunks) == content
+
+
+@pytest.mark.parametrize("url", ["https://evil.example/upload?upload_id=x",
+    "http://www.googleapis.com/upload/drive/v3/files?upload_id=x",
+    "https://www.googleapis.com:443/upload/drive/v3/files?upload_id=x",
+    "https://www.googleapis.com/other?upload_id=x"])
+def test_drive_upload_refuses_foreign_session(monkeypatch, url):
+    from dapier_cli.commands import gdrive as cmd
+    monkeypatch.setattr(cmd, "_session_request", lambda *a: pytest.fail("foreign URL not contacted"))
+    with pytest.raises(cmd.api.ApiError, match="Invalid Drive upload session"):
+        cmd._upload_session(url, b"bytes", "application/zip")
+
+
+@pytest.mark.parametrize("status,body,headers", [
+    (410, b"expired", {}), (302, b"", {"Location": "https://evil.example"}),
+    (200, b'{"id":"file1","size":"5","md5Checksum":"bad"}', {}),
+    (308, b"", {"Range": "bytes=0-99999"})])
+def test_drive_upload_failure_redacts_capability(monkeypatch, status, body, headers):
+    from dapier_cli.commands import gdrive as cmd
+    monkeypatch.setattr(cmd, "_session_request", lambda *a: (status, body, headers))
+    with pytest.raises(cmd.api.ApiError) as error:
+        cmd._upload_session("https://www.googleapis.com/upload/drive/v3/files?upload_id=private", b"bytes", "application/zip")
+    assert "upload_id" not in str(error.value) and "private" not in str(error.value)

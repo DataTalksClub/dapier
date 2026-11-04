@@ -18,7 +18,8 @@ to Drive. Shared drives ride ``supportsAllDrives`` everywhere.
 import base64
 import json
 import re
-from urllib.parse import quote, urlencode
+import urllib.request
+from urllib.parse import quote, urlencode, urlsplit
 
 from ...connections import discovery as provider
 from ...connections import tokens
@@ -29,7 +30,7 @@ DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 200
 
-FILE_FIELDS = ("id,name,mimeType,size,createdTime,modifiedTime,webViewLink,"
+FILE_FIELDS = ("id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,webViewLink,"
                "iconLink,trashed,parents,owners(displayName,emailAddress),"
                "capabilities(canEdit,canShare),fileExtension,fullFileExtension")
 
@@ -113,6 +114,7 @@ def _file_view(item):
     return {
         "id": item.get("id"),
         "name": item.get("name"),
+        "md5_checksum": item.get("md5Checksum"),
         "mime_type": item.get("mimeType"),
         "size": int(item["size"]) if str(item.get("size") or "").isdigit() else None,
         "created_time": item.get("createdTime"),
@@ -256,6 +258,42 @@ def download(account, file_id, export_mime=None):
 
 
 # --- mutations ------------------------------------------------------------------
+
+
+class _NoUploadRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def start_upload(account, name, size, mime_type=None, folder_id=None):
+    """Authorize one Google resumable upload; no file bytes cross Lambda ingress."""
+    if not isinstance(size, int) or isinstance(size, bool) or size < 1:
+        raise GDriveOpsError("upload size must be a positive integer")
+    metadata = {"name": str(name or "").strip(), "mimeType": mime_type or "application/octet-stream"}
+    if not metadata["name"]:
+        raise GDriveOpsError("a file name is required")
+    if folder_id:
+        metadata["parents"] = [folder_id]
+    _connection_id, _connection, token = _connection_and_token(account)
+    url = DRIVE_UPLOAD_URL + "?" + urlencode({"uploadType": "resumable",
+        "supportsAllDrives": "true", "fields": FILE_FIELDS})
+    request = urllib.request.Request(url, data=json.dumps(metadata).encode(), method="POST", headers={
+        "Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8",
+        "X-Upload-Content-Type": metadata["mimeType"], "X-Upload-Content-Length": str(size)})
+    try:
+        with urllib.request.build_opener(_NoUploadRedirect).open(request, timeout=30) as response:
+            session_url = response.headers.get("Location", "")
+            status = response.status
+    except Exception as exc:
+        # Provider exception strings can contain the sensitive upload capability.
+        code = getattr(exc, "code", 502)
+        raise GDriveOpsError("Drive upload session initialization failed", status=code) from None
+    parsed = urlsplit(session_url)
+    if (status not in (200, 201) or parsed.scheme != "https" or parsed.netloc != "www.googleapis.com"
+            or parsed.path != "/upload/drive/v3/files" or parsed.fragment
+            or not parsed.query or "upload_id=" not in parsed.query):
+        raise GDriveOpsError("Drive returned an invalid upload session", status=502)
+    return {"upload_url": session_url, "size": size}
 
 
 def upload(account, name, content_b64, mime_type=None, folder_id=None):
