@@ -305,6 +305,10 @@ sam deploy --config-env sandbox --parameter-overrides OperatorEmails=you@datatal
 ```
 
 Install the operator CLI from this repo and sign in with the same DTC identity.
+CLI stdout and stderr use UTF-8, including when piped or redirected on Windows.
+Read saved output as UTF-8 to preserve Unicode message bodies and JSON values;
+no `PYTHONUTF8` or `PYTHONIOENCODING` setting is required.
+
 `dapier auth login` pairs the device: it prints a short code and opens
 `https://dapier.dtcdev.click/device`, where you enter the code after signing in
 through DTC (GitHub-style device flow — no localhost listener). Approving

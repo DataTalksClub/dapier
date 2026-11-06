@@ -12,6 +12,12 @@ from .cli import build_parser, dispatch
 
 
 def main(argv=None):
+    # Redirected Windows streams otherwise use the legacy locale encoding.
+    # Keep JSON, message bodies and diagnostics lossless in pipes and files.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
     raw = list(sys.argv[1:] if argv is None else argv)
     # Split the child command on the first `--` before argparse sees it, so
     # child flags never confuse option parsing (nargs=REMAINDER would swallow
