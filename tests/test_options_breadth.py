@@ -81,6 +81,12 @@ def test_option_fetches_map_the_event_slot_to_the_listing_params(monkeypatch):
     _options("youtube", "youtube.playlist_items", event="UU1234-abcd")
     assert seen[-1] == ("youtube.playlist_items", "conn-1", 5, {"playlist_id": "UU1234-abcd"})
 
+    _options("youtube", "youtube.broadcasts", event="upcoming/page-two")
+    assert seen[-1] == ("youtube.broadcasts", "conn-1", 5,
+                        {"status": "upcoming", "page_token": "page-two"})
+    _options("youtube", "youtube.broadcasts")
+    assert seen[-1] == ("youtube.broadcasts", "conn-1", 5, {"status": "upcoming"})
+
     # Two params: "<required>/<optional tail>" — a missing tail keeps the
     # provider default (worksheet defaults to Sheet1).
     _options("google-sheets", "google-sheets.rows", event="sheet-1/Tab 2")
