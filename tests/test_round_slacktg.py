@@ -11,6 +11,7 @@ types are registered with their field specs and discover markers, and that
 a chain using them validates.
 """
 import json
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -223,8 +224,11 @@ def test_find_message_searches_and_shapes_the_matches(monkeypatch):
         "user": "U1", "text": "deploy done",
         "permalink": "https://slack.com/archives/C1/p1758900012000300"}]
     call = transport.calls[0]
-    assert call["url"] == "https://slack.com/api/search.messages"
-    assert json.loads(call["body"]) == {"query": "ship it", "count": 5}
+    assert call["method"] == "GET"
+    assert urlsplit(call["url"]).path == "/api/search.messages"
+    assert parse_qs(urlsplit(call["url"]).query) == {"query": ["ship it"], "count": ["5"]}
+    assert call["body"] is None
+    assert call["headers"] == {"authorization": "Bearer xoxb-tok"}
 
 
 def test_find_message_miss_is_a_verdict_not_an_error(monkeypatch):
@@ -237,7 +241,7 @@ def test_find_message_miss_is_a_verdict_not_an_error(monkeypatch):
         SLACK_EVENT, transport=transport)
     assert output == {"found": False, "messages": [], "count": 0}
     # count is optional: the default page size applies.
-    assert json.loads(transport.calls[0]["body"])["count"] == 20
+    assert parse_qs(urlsplit(transport.calls[0]["url"]).query)["count"] == ["20"]
 
 
 def test_find_message_slack_errors_raise(monkeypatch):

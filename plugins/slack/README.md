@@ -135,4 +135,16 @@ and `{ts}`.
 | `slack_schedule_message` | `chat.scheduleMessage` | send for later; `post_at` takes an ISO 8601 datetime (a missing offset reads as UTC) or epoch seconds; `thread_ts` schedules the reply into one thread |
 | `slack_add_reminder` | `reminders.add` | set one reminder; `time` takes Slack's natural-language times (`in 20 minutes`, `tomorrow 9am`) or epoch seconds — empty = Slack's default (20 minutes); the reminder belongs to the token's own user; output `{ok, reminder: {id, time, text}}` |
 
+`slack_find_message` is read-only and uses an existing user connection with
+`search:read`; a bot-only connection cannot search the workspace. In a workflow,
+set `type: slack_find_message`, the approved `connection_id`, a Slack search
+`query` (for example `in:release-notes "media agent"`) and optional `count`.
+Run it through `dapier workflows test-step workflow.json --action find --event '{}' --execute`
+to perform the provider read; without `--execute` the command only renders inputs.
+The runner calls Slack's documented authenticated GET endpoint with URL-encoded
+query parameters. `search.messages` does not accept the JSON POST used by Slack
+message mutation actions. Tokens stay in the Authorization header. A provider
+error remains an error; do not switch accounts or expand grants to bypass it.
+See [Slack's search.messages reference](https://docs.slack.dev/reference/methods/search.messages/).
+
 

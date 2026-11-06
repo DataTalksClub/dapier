@@ -9,6 +9,7 @@ import json
 import mimetypes
 import os
 import re
+from urllib.parse import urlencode
 
 from src.dapier.connections import credentials
 from src.dapier.engine import logic_pkg as logic
@@ -90,8 +91,8 @@ def run_slack(action, event, *, steps=None):
     return {"ok": True, "channel": result.get("channel"), "ts": result.get("ts")}
 
 
-def _slack_rpc(url, token, payload, *, transport=None):
-    """One Slack Web API POST through the injectable transport.
+def _slack_rpc(url, token, payload, *, transport=None, method="POST"):
+    """One Slack Web API request through the injectable transport.
 
     Unlike ``run_slack`` (which sits on ``base._json_request`` with no seam),
     this takes ``transport`` so tests can fake the network. Returns the parsed
@@ -99,14 +100,16 @@ def _slack_rpc(url, token, payload, *, transport=None):
     Slack error code when the body carries one.
     """
     transport = transport or base._default_transport
+    headers = {"authorization": f"Bearer {token}"}
+    body = None
+    if method == "GET":
+        url = f"{url}?{urlencode(payload)}"
+    else:
+        headers["content-type"] = "application/json"
+        body = json.dumps(payload).encode()
     try:
         status, raw = transport(
-            "POST", url,
-            headers={
-                "authorization": f"Bearer {token}",
-                "content-type": "application/json",
-            },
-            body=json.dumps(payload).encode(),
+            method, url, headers=headers, body=body,
             timeout=15,
         )
     except Exception as exc:
@@ -555,7 +558,7 @@ def run_slack_find_message(action, event, *, steps=None, transport=None):
         raise ValueError("slack_find_message requires a rendered query")
     data = _slack_rpc(SLACK_SEARCH_URL, token,
                       {"query": query, "count": _search_count(action.get("count"))},
-                      transport=transport)
+                      transport=transport, method="GET")
     if not data.get("ok"):
         raise RuntimeError(f"Slack find failed: {data.get('error', 'unknown_error')}")
     matches = [match for match in (data.get("messages") or {}).get("matches") or []
