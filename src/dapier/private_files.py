@@ -32,7 +32,7 @@ def protect(path):
         $acl.SetAccessRuleProtection($true, $false)
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'Allow')
         $acl.AddAccessRule($rule)
-        Set-Acl -LiteralPath $env:DAPIER_PRIVATE_PATH -AclObject $acl
+        [System.IO.File]::SetAccessControl($env:DAPIER_PRIVATE_PATH, $acl)
     """)
 
 

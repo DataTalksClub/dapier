@@ -10,6 +10,8 @@ def test_protected_token_is_private(tmp_path):
     path = tmp_path / "token with spaces.txt"
     path.write_text("secret")
     protect(path)
+    # Reapplying protection must not request the Windows audit privilege.
+    protect(path)
     require_private(path)
     assert path.read_text() == "secret"
 
