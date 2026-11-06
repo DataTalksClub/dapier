@@ -45,7 +45,7 @@ def live_token(monkeypatch):
 def test_youtube_catalog_lists_channel_playlists_playlist_items_and_videos():
     resources = discovery.resources_for("youtube")
     assert [resource.name for resource in resources] == \
-        ["channel", "playlists", "playlist_items", "videos"]
+        ["channel", "playlists", "playlist_items", "videos", "broadcasts"]
     playlist_items = resources[2]
     assert [(param.name, param.required) for param in playlist_items.params] == \
         [("playlist_id", True)]
@@ -166,7 +166,56 @@ def test_registry_runners_delegate_to_the_matching_resource(monkeypatch):
     assert sorted(seen) == sorted([("yt-main", "channel", {"a": "b"}),
                                    ("yt-main", "playlists", {"a": "b"}),
                                    ("yt-main", "playlist_items", {"a": "b"}),
-                                   ("yt-main", "videos", {"a": "b"})])
+                                   ("yt-main", "videos", {"a": "b"}),
+                                   ("yt-main", "broadcasts", {"a": "b"})])
+
+
+def test_broadcasts_include_upcoming_details_and_continuation():
+    from urllib.parse import parse_qs, urlparse
+
+    transport = FakeTransport(("liveBroadcasts?", 200, {
+        "items": [{"id": "scheduled-1", "snippet": {
+            "title": "A future Q&A", "channelId": "UCfixture",
+            "description": "Existing speaker details",
+            "scheduledStartTime": "2027-03-02T16:00:00Z",
+        }, "status": {"lifeCycleStatus": "ready", "privacyStatus": "unlisted"}}],
+        "nextPageToken": "page-two",
+    }))
+    items = discovery.discover(CONNECTION, "broadcasts", {}, transport=transport)
+    assert items[0]["id"] == "scheduled-1"
+    assert items[0]["channel_id"] == "UCfixture"
+    assert items[0]["scheduled_start"] == "2027-03-02T16:00:00Z"
+    assert items[0]["description"] == "Existing speaker details"
+    assert items[0]["privacy_status"] == "unlisted"
+    assert items[0]["next_page_token"] == "page-two"
+    query = parse_qs(urlparse(transport.calls[0]["url"]).query)
+    assert query["broadcastStatus"] == ["upcoming"]
+    assert query["broadcastType"] == ["all"]
+    assert "mine" not in query
+
+
+def test_broadcasts_follow_explicit_page_and_preserve_empty_result():
+    transport = FakeTransport(("pageToken=page-two", 200, {"items": []}))
+    assert discovery.discover(CONNECTION, "broadcasts", {
+        "status": "all", "page_token": "page-two", "limit": 100,
+    }, transport=transport) == []
+    assert "maxResults=50" in transport.calls[0]["url"]
+
+
+def test_broadcasts_reject_invalid_status():
+    transport = FakeTransport()
+    with pytest.raises(discovery.DiscoveryError, match="status must"):
+        discovery.discover(CONNECTION, "broadcasts", {"status": "draft"},
+                           transport=transport)
+    assert not transport.calls
+
+
+def test_empty_incomplete_broadcast_page_is_not_reported_as_absent():
+    transport = FakeTransport(("liveBroadcasts?", 200, {
+        "items": [], "nextPageToken": "more",
+    }))
+    with pytest.raises(discovery.DiscoveryError, match="empty broadcast page"):
+        discovery.discover(CONNECTION, "broadcasts", {}, transport=transport)
 
 
 def test_youtube_connection_test_reports_the_channel_identity(monkeypatch):
