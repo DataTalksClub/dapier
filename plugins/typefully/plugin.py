@@ -2,6 +2,8 @@
 import json
 import re
 import time
+from http import HTTPStatus
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 
 from src.dapier.connections import credentials
@@ -17,6 +19,16 @@ MEDIA_POLL_ATTEMPTS = 10
 MEDIA_POLL_INTERVAL_SECONDS = 2.0
 
 
+def _http_error(status):
+    # Use only standard reason phrases. Provider bodies, exception reasons and
+    # URLs can contain credentials or echo private draft content.
+    try:
+        phrase = HTTPStatus(status).phrase
+    except ValueError:
+        phrase = None
+    return ValueError(f"Typefully returned HTTP {status}" + (f" ({phrase})" if phrase else ""))
+
+
 def request(path, connection=None, *, method="GET", body=None, transport=None):
     secret = credentials.get_credential((connection or {}).get("credential_id") or "typefully")
     key = secret.get("api_key")
@@ -30,10 +42,12 @@ def request(path, connection=None, *, method="GET", body=None, transport=None):
     try:
         status, raw = (transport or base._default_transport)(
             method, API_ROOT + path, headers=headers, body=payload, timeout=30)
+    except HTTPError as error:
+        raise _http_error(error.code) from None
     except Exception:
         raise ValueError("Typefully is unreachable") from None
     if status not in (200, 201):
-        raise ValueError(f"Typefully returned HTTP {status}")
+        raise _http_error(status)
     if status == 204 or raw in (None, b"", ""):
         return {}
     try:
