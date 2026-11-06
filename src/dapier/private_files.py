@@ -5,9 +5,18 @@ import subprocess
 
 def _windows_acl(path, script):
     env = dict(os.environ, DAPIER_PRIVATE_PATH=os.fspath(path))
+    # A Python child of PowerShell 7 inherits its module paths. Windows
+    # PowerShell must load its own Security module, not the incompatible
+    # version from the parent shell's PSModulePath.
+    bootstrap = (
+        "$ErrorActionPreference = 'Stop'; "
+        "Import-Module (Join-Path $PSHOME "
+        "'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1') "
+        "-ErrorAction Stop; "
+    )
     return subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-         "$ErrorActionPreference = 'Stop'; " + script],
+         bootstrap + script],
         env=env, capture_output=True, text=True, check=True,
     ).stdout.strip()
 

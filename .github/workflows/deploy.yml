@@ -17,6 +17,17 @@ env:
   AWS_REGION: eu-west-1
 
 jobs:
+  windows-private-files:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify Windows credential file ACLs
+        run: uv run --with pytest pytest --noconftest -q tests/test_private_files.py
+
   test:
     runs-on: ubuntu-latest
     steps:
