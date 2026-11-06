@@ -434,6 +434,45 @@ def _youtube_videos(connection, token, params, limit, *, transport=None):
                                    limit, transport=transport)
 
 
+def _youtube_broadcasts(connection, token, params, limit, *, transport=None):
+    """Read scheduled streams separately from uploaded videos.
+
+    The status filter scopes liveBroadcasts.list to the authenticated channel;
+    it must not be combined with the mutually exclusive mine filter.
+    """
+    status = params.get("status", "upcoming")
+    if status not in {"upcoming", "active", "completed", "all"}:
+        raise DiscoveryError("broadcasts status must be upcoming, active, completed or all")
+    query = {"part": "snippet,status", "broadcastStatus": status,
+             "broadcastType": "all", "maxResults": min(limit, 50)}
+    if params.get("page_token"):
+        query["pageToken"] = params["page_token"]
+    url = f"{YOUTUBE_API_URL}/liveBroadcasts?" + urllib.parse.urlencode(query)
+    data = _request("GET", url, token, None, transport=transport)
+    items = []
+    for entry in data.get("items") or []:
+        if not isinstance(entry, dict) or not entry.get("id"):
+            continue
+        snippet = entry.get("snippet") or {}
+        state = entry.get("status") or {}
+        items.append({
+            "id": entry["id"], "name": snippet.get("title") or entry["id"],
+            "channel_id": snippet.get("channelId"),
+            "scheduled_start": snippet.get("scheduledStartTime"),
+            "scheduled_end": snippet.get("scheduledEndTime"),
+            "lifecycle_status": state.get("lifeCycleStatus"),
+            "privacy_status": state.get("privacyStatus"),
+            "description": snippet.get("description", ""),
+            "url": f"https://www.youtube.com/watch?v={entry['id']}",
+        })
+    if data.get("nextPageToken"):
+        if not items:
+            raise DiscoveryError("YouTube returned an empty broadcast page with a continuation token",
+                                 status=502)
+        items[-1]["next_page_token"] = data["nextPageToken"]
+    return items
+
+
 # --- Dropbox ---
 
 
@@ -758,6 +797,10 @@ CATALOG = {
                  (Param("playlist_id", True, "Playlist ID from the playlists list"),)),
         Resource("videos", "Channel videos", "The channel's recent uploads, newest first",
                  _youtube_videos),
+        Resource("broadcasts", "Live broadcasts", "Owned live broadcasts (default: upcoming)",
+                 _youtube_broadcasts,
+                 (Param("status", False, "upcoming (default), active, completed or all"),
+                  Param("page_token", False, "next_page_token from the last result row"))),
     ],
     "dropbox": [
         Resource("folder", "Folder entries",

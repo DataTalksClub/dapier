@@ -299,6 +299,23 @@ register_discovery(Discovery(
 ))
 
 
+def _run_broadcasts(connection, params, *, transport=None):
+    return provider.discover(connection, "broadcasts", params, transport=transport)
+
+
+register_discovery(Discovery(
+    name="broadcasts",
+    connector="youtube",
+    label="Live broadcasts",
+    description="Owned live broadcasts (default: upcoming), including scheduled streams",
+    params=({"key": "status", "label": "Status (upcoming, active, completed, all)",
+             "type": "text", "required": False},
+            {"key": "page_token", "label": "Next page token", "type": "text",
+             "required": False}),
+    run=_run_broadcasts,
+))
+
+
 def _run_test(connection, *, transport=None):
     return provider.test_connection(connection, transport=transport)
 

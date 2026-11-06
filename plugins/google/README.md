@@ -9,6 +9,30 @@ completes consent.
 See the [shared connector procedures](../../docs/connectors/README.md) for OAuth credential
 rotation, CLI operations, and the general process for changing scopes.
 
+## Discover scheduled YouTube broadcasts
+
+`videos` lists recent uploads, which does not establish whether a scheduled
+stream exists. Use the existing authorized YouTube connection and the shared
+discovery API/console resource instead:
+
+```bash
+dapier connections show youtube datatalks
+dapier connections discover youtube:datatalks broadcasts
+dapier connections discover youtube:datatalks broadcasts --param status=all
+dapier connections discover youtube:datatalks broadcasts --param page_token=NEXT_TOKEN
+```
+
+The default is `status=upcoming`; `active`, `completed` and `all` are also
+supported. Verify `channel_id`, title and `scheduled_start` against the owning
+event before changing anything. Results include the existing description and
+privacy/lifecycle state. If the final row has `next_page_token`, continue with
+that token and the same status before concluding a target is absent.
+
+This resource uses Google's [liveBroadcasts.list](https://developers.google.com/youtube/data/live/reference/rest/v3/liveBroadcasts/list)
+and works with `youtube.readonly`. It creates or changes no broadcast. A read
+grant does not authorize metadata or thumbnail writes; do not broaden an OAuth
+grant to bypass a missing write permission.
+
 ## Current configuration
 
 - Google Cloud project: **`dtcdev-click`**.
