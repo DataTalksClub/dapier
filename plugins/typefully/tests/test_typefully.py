@@ -1,6 +1,7 @@
 import io
 import json
 import sys
+from urllib.error import HTTPError, URLError
 import pytest
 from plugins.typefully import plugin
 from src.dapier.connections import credentials
@@ -39,6 +40,39 @@ def test_request_scopes_bearer_to_fixed_provider(monkeypatch):
     assert plugin.request("/me", transport=transport) == {"id": 7}
     assert calls[0][0:2] == ("GET", "https://api.typefully.com/v2/me")
     assert calls[0][2]["headers"]["authorization"] == "Bearer secret"
+
+
+@pytest.mark.parametrize("status, phrase", [(400, "Bad Request"), (401, "Unauthorized"), (422, "Unprocessable Entity"), (429, "Too Many Requests"), (503, "Service Unavailable")])
+def test_request_reports_http_rejection_without_echoing_private_response(monkeypatch, status, phrase):
+    monkeypatch.setattr(credentials, "get_credential", lambda _: {"api_key": "private-key"})
+
+    def reject(request, timeout):
+        raise HTTPError(
+            "https://api.typefully.com/v2/private-url", status, "private exception reason",
+            {"Authorization": "Bearer private-key", "X-Private": "private-header"},
+            io.BytesIO(b'{"error":"private-draft-content private-key"}'),
+        )
+
+    monkeypatch.setattr(plugin.base.urllib.request, "urlopen", reject)
+    with pytest.raises(ValueError) as caught:
+        plugin.request("/social-sets/7/drafts/9", method="PATCH", body={"text": "private-draft-content"})
+    expected = {f"Typefully returned HTTP {status} ({phrase})"}
+    if status == 422:
+        # Python 3.13+ uses the updated standard phrase for this status.
+        expected.add("Typefully returned HTTP 422 (Unprocessable Content)")
+    assert str(caught.value) in expected
+
+
+def test_request_keeps_network_failures_private_and_handles_returned_http_status(monkeypatch):
+    monkeypatch.setattr(credentials, "get_credential", lambda _: {"api_key": "private-key"})
+
+    def unavailable(*args, **kwargs):
+        raise URLError("private-key private network reason")
+
+    with pytest.raises(ValueError, match="^Typefully is unreachable$"):
+        plugin.request("/me", transport=unavailable)
+    with pytest.raises(ValueError, match=r"^Typefully returned HTTP 403 \(Forbidden\)$"):
+        plugin.request("/me", transport=lambda *args, **kwargs: (403, b"private-key"))
 
 
 def test_discovery_paginates_without_trusting_next_url(monkeypatch):
