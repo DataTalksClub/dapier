@@ -25,8 +25,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Verify Windows credential file ACLs
-        run: uv run --with pytest pytest --noconftest -q tests/test_private_files.py
+      - name: Verify Windows credential file ACLs and CLI output
+        run: uv run --with pytest pytest --noconftest -q tests/test_private_files.py tests/test_cli_encoding.py
 
   test:
     runs-on: ubuntu-latest
