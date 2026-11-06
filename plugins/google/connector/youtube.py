@@ -561,6 +561,19 @@ register_trigger_discovery(TriggerDiscovery(
     fetch=_fetch_video_options))
 
 
+def _fetch_broadcast_options(event=None, connection_id=None, limit=DEFAULT_LIMIT):
+    return trigger_discovery.options_from_registry(
+        "youtube.broadcasts", connection_id, limit, provider="youtube",
+        params=trigger_discovery.listing_params(event or "upcoming", ("status", "page_token")),
+        option_of=lambda item: {"value": item.get("id"),
+                                "label": item.get("name") or item.get("id")})
+
+
+register_trigger_discovery(TriggerDiscovery(
+    connector="youtube", label="YouTube", kind="options", resource="youtube.broadcasts",
+    fetch=_fetch_broadcast_options))
+
+
 def _live_upload(connection, *, transport=None):
     """The connected channel's newest upload as a video.published data dict.
 
