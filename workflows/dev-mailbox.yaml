@@ -1,6 +1,6 @@
 id: dev-mailbox
 enabled: true
-description: Developer mailbox dev@dtcdev.click -> Developer bot webhook
+description: Developer mailbox dev@dtcdev.click -> Developer bot webhook + direct oncall ingest
 triggers:
   - connector: email
     event: message.received
@@ -20,6 +20,14 @@ actions:
   - id: get-token
     type: storage_get
     key: webhook_token
+  - id: get-oncall-url
+    type: storage_get
+    key: oncall_webhook_url
+    secret: true
+  - id: get-oncall-token
+    type: storage_get
+    key: oncall_webhook_token
+    secret: true
   - id: format-email
     type: code
     code: |
@@ -117,6 +125,17 @@ actions:
           "text_body": text,
           "attachments": attachments,
       }
+  - id: oncall-delivery-id
+    type: code
+    code: |
+      import hashlib
+      import json
+
+      _payload = ((steps.get("format-email") or {}).get("output") or {}).get("result") or {}
+      _identity = str(_payload.get("message_id") or "").strip()
+      if not _identity:
+          _identity = json.dumps(_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+      output = hashlib.sha256(_identity.encode("utf-8")).hexdigest()
   - id: post-webhook
     type: http_request
     method: POST
@@ -125,3 +144,26 @@ actions:
     auth_token: "{steps.get-token.output.value}"
     content_type: application/json
     body: "{steps.format-email.output.result}"
+    on_error: continue
+  - id: post-oncall-ingest
+    type: http_request
+    method: POST
+    url: "{steps.get-oncall-url.output.value}"
+    auth_type: bearer
+    auth_token: "{steps.get-oncall-token.output.value}"
+    headers:
+      X-Delivery-Id: "{steps.oncall-delivery-id.output.result}"
+    content_type: application/json
+    body: "{steps.format-email.output.result}"
+    on_error: continue
+  - id: verify-both-deliveries
+    type: code
+    code: |
+      failed = []
+      for step_id in ("post-webhook", "post-oncall-ingest"):
+          step = steps.get(step_id) or {}
+          if step.get("status") != "completed":
+              failed.append(step_id)
+      if failed:
+          raise ValueError("dev-mailbox delivery failed for: " + ", ".join(failed))
+      output = {"developer_webhook": "completed", "oncall_ingest": "completed"}

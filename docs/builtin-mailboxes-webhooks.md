@@ -93,19 +93,29 @@ trigger:
 
 | Address | Webhook | Workflow | Destination |
 | --- | --- | --- | --- |
-| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Developer bot webhook |
+| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Developer bot webhook + direct oncall ingest |
 | `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | Tofu Grok bot webhook |
 | `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | Orin Grok bot webhook |
 
-Notify path: each mailbox workflow (`dev-mailbox`, `tofu-mailbox`,
-`orin-mailbox`) forwards directly to its own Grok bot webhook via HTTP POST
-without running an agent and without sending any email. Each workflow reads
-its own storage keys `webhook_url` / `webhook_token` (per-workflow storage,
-same shape for all three), fails fast with a clear error naming the missing
-keys when either is unset (no POST to an empty URL), and POSTs JSON with
-`from`, `to`, `subject`, `snippet` (first 200 chars of the plain-text body),
-`text` (full body), `date`, `message_id` (dedupe), and attachments metadata
-(filename, content_type, size, plus checksum/content_id when present).
+Notify path: `dev-mailbox` posts every dev@ alert to both the existing
+Developer/Grok webhook and the direct oncall ingest at
+`https://hub.dtcdev.click/webhooks/oncall`. The direct receiver is Hub2, a
+Node server on the GCP VM with a durable SQLite queue. The Hub host polls that
+queue and invokes `~/bin/oncall-send` followed by `~/bin/orch-send`; those
+helpers save to the oncall inbox before waking live sessions. The two HTTP
+actions continue independently, then the workflow fails if either one did
+not complete so Dapier retries the event. A stable delivery ID makes replay
+of the direct ingest idempotent. Developer remains on the path until its hop
+is intentionally removed after the direct path is proven.
+
+`dev-mailbox` reads `webhook_url` / `webhook_token` for the existing
+Developer/Grok endpoint and `oncall_webhook_url` / `oncall_webhook_token` for
+Hub2. Keep all values in workflow storage. The tofu and orin workflows still
+read only their own `webhook_url` / `webhook_token` keys and post to their own
+Grok webhooks. Each webhook payload includes `from`, `to`, `subject`,
+`snippet` (first 200 chars of the plain-text body), `text` (full body), `date`,
+`message_id`, and attachments metadata (filename, content_type, size, plus
+checksum/content_id when present).
 
 Loop safety: the mailbox workflows contain no email-send step, and the bot's
 own outgoing/notification senders stay off the sender allowlists, so a bot
@@ -138,6 +148,12 @@ dapier emails list          # expect dev@, tofu@, orin@
 # leading "Bearer " prefix; values are never printed in logs or reports.
 dapier storage set dev-mailbox webhook_url "https://api2.cursor.sh/automations/webhook/<target-id>"
 dapier storage set dev-mailbox webhook_token "<developer-bot-bearer-token>"
+# Hub2 setup creates one-time ingest and poll tokens through
+# POST https://hub.dtcdev.click/api/oncall-alerts/config. Store the ingest
+# token only in Dapier; store the poll token in the Hub host's private
+# oncall-alerts.json config. Never put either token in Git or a report.
+dapier storage set dev-mailbox oncall_webhook_url "https://hub.dtcdev.click/webhooks/oncall"
+dapier storage set dev-mailbox oncall_webhook_token "<Hub2-ingest-token>"
 dapier storage set tofu-mailbox webhook_url "<tofu-bot-webhook-url>"
 dapier storage set tofu-mailbox webhook_token "<tofu-bot-bearer-token>"
 dapier storage set orin-mailbox webhook_url "<orin-bot-webhook-url>"
