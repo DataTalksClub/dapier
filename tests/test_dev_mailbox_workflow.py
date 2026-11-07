@@ -1,4 +1,4 @@
-"""Tests verifying the per-bot mailbox workflows (email -> Grok bot webhook).
+"""Tests verifying per-bot mailbox workflows and dev dual delivery.
 
 Acceptance criteria (dev / tofu / orin):
 - mail to <bot>@dtcdev.click triggers <bot>-mailbox workflow, enabled
@@ -66,8 +66,14 @@ def test_bot_mailbox_definition(workflow_id, route, address):
     assert "http_request" in action_types
 
     storage_keys = sorted(a.get("key") for a in actions if a.get("type") == "storage_get")
-    assert storage_keys == ["webhook_token", "webhook_url"]
+    expected_storage_keys = ["webhook_token", "webhook_url"]
+    if workflow_id == "dev-mailbox":
+        expected_storage_keys += ["oncall_webhook_token", "oncall_webhook_url"]
+    assert storage_keys == sorted(expected_storage_keys)
     assert next(a for a in actions if a.get("key") == "webhook_url")["secret"] is True
+    if workflow_id == "dev-mailbox":
+        assert next(a for a in actions if a.get("key") == "oncall_webhook_url")["secret"] is True
+        assert next(a for a in actions if a.get("key") == "oncall_webhook_token")["secret"] is True
 
     http_action = next(a for a in actions if a.get("type") == "http_request")
     assert http_action["method"] == "POST"
@@ -109,6 +115,16 @@ def test_dev_mailbox_definition():
     assert "storage_get" in action_types
     assert "code" in action_types
     assert "http_request" in action_types
+    assert [a["id"] for a in actions if a.get("type") == "http_request"] == [
+        "post-webhook", "post-oncall-ingest",
+    ]
+    assert all(a.get("on_error") == "continue" for a in actions if a.get("type") == "http_request")
+    oncall_action = next(a for a in actions if a.get("id") == "post-oncall-ingest")
+    assert oncall_action["url"] == "{steps.get-oncall-url.output.value}"
+    assert oncall_action["headers"]["X-Delivery-Id"] == "{steps.oncall-delivery-id.output.result}"
+    assert oncall_action["auth_type"] == "bearer"
+    verify_action = next(a for a in actions if a.get("id") == "verify-both-deliveries")
+    assert verify_action["type"] == "code"
 
     # Ensure no secrets or tokens are committed in the YAML
     assert "crsr_" not in raw_yaml
@@ -237,6 +253,18 @@ def test_dev_mailbox_code_action_payload_formatting():
     assert result["attachments"][0]["checksum"] == "abc123def456"
 
 
+def test_dev_mailbox_oncall_delivery_id_is_stable_and_separate_from_developer_payload():
+    _, wf = _load("dev-mailbox")
+    id_action = next(a for a in wf["actions"] if a.get("id") == "oncall-delivery-id")
+    payload = {"message_id": "<stable-message-id@example.invalid>", "subject": "Alert"}
+    steps = {"format-email": {"status": "completed", "output": {"result": payload}}}
+    first = run_code(id_action, {"connector": "email", "data": {}}, steps=steps)["result"]
+    second = run_code(id_action, {"connector": "email", "data": {}}, steps=steps)["result"]
+    assert len(first) == 64
+    assert first == second
+    assert "delivery_id" not in payload
+
+
 def test_dev_mailbox_code_action_with_s3_body_pointer():
     wf_path = Path(__file__).parent.parent / "workflows/dev-mailbox.yaml"
     wf = yaml.safe_load(wf_path.read_text())
@@ -356,6 +384,50 @@ def test_dev_mailbox_http_request_delivery():
     sent_data = json.loads(captured["body"].decode("utf-8"))
     assert sent_data["subject"] == "Webhook test"
     assert sent_data["text"] == "Hello developer webhook"
+
+
+def test_dev_mailbox_oncall_http_request_delivery():
+    _, wf = _load("dev-mailbox")
+    action = next(a for a in wf["actions"] if a.get("id") == "post-oncall-ingest")
+    event = {"connector": "email", "data": {}}
+    payload = {
+        "from": "alexey@datatalks.club",
+        "to": "dev@dtcdev.click",
+        "subject": "[TEST] oncall delivery",
+        "message_id": "<oncall-1@test>",
+        "text": "Test alert",
+    }
+    steps = {
+        "get-oncall-url": {"status": "completed", "output": {"value": "https://hub.dtcdev.click/webhooks/oncall"}},
+        "get-oncall-token": {"status": "completed", "output": {"value": "private-test-token"}},
+        "format-email": {"status": "completed", "output": {"result": payload}},
+        "oncall-delivery-id": {"status": "completed", "output": {"result": "a" * 64}},
+    }
+    captured = {}
+
+    def mock_transport(method, url, headers=None, body=None, timeout=None):
+        captured.update(method=method, url=url, headers=headers, body=body)
+        return 202, b'{"accepted": true}', {"content-type": "application/json"}
+
+    result = run_http_request(action, event, steps=steps, transport=mock_transport)
+    assert result["status"] == 202
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://hub.dtcdev.click/webhooks/oncall"
+    assert captured["headers"]["authorization"] == "Bearer private-test-token"
+    assert captured["headers"]["X-Delivery-Id"] == "a" * 64
+    sent_data = json.loads(captured["body"].decode("utf-8"))
+    assert sent_data["message_id"] == "<oncall-1@test>"
+    assert "delivery_id" not in sent_data
+
+
+def test_dev_mailbox_delivery_verifier_requires_both_endpoints():
+    _, wf = _load("dev-mailbox")
+    verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-both-deliveries")
+    completed = {"status": "completed", "output": {}}
+    failed = {"status": "failed", "output": {}}
+    steps = {"post-webhook": completed, "post-oncall-ingest": failed}
+    with pytest.raises(RuntimeError, match="post-oncall-ingest"):
+        run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
 
 
 @pytest.mark.parametrize("token_value", [
