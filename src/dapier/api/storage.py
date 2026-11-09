@@ -14,7 +14,6 @@ implementation):
 authentication; domain logic lives only here so the console, the CLI and
 the engine cannot drift apart.
 """
-from ..auth import visibility
 from ..engine.actions import storage
 
 
@@ -23,21 +22,7 @@ def _error(exc):
     return 400, {"error": str(exc)}
 
 
-def _hidden(workflow_id, visible):
-    """Whether a ``visible`` scope may not see this workflow's storage.
-
-    A hidden partition answers exactly like an empty one — the read paths
-    return their ordinary no-data shape, never a distinction that would
-    reveal the workflow exists."""
-    if visible is None:
-        return False
-    owners = visibility.owners_for(visible)
-    return not visible.workflow_visible(workflow_id, owners)
-
-
-def get(workflow_id, key, visible=None):
-    if _hidden(workflow_id, visible):
-        return 404, {"error": f"No stored value for key '{key or ''}'"}
+def get(workflow_id, key):
     try:
         item = storage.kv_get(workflow_id, key)
     except ValueError as exc:
@@ -58,14 +43,7 @@ def _epoch(value):
     return int(value) if value is not None else None
 
 
-def find(workflow_id, prefix, limit, visible=None):
-    if _hidden(workflow_id, visible):
-        return 200, {
-            "workflow": workflow_id,
-            "prefix": prefix or "",
-            "items": [],
-            "count": 0,
-        }
+def find(workflow_id, prefix, limit):
     try:
         parsed = int(limit) if str(limit or "").strip() else None
     except (TypeError, ValueError):

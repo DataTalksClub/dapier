@@ -202,12 +202,11 @@ def require_operator(event, action):
 
 
 def _visibility(event, subject):
-    """The caller's G17 Phase 2 read scope, decided exactly as
+    """The caller's workflow write scope, decided exactly as
     require_operator decides its gate: an API token passes only as an
-    operator, a DTC identity resolves through the operator allowlist —
-    operators see everything, anyone else is owner-scoped to their
-    subject (auth.visibility). Writes gate through the same scope
-    (_write_denied, Phase 3)."""
+    operator, a DTC identity resolves through the operator allowlist
+    (auth.visibility). Reads are not scoped; writes gate through this
+    (_write_denied)."""
     if event.get("_api_token"):
         return visibility.Visibility(subject, is_operator=True)
     claims = event.get("_dtc_claims") or {}

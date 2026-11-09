@@ -195,35 +195,6 @@ def execution(workflow_id, event_id, started):
 
 # --- helper unit tests -------------------------------------------------------
 
-def test_operator_sees_everything():
-    op = visibility.Visibility("anyone", is_operator=True)
-    assert op.owner_visible(MINE)
-    assert op.owner_visible(THEIRS)
-    assert op.owner_visible("")
-    assert op.owner_visible(None)
-    assert op.workflow_visible("whatever", {})
-
-
-def test_owner_sees_own_but_not_others():
-    viewer = visibility.Visibility(MINE)
-    assert viewer.owner_visible(MINE)
-    assert not viewer.owner_visible(THEIRS)
-    assert viewer.workflow_visible("w1", {"w1": MINE})
-    assert not viewer.workflow_visible("w2", {"w2": THEIRS})
-
-
-def test_missing_owner_is_visible_to_everyone():
-    viewer = visibility.Visibility(MINE)
-    # No stamp, nothing to backfill: defensive visibility, never hidden data.
-    assert viewer.owner_visible("")
-    assert viewer.owner_visible(None)
-    assert viewer.workflow_visible("old", {})
-    # An unknown workflow (deleted, store unreadable) reads as no owner.
-    assert viewer.workflow_visible("unknown", {"other": THEIRS})
-    # ...but a known, foreign-owned workflow is still hidden.
-    assert not viewer.workflow_visible("known", {"known": THEIRS})
-
-
 def test_for_session_scopes_by_the_operator_allowlist(monkeypatch):
     operator_env(monkeypatch)
     # On the allowlist: an operator, everything visible.
@@ -242,32 +213,6 @@ def test_owner_of_item_drafts_belong_to_the_drafter(published):
     unstamped.pop("owner")
     unstamped["published_by"] = THEIRS  # a stale byline no longer backfills
     assert visibility.owner_of_item(unstamped) == ""  # the stamp is the only source
-
-
-def test_workflow_owners_maps_live_and_draft_only(published):
-    table = published_workflows.get_table()
-    seed(table,
-         workflow_item("live-mine", MINE),
-         draft_item("live-mine", MINE, live=True),      # draft pair: live owns the id
-         draft_item("draft-only", THEIRS))
-    owners = visibility.workflow_owners()
-    assert owners == {"live-mine": MINE, "draft-only": THEIRS}
-
-
-def test_workflow_owners_unconfigured_is_empty(monkeypatch):
-    monkeypatch.delenv(published_workflows.TABLE_ENV, raising=False)
-    assert visibility.workflow_owners() == {}
-
-
-def test_workflow_owners_survives_store_failures(monkeypatch):
-    monkeypatch.setenv(published_workflows.TABLE_ENV, "published-test")
-
-    class Exploding:
-        def scan(self, **_):
-            raise RuntimeError("dynamodb down")
-
-    monkeypatch.setattr(published_workflows, "get_table", lambda table_ref=None: Exploding())
-    assert visibility.workflow_owners() == {}
 
 
 # --- designer list -----------------------------------------------------------
@@ -348,36 +293,6 @@ def overview_env(monkeypatch, published, tmp_path):
     return tables
 
 
-def test_overview_operator_sees_all_and_scopes_apply(monkeypatch, overview_env, published):
-    operator_env(monkeypatch)
-    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS),
-         workflow_item("unowned", ""))
-    for workflow_id in ("mine", "theirs", "unowned"):
-        overview_env["task-usage"].put_item(
-            Item={"month": "202609", "workflow_id": workflow_id, "tasks": 3})
-    overview_env["executions"].put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
-    overview_env["executions"].put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
-
-    operator = json.loads(overview_api.overview(cookie_event(
-        session_token(monkeypatch)))["body"])
-    assert [row["id"] for row in operator["workflows"]] == ["mine", "theirs", "unowned"]
-    assert {row["workflow_id"] for row in operator["usage"]} == {"mine", "theirs", "unowned"}
-    assert {row["workflow_id"] for row in operator["runs"]} == {"mine", "theirs"}
-
-    # The scoped variant (the domain-level contract the scope threading
-    # relies on): a subject-scoped view sees its own and the unowned rows.
-    scoped = json.loads(overview_api.overview(
-        cookie_event(session_token(monkeypatch)),
-        visible=visibility.Visibility(MINE),
-    )["body"])
-    assert [row["id"] for row in scoped["workflows"]] == ["mine", "unowned"]
-    assert {row["workflow_id"] for row in scoped["usage"]} == {"mine", "unowned"}
-    assert [row["workflow_id"] for row in scoped["runs"]] == ["mine"]
-    assert [row["workflow_id"] for row in scoped["executions"]] == ["mine"]
-    # Aggregates computed after the filter, so the dropdowns never leak ids.
-    assert scoped["workflow_tags"] == []
-
-
 def test_overview_route_denies_non_operators(monkeypatch, overview_env, published):
     operator_env(monkeypatch)
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
@@ -396,26 +311,6 @@ def runs_env(monkeypatch):
     dynamo(monkeypatch, {"executions": table})
     monkeypatch.setenv("EXECUTIONS_TABLE", "executions")
     return table
-
-
-def test_runs_list_operator_sees_all_and_scopes_apply(monkeypatch, published, runs_env):
-    operator_env(monkeypatch)
-    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
-    runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
-    runs_env.put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
-    # A run whose workflow no longer exists: audit duty keeps it visible.
-    runs_env.put_item(Item=execution("gone-wf", "e3", "2026-09-28T08:00:00+00:00"))
-
-    operator = runs_api.api_list(25)
-    assert [run["workflow_id"] for run in operator[1]["runs"]] == [
-        "mine", "theirs", "gone-wf"]
-
-    scoped = runs_api.api_list(25, visible=visibility.Visibility(MINE))
-    assert [run["workflow_id"] for run in scoped[1]["runs"]] == ["mine", "gone-wf"]
-
-    exported = runs_api.api_export(visible=visibility.Visibility(MINE))
-    rows = [line.split(",")[1] for line in exported[1]["csv"].splitlines()[1:]]
-    assert sorted(rows) == ["gone-wf", "mine"]
 
 
 def test_runs_route_denies_non_operators(monkeypatch, published, runs_env):
@@ -465,26 +360,6 @@ def inbox_row(inbox_id, matched, received_at):
     }
 
 
-def test_inbox_list_operator_sees_all_and_scopes_apply(monkeypatch, published, inbox_env):
-    operator_env(monkeypatch)
-    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
-    inbox_env.put_item(Item=inbox_row("evt-1", ["mine"], "2026-09-28T10:01:00+00:00"))
-    inbox_env.put_item(Item=inbox_row("evt-2", ["theirs"], "2026-09-28T10:02:00+00:00"))
-    inbox_env.put_item(Item=inbox_row("evt-3", [], "2026-09-28T10:03:00+00:00"))
-    inbox_env.put_item(Item=inbox_row("evt-4", ["gone-wf"], "2026-09-28T10:04:00+00:00"))
-
-    operator = inbox_store.api_list()
-    assert [event["inbox_id"] for event in operator[1]["events"]] == [
-        "evt-4", "evt-3", "evt-2", "evt-1"]
-    assert operator[1]["total"] == 4
-
-    scoped = inbox_store.api_list(visible=visibility.Visibility(MINE))
-    assert [event["inbox_id"] for event in scoped[1]["events"]] == ["evt-4", "evt-3", "evt-1"]
-    assert scoped[1]["total"] == 3
-    # The matched list stays whole on a visible row — it is what ran.
-    assert scoped[1]["events"][0]["matched"] == ["gone-wf"]
-
-
 def test_inbox_route_denies_non_operators(monkeypatch, published, inbox_env):
     operator_env(monkeypatch)
     seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
@@ -498,27 +373,6 @@ def test_inbox_route_denies_non_operators(monkeypatch, published, inbox_env):
 
 
 # --- usage -------------------------------------------------------------------
-
-def test_usage_operator_sees_all_and_scopes_apply(monkeypatch, published):
-    table = DictTable(("month", "workflow_id"))
-    dynamo(monkeypatch, {"task-usage": table})
-    monkeypatch.setenv("TASK_USAGE_TABLE", "task-usage")
-    seed(published, workflow_item("mine", MINE), workflow_item("theirs", THEIRS))
-    for workflow_id in ("mine", "theirs", "gone-wf"):
-        table.put_item(Item={"month": "202609", "workflow_id": workflow_id, "tasks": 3})
-    table.put_item(Item={"month": "202609", "workflow_id": usage_rollup.TOTAL_WORKFLOW_ID,
-                         "tasks": 9})
-
-    operator = usage_rollup.api_usage(
-        1, now=datetime(2026, 9, 15, tzinfo=timezone.utc))
-    assert [row["workflow_id"] for row in operator[1]["usage"]] == [
-        "theirs", "mine", "gone-wf"]
-
-    scoped = usage_rollup.api_usage(
-        1, now=datetime(2026, 9, 15, tzinfo=timezone.utc),
-        visible=visibility.Visibility(MINE))
-    assert [row["workflow_id"] for row in scoped[1]["usage"]] == ["mine", "gone-wf"]
-
 
 def test_usage_route_denies_non_operators(monkeypatch, published):
     table = DictTable(("month", "workflow_id"))

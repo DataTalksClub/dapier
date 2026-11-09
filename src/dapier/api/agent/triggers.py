@@ -7,7 +7,7 @@ from ...connectors import trigger_discovery
 from .. import hook_activity, runs
 from ...triggers import email_from, email_triggers, hook_triggers, poll_triggers, schedule_triggers
 
-from .common import _json_response, _no_store, _visibility
+from .common import _json_response, _no_store
 
 from .common import _LateBinding
 
@@ -59,8 +59,7 @@ def trigger_sample_api(event):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_trigger_sample(
-        query.get("workflow") or query.get("workflow_id"),
-        visible=_visibility(event, subject))
+        query.get("workflow") or query.get("workflow_id"))
     audit.emit(str(query.get("workflow") or query.get("workflow_id") or "unknown"),
                "triggers.sample", subject,
                outcome="ok" if status == 200 else "error", error=payload.get("error"))
@@ -219,14 +218,13 @@ def hook_delivery_api(event, delivery_id=None):
     subject, error = require_operator(event, "hook-trigger.deliveries")
     if error:
         return error
-    visible = _visibility(event, subject)
     if delivery_id:
-        status, payload = hook_activity.api_delivery(delivery_id, visible=visible)
+        status, payload = hook_activity.api_delivery(delivery_id)
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = hook_activity.api_deliveries(
         query.get("hook"), query.get("limit", 25),
-        next_token=query.get("next") or None, visible=visible)
+        next_token=query.get("next") or None)
     return _no_store(_json_response(status, payload))
 
 

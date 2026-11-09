@@ -142,94 +142,9 @@ def viewer():
 
 # --- runs.api_get ------------------------------------------------------------
 
-def test_run_get_scopes_to_visible_workflows(monkeypatch, published, runs_env):
-    seed = published
-    seed.put_item(Item=workflow_item("mine", MINE))
-    seed.put_item(Item=workflow_item("theirs", THEIRS))
-    runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00"))
-    runs_env.put_item(Item=execution("theirs", "e2", "2026-09-28T09:00:00+00:00"))
-    # A run whose workflow no longer exists: audit duty keeps it visible.
-    runs_env.put_item(Item=execution("gone-wf", "e3", "2026-09-28T08:00:00+00:00"))
-
-    operator = runs_api.api_get("mine:evt-e1")
-    assert operator[0] == 200
-    assert runs_api.api_get("theirs:evt-e2")[0] == 200
-
-    scope = viewer()
-    assert runs_api.api_get("mine:evt-e1", visible=scope)[0] == 200
-    assert runs_api.api_get("gone-wf:evt-e3", visible=scope)[0] == 200
-    hidden = runs_api.api_get("theirs:evt-e2", visible=scope)
-    missing = runs_api.api_get("nope:evt-none")
-    assert hidden == missing  # a hidden run reads exactly like a missing one
-
-
-def test_trigger_sample_scopes_to_visible_workflows(monkeypatch, published, runs_env):
-    published.put_item(Item=workflow_item("mine", MINE))
-    published.put_item(Item=workflow_item("theirs", THEIRS))
-    runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00",
-                                     input={"body": "hello"}))
-
-    scope = viewer()
-    own = runs_api.api_trigger_sample("mine", visible=scope)
-    assert own[0] == 200
-    assert own[1]["source"] == "history"
-    assert own[1]["data"] == {"body": "hello"}
-    hidden = runs_api.api_trigger_sample("theirs", visible=scope)
-    assert hidden[0] == 404
-
-
 # --- inbox.api_get -----------------------------------------------------------
 
-def test_inbox_get_scopes_to_matched_workflows(monkeypatch, published):
-    published.put_item(Item=workflow_item("mine", MINE))
-    published.put_item(Item=workflow_item("theirs", THEIRS))
-    table = InboxTable()
-    table.put_item(Item={"inbox_id": "ev-mine", "connector": "email",
-                         "event": "message.received", "matched": ["mine"],
-                         "data": {"body": "hello"}})
-    table.put_item(Item={"inbox_id": "ev-theirs", "connector": "email",
-                         "event": "message.received", "matched": ["theirs"],
-                         "data": {"body": "secret"}})
-    table.put_item(Item={"inbox_id": "ev-none", "connector": "email",
-                         "event": "message.received", "matched": [],
-                         "data": {"body": "unmatched"}})
-
-    operator = inbox_store.api_get("ev-theirs", table_ref=table)
-    assert operator[0] == 200
-
-    scope = viewer()
-    assert inbox_store.api_get("ev-mine", table_ref=table, visible=scope)[0] == 200
-    # Matched nothing = nobody's row: the defensive rule keeps it visible.
-    assert inbox_store.api_get("ev-none", table_ref=table, visible=scope)[0] == 200
-    hidden = inbox_store.api_get("ev-theirs", table_ref=table, visible=scope)
-    missing = inbox_store.api_get("ev-gone", table_ref=table)
-    assert hidden == missing
-
-
 # --- errors.api_summary ------------------------------------------------------
-
-def test_error_summary_scopes_counts_to_visible_workflows(monkeypatch, published, runs_env):
-    published.put_item(Item=workflow_item("mine", MINE))
-    published.put_item(Item=workflow_item("theirs", THEIRS))
-    runs_env.put_item(Item=execution("mine", "e1", "2026-09-28T10:00:00+00:00",
-                                     status="failed", error="boom"))
-    runs_env.put_item(Item=execution("mine", "e2", "2026-09-28T09:00:00+00:00",
-                                     status="failed", error="also boom"))
-    runs_env.put_item(Item=execution("theirs", "e3", "2026-09-28T08:00:00+00:00",
-                                     status="failed", error="theirs"))
-    now = datetime(2026, 9, 28, 12, tzinfo=timezone.utc)
-
-    operator = errors_api.api_summary(days=7, now=now)
-    assert operator[1]["total_failed_runs"] == 3
-    assert [row["workflow_id"] for row in operator[1]["workflows"]] == [
-        "mine", "theirs"]
-
-    scope = viewer()
-    scoped = errors_api.api_summary(days=7, now=now, visible=scope)
-    assert scoped[1]["total_failed_runs"] == 2
-    assert [row["workflow_id"] for row in scoped[1]["workflows"]] == ["mine"]
-    assert "bounded" not in scoped[1]
-
 
 # --- storage partition reads -------------------------------------------------
 
@@ -239,31 +154,6 @@ def storage_env(monkeypatch):
     dynamo(monkeypatch, {"workflow-state": table})
     monkeypatch.setenv("STORAGE_TABLE", "workflow-state")
     return table
-
-
-def test_storage_partition_reads_hide_other_owners(monkeypatch, published, storage_env):
-    published.put_item(Item=workflow_item("mine", MINE))
-    published.put_item(Item=workflow_item("theirs", THEIRS))
-    storage_actions.kv_set("mine", "shared-key", "mine-value")
-    storage_actions.kv_set("theirs", "shared-key", "theirs-value")
-
-    operator = storage_api.get("theirs", "shared-key")
-    assert operator[0] == 200
-
-    scope = viewer()
-    assert storage_api.get("mine", "shared-key", visible=scope)[1]["value"] == "mine-value"
-    # A hidden partition answers exactly like an empty one: the same 404 a
-    # workflow with nothing stored returns (an unknown workflow id resolves
-    # to no owner, so the defensive rule reads it — and finds nothing).
-    hidden = storage_api.get("theirs", "shared-key", visible=scope)
-    empty = storage_api.get("ghost-wf", "shared-key", visible=scope)
-    assert hidden == empty
-
-    own_find = storage_api.find("mine", "", 10, visible=scope)
-    assert own_find[1]["count"] == 1
-    hidden_find = storage_api.find("theirs", "", 10, visible=scope)
-    assert hidden_find[1]["count"] == 0
-    assert hidden_find[1]["items"] == []
 
 
 # --- route-level: the threading reaches the caller ---------------------------

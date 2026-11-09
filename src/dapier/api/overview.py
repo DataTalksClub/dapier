@@ -17,7 +17,7 @@ from ..connections.credentials import (
 from ..connections.providers import oauth_clients
 
 
-def _workflows(visible=None, owners=None):
+def _workflows():
     from ..triggers import failure_counts
 
     counts = failure_counts.all_counts()
@@ -26,9 +26,6 @@ def _workflows(visible=None, owners=None):
         for item in published_workflows.load_items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
-                continue
-            if visible is not None and not visible.owner_visible(
-                    visibility.owner_of_item(item)):
                 continue
             result[str(workflow["id"])] = _workflow_view(
                 workflow, item.get("file"), published=True,
@@ -155,19 +152,12 @@ def _email_from():
                 "routes": {}, "addresses": []}
 
 
-def _usage(visible=None, owners=None):
+def _usage():
     """The 3-month usage block; empty when the rollup table is not wired.
-
-    ``visible`` read-filters the per-workflow rows like the usage endpoint
-    (the account-wide quota block below is not workflow-owned and stays
-    whole for everyone)."""
+"""
     if not os.environ.get("TASK_USAGE_TABLE"):
         return []
-    rows = usage.api_usage(3)[1].get("usage", [])
-    if visible is not None:
-        rows = [row for row in rows
-                if visible.workflow_visible(row.get("workflow_id"), owners or {})]
-    return rows
+    return usage.api_usage(3)[1].get("usage", [])
 
 
 def _quota():
@@ -177,7 +167,7 @@ def _quota():
     return usage.quota_status()
 
 
-def overview(event=None, visible=None):
+def overview(event=None):
     """The operator overview. ``?section=`` reads only the requested block;
     omitting it preserves the complete response. ``?q=`` filters the workflows
     list (same match
@@ -188,12 +178,7 @@ def overview(event=None, visible=None):
     the distinct tags and folders in use (computed before both filters), the
     lists the console's filter dropdowns offer.
 
-    ``visible`` (an auth.visibility.Visibility, None = unrestricted) applies
-    the G17 Phase 2 read filter to every workflow-tied block: the workflow
-    list (owner on the item), the executions and runs blocks and the usage
-    rows (owner resolved from the published store via workflow_id; a row
-    whose workflow is gone stays visible). Connections, credentials, tokens,
-    and the trigger registries are not workflow-owned and are untouched."""
+    Every caller gets the same blocks: there are no per-identity views."""
     query = (event or {}).get("queryStringParameters") or {}
     sections = {"workflows", "activity", "usage", "connections", "credentials", "tokens", "emails"}
     section = query.get("section")
@@ -204,9 +189,8 @@ def overview(event=None, visible=None):
         "service": "dapier",
         "region": os.environ.get("AWS_REGION", "eu-west-1"),
     }
-    owners = visibility.owners_for(visible) if selected & {"workflows", "activity", "usage"} else None
     if "workflows" in selected:
-        workflows = _workflows(visible, owners)
+        workflows = _workflows()
         workflow_tags = sorted({str(tag) for view in workflows for tag in view.get("tags") or []})
         workflow_folders = sorted({str(view.get("folder") or "").strip() for view in workflows
                                    if str(view.get("folder") or "").strip()})
@@ -227,16 +211,14 @@ def overview(event=None, visible=None):
         # Newest first by the moment each step actually started — execution_id
         # is ``workflow:action:event``, so its string order is not chronological.
         executions = sorted(
-            (item for item in _scan(os.environ["EXECUTIONS_TABLE"])
-             if visible is None or visible.workflow_visible(
-                 item.get("workflow_id"), owners)),
+            _scan(os.environ["EXECUTIONS_TABLE"]),
             key=lambda item: (str(item.get("started_at") or ""),
                               str(item.get("execution_id") or "")),
             reverse=True,
         )
-        payload.update(executions=executions[:25], runs=runs.recent(25, visible=visible))
+        payload.update(executions=executions[:25], runs=runs.recent(25))
     if "usage" in selected:
-        payload.update(usage=_usage(visible, owners), quota=_quota())
+        payload.update(usage=_usage(), quota=_quota())
     if "connections" in selected:
         # ``used_in`` (which workflows and hook triggers reference each
         # connection) rides along so the console snapshot matches the paged

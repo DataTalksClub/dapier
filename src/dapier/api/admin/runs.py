@@ -24,9 +24,12 @@ def _hidden_run(event, run_id):
     scope = _actor_scope(event)
     if scope is None:
         return None
-    status, payload = runs.api_get(run_id, visible=scope)
+    status, payload = runs.api_get(run_id)
     if status != 200:
         return http._json_response(status, payload)
+    denied = scope.can_write(str(payload.get("workflow_id") or ""))
+    if denied:
+        return http._json_response(*denied)
     return None
 
 
@@ -40,11 +43,8 @@ def _hidden_workflow(event, workflow_id):
     return None
 
 
-def list_runs(event, visible=None):
-    """Recent runs, one row per workflow handling of a trigger event.
-
-    ``visible`` (G17 auth.visibility, built by the dispatcher from the
-    session) read-filters the list for non-operators."""
+def list_runs(event):
+    """Recent runs, one row per workflow handling of a trigger event."""
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_list(
         query.get("limit", 25),
@@ -54,23 +54,17 @@ def list_runs(event, visible=None):
         before=query.get("before") or None,
         q=query.get("q") or None,
         next_token=query.get("next") or None,
-        visible=visible,
-        owner=query.get("owner") or None,
-        as_id=query.get("as") or None,
-        assignee=query.get("assignee") or None,
     )
     return http._json_response(status, payload)
 
 
-def export_runs(event, operator, visible=None):
+def export_runs(event, operator):
     """Run history as CSV (runs.api_export): the list's filters, one
     bounded export.
 
     The response carries {filename, count, truncated, csv}; the console
     turns it into a download and the CLI writes the file. The export is
     audited like the audit CSV export: bulk reads leave a mark in the trail.
-    ``visible`` applies the G17 read filter exactly as the list does, so
-    the CSV cannot see past it.
     """
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_export(
@@ -80,10 +74,6 @@ def export_runs(event, operator, visible=None):
         since=query.get("since") or None,
         before=query.get("before") or None,
         q=query.get("q") or None,
-        visible=visible,
-        owner=query.get("owner") or None,
-        as_id=query.get("as") or None,
-        assignee=query.get("assignee") or None,
     )
     if status == 200:
         session._audit_event("runs", "runs.export", operator or "unknown",
@@ -93,12 +83,9 @@ def export_runs(event, operator, visible=None):
 
 
 
-def get_run(run_id, visible=None):
-    """One run's step-by-step flow: status, input, output, duration, error.
-
-    ``visible`` scopes the single read exactly as the runs list does: a
-    hidden run answers like a missing one."""
-    status, payload = runs.api_get(run_id, visible=visible)
+def get_run(run_id):
+    """One run's step-by-step flow: status, input, output, duration, error."""
+    status, payload = runs.api_get(run_id)
     return http._json_response(status, payload)
 
 

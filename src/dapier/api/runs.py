@@ -36,7 +36,6 @@ from datetime import datetime, timezone
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
 
-from ..auth import visibility
 from ..clock import parse_ts
 from ..paging import decode_token, encode_token
 from ..engine.history import redact
@@ -544,7 +543,7 @@ def _search_blob(run_id, items):
 
 
 def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
-           visible=None, lean=False):
+           lean=False):
     """The most recent runs, newest first, optionally filtered.
 
     A bounded scan groups into runs; runs older than the scan window age
@@ -552,44 +551,15 @@ def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
     bookkeeping items (written by the worker's notification path) never
     group into the list. Filters narrow the scanned window client-side,
     like the grouping itself — a filter matching only runs older than the
-    window returns nothing. ``visible`` (G17 auth.visibility, None =
-    unrestricted) drops the runs of workflows the caller may not see.
+    window returns nothing.
     """
     status_code, payload = api_list(limit, workflow_id=workflow_id, status=status,
-                                    since=since, before=before, visible=visible,
-                                    lean=lean)
+                                    since=since, before=before, lean=lean)
     return payload["runs"] if status_code == 200 else []
 
 
-def _actor_match(owner=None, as_id=None, assignee=None):
-    """The owner-filter match set, or ``(None, error_payload)``."""
-    from ..auth import actors
-
-    match, error = actors.resolve_filter(owner, as_id, assignee)
-    if error:
-        return None, (400, {"error": error})
-    return match, None
-
-
-def _keep_actor(rows, match):
-    """Drop rows outside an owner filter. Operators still see every owner
-    until they ask; the filter then uses the published-workflow owner."""
-    if match is None:
-        return rows
-    from ..auth import actors
-
-    owners = visibility.workflow_owners()
-    return [row for row in rows if actors.row_visible(
-        match,
-        workflow_owner=owners.get(str(row.get("workflow_id") or "")),
-        fields=(row.get("owner"), row.get("actor"), row.get("assignee"),
-                row.get("subject")),
-    )]
-
-
 def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
-             q=None, next_token=None, visible=None, owner=None, as_id=None,
-             assignee=None, lean=False):
+             q=None, next_token=None, lean=False):
     """The list response: runs plus a ``paging`` block.
 
     ``next`` carries the last returned row's sort key; the follow-up call
@@ -612,22 +582,14 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     because "no failures" and "no failures in the part we looked at" are
     different answers and only the caller knows which one it got.
 
-    ``visible`` (an auth.visibility.Visibility, None = unrestricted)
-    read-filters the list, G17 Phase 2: a non-operator keeps only the runs
-    of workflows it owns; a run whose workflow no longer exists resolves to
-    no owner and stays visible (the audit duty), as does any run when the
-    owner stamp is missing.
+    Every caller sees every run: there are no per-identity views.
     """
-    match, denied = _actor_match(owner, as_id, assignee)
-    if denied:
-        return denied
     limit = max(1, min(_int(limit) or DEFAULT_LIMIT, MAX_LIMIT))
     token_key = _decode_token(next_token) if next_token else None
     if next_token and token_key is None:
         return 400, {"error": "Invalid page token"}
     query = str(q or "").strip().lower()
-    owners = visibility.owners_for(visible)
-    narrowed = bool(workflow_id or status or since or before or query or match)
+    narrowed = bool(workflow_id or status or since or before or query)
     scan_args = {"lean": True} if lean and not query else {}
     items, clipped = _scan_items(filtered=narrowed, **scan_args)
     grouped = _grouped(items)
@@ -636,13 +598,9 @@ def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
     runs = [run for run in runs
             if _wanted(run, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
-    if visible is not None:
-        runs = [run for run in runs
-                if visible.workflow_visible(run.get("workflow_id"), owners)]
     if query:
         runs = [run for run in runs
                 if query in _search_blob(run["run_id"], grouped[run["run_id"]])]
-    runs = _keep_actor(runs, match)
     runs.sort(key=_sort_key, reverse=True)
     if token_key is not None:
         runs = [run for run in runs if _sort_key(run) < token_key]
@@ -679,39 +637,29 @@ def runs_to_csv(rows):
 
 
 def api_export(max_rows=EXPORT_DEFAULT_ROWS, workflow_id=None, status=None,
-               since=None, before=None, q=None, now=None, visible=None,
-               owner=None, as_id=None, assignee=None):
+               since=None, before=None, q=None, now=None):
     """The filtered run history as CSV: ``(status, payload)``.
 
     Same filters as api_list (including content search and resolution),
     newest first, capped at ``max_rows`` rows (``truncated`` flags the
     clip). Returns ``{filename, count, truncated, csv}`` — the caller
     decides delivery (CLI file write, console download), like the audit
-    trail's export. ``visible`` applies the same G17 read filter as the
-    list, so the CSV cannot see past it.
+    trail's export.
     """
-    match, denied = _actor_match(owner, as_id, assignee)
-    if denied:
-        return denied
     try:
         max_rows = max(1, min(int(max_rows), EXPORT_MAX_ROWS))
     except (TypeError, ValueError):
         max_rows = EXPORT_DEFAULT_ROWS
-    owners = visibility.owners_for(visible)
     grouped = _grouped(_export_window(max_rows))
     rows = [run_summary(run_id, group) for run_id, group in grouped.items()]
     _derive_recovered(rows)
     rows = [row for row in rows
             if _wanted(row, workflow_id=workflow_id, status=status,
                        since=since, before=before)]
-    if visible is not None:
-        rows = [row for row in rows
-                if visible.workflow_visible(row.get("workflow_id"), owners)]
     query = str(q or "").strip().lower()
     if query:
         rows = [row for row in rows
                 if query in _search_blob(row["run_id"], grouped[row["run_id"]])]
-    rows = _keep_actor(rows, match)
     rows.sort(key=_sort_key, reverse=True)
     truncated = len(rows) > max_rows
     page = rows[:max_rows]
@@ -807,19 +755,12 @@ def _run_items(run_id):
     return _order_steps_hierarchically(items)
 
 
-def api_get(run_id, visible=None):
+def api_get(run_id):
     run_id = str(run_id or "").strip()
     if not run_id:
         return 400, {"error": "run_id is required"}
     items = _run_items(run_id)
     if not items:
-        return 404, {"error": "Run not found"}
-    owners = visibility.owners_for(visible)
-    if visible is not None and not any(
-            visible.workflow_visible(item.get("workflow_id"), owners)
-            for item in items):
-        # Same answer as a missing run: a hidden run must not reveal that
-        # it exists (the list the caller came from already dropped it).
         return 404, {"error": "Run not found"}
     run = run_summary(run_id, items)
     # Derive recovery for this one run too, so the detail view and the list
@@ -1265,7 +1206,7 @@ def api_replay_failed(workflow_id, *, queue=None):
     }
 
 
-def api_trigger_sample(workflow_id, visible=None):
+def api_trigger_sample(workflow_id):
     """The trigger input an author can fill ``{trigger.*}`` templates from.
 
     The most recent run for ``workflow`` carries its recorded trigger input
@@ -1280,23 +1221,15 @@ def api_trigger_sample(workflow_id, visible=None):
     example. Neither source applies — unknown workflow, or a connector
     nothing can sample — is a 404.
 
-    ``visible`` (G17 auth.visibility, None = unrestricted) scopes the whole
-    ask: a workflow the caller may not see has no sample (404), and the
-    history branch reads only the runs that scope allows.
-
     Behind ``GET /api/admin|agent/triggers/sample?workflow=<id>``.
     """
     workflow_id = str(workflow_id or "").strip()
     if not workflow_id:
         return 400, {"error": "workflow is required"}
-    owners = visibility.owners_for(visible)
-    if visible is not None and not visible.workflow_visible(workflow_id, owners):
-        return 404, {"error": f"no runs recorded for workflow '{workflow_id}'"}
-    status, payload = api_list(DEFAULT_LIMIT, workflow_id=workflow_id,
-                               visible=visible)
+    status, payload = api_list(DEFAULT_LIMIT, workflow_id=workflow_id)
     newest = next(iter(payload.get("runs") or []), None)
     if newest:
-        got_status, detail = api_get(newest["run_id"], visible=visible)
+        got_status, detail = api_get(newest["run_id"])
         if got_status == 200:
             envelope, error = replay_event(newest["run_id"], detail.get("steps") or [])
             if envelope is not None and not error:

@@ -5,13 +5,13 @@ import difflib
 from ...triggers import published_workflows
 from .validation import AUTO_PAUSE_KEYS, FILE_PATTERN, shared
 from .drafts import _draft_view, api_save
-from .listing import _read_denied, api_get, workflow_yaml_text
+from .listing import api_get, workflow_yaml_text
 
 RUN_STATE_KEYS = ("run_state", "last_run", "last_run_at", "run_count", "stats",
                   *AUTO_PAUSE_KEYS)
 
 
-def api_versions(source, visible=None):
+def api_versions(source):
     """Version history for one workflow, newest revision first.
 
     Every save, toggle, and rollback publishes a version record; this lists
@@ -19,17 +19,11 @@ def api_versions(source, visible=None):
     revision as ``current``. A deleted workflow's history survives the
     delete (the records outlive the YAML and the live item), so the list
     still answers for the id — nothing flagged current, revision 0.
-    ``visible`` (G17 auth.visibility, None = unrestricted) hides a workflow
-    the caller may not see behind the same 404 an unknown file gets; a
-    deleted workflow (nothing stored) stays answerable, like every
-    no-owner item.
     """
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
-    if _read_denied(source, visible):
-        return 404, {"error": f"no such workflow: {source}"}
     status, payload = api_get(source)
     if status == 200:
         workflow_id = str(payload["workflow"]["id"])
@@ -72,7 +66,7 @@ def api_versions(source, visible=None):
 MAX_DIFF_CHARS = 20000
 
 
-def api_diff(source, from_revision, to_revision, visible=None):
+def api_diff(source, from_revision, to_revision):
     """Unified text diff between two published versions of one workflow —
     the rollback-confidence half of the versions list.
 
@@ -82,16 +76,12 @@ def api_diff(source, from_revision, to_revision, visible=None):
     (empty when the definitions are identical, which ``same`` flags — a
     re-save without changes, or the same revision on both sides). Like
     api_versions, it still answers for a deleted workflow's id: the version
-    records outlive the live item. ``visible`` (G17 auth.visibility, None =
-    unrestricted) hides a workflow the caller may not see behind the same
-    404 an unknown file gets.
+    records outlive the live item.
     """
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
-    if _read_denied(source, visible):
-        return 404, {"error": f"no such workflow: {source}"}
     try:
         revisions = (int(from_revision), int(to_revision))
     except (TypeError, ValueError):

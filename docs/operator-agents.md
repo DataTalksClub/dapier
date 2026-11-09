@@ -8,8 +8,7 @@ A row with the `agent` role is least privilege — it passes only
 owner-scoped by the G17 write gate, and is refused on console routes
 outside `console_allowed`. The first successful sign-in stores the DTC
 subject beside the email in the device-sessions table
-(`actor#<email>`, no expiry). Until that subject exists, `--owner <alias>`
-matches the alias and the email only.
+(`actor#<email>`, no expiry).
 
 ## Orin
 
@@ -23,16 +22,11 @@ matches the alias and the email only.
 Orin holds the same role and rights as Alexey's dapier account:
 workflows, runs, inbox, polls, schedules, errors, credential view, and
 everything else the operator allowlist gates — reads and writes. The
-directory row keeps the stable alias so `--owner orin` and the console
-"View as" control keep working.
+directory row keeps the stable alias.
 
 ## Seeing another person's work
 
-A full operator stays signed in as themselves and narrows a list:
-
-```bash
-dapier runs list --owner orin
-dapier runs list --as <subject-id>
-```
-
-`--owner` must name someone in the directory. `--as` takes a subject id, or the same alias. The console has a View as control in the page header, next to Refresh. Choosing a person filters workflows and runs and hides write controls. The filter does not switch the account a write runs as.
+There are no per-identity views. Every signed-in user, Orin and Alexey
+included, sees the same Home, workflows, runs, failures and connections.
+Ownership still gates writes: an agent-role identity may change only
+workflows it owns.

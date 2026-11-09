@@ -1,5 +1,4 @@
 """Organization: tags, folders, and the bulk enable/disable."""
-from ...auth import visibility
 from ...triggers import published_workflows
 from .github import SyncConfigError, SyncError
 from .validation import (FILE_PATTERN, WorkflowError, _LateBinding,
@@ -166,10 +165,8 @@ def api_bulk(body, operator=None, visible=None):
     the single audit row for the whole batch.
 
     ``visible`` (an auth.visibility.Visibility, None = unrestricted) applies
-    the G17 write gate per target: the tag/search/all scopes resolve through
-    the same read filter as the list (a non-operator only ever targets what
-    it can see), and every target is owner-checked before its toggle — a
-    foreign id fails alone, like any other per-id error.
+    the G17 write gate per target: every target is owner-checked before its
+    toggle — a foreign id fails alone, like any other per-id error.
     """
     if not isinstance(body, dict):
         return 400, {"error": "request body must be an object"}
@@ -203,7 +200,7 @@ def api_bulk(body, operator=None, visible=None):
     if ids is not None:
         targets = [(raw.strip(), raw.strip()) for raw in ids]
     else:
-        status, payload = api_list(q=search, tag=tag, visible=visible)
+        status, payload = api_list(q=search, tag=tag)
         if status != 200:
             return status, payload
         targets = [(row.get("source") or filename_for(row["id"]), row["id"])

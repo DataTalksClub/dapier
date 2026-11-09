@@ -8,13 +8,12 @@ from ...auth import session
 from ...engine import usage as usage_rollup
 
 
-def usage(event, visible=None):
+def usage(event):
     """Task usage rollup: tasks per workflow per month, latest months first.
 
-    ``visible`` (G17 auth.visibility) read-filters the per-workflow rows for
-    non-operators; the quota endpoint (account-wide) is separate."""
+    The quota endpoint (account-wide) is separate."""
     query = event.get("queryStringParameters") or {}
-    status, payload = usage_rollup.api_usage(query.get("months", 12), visible=visible)
+    status, payload = usage_rollup.api_usage(query.get("months", 12))
     return http._json_response(status, payload)
 
 
@@ -40,14 +39,12 @@ def quota_save(event, operator):
     return http._json_response(status, payload)
 
 
-def errors_summary(event, visible=None):
+def errors_summary(event):
     """Failed-run counts by workflow over the recent window (default 7 days).
 
-    ``visible`` (G17 auth.visibility) scopes the counts like the runs list:
-    a non-operator keeps its own workflows' failures."""
+"""
     query = event.get("queryStringParameters") or {}
-    status, payload = errors_api.api_summary(query.get("days", 7),
-                                             visible=visible)
+    status, payload = errors_api.api_summary(query.get("days", 7))
     return http._json_response(status, payload)
 
 
@@ -97,8 +94,8 @@ def export_audit(event, operator):
 
 
 
-def costs(event, visible=None):
+def costs(event):
     from ...paid_api_usage import api_costs
     query = event.get("queryStringParameters") or {}
-    status, payload = api_costs(query.get("months", 1), visible=visible)
+    status, payload = api_costs(query.get("months", 1))
     return http._json_response(status, payload)

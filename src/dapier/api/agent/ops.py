@@ -31,27 +31,25 @@ __all__ = ["costs_api", "audit_api", "audit_export_api", "errors_digest_api", "e
 
 
 def operator_overview(event):
-    """Operator-only read view mirroring the console overview (G17
-    read-filtered for non-operators like the console route)."""
+    """Operator-only read view mirroring the console overview ."""
     subject, error = require_operator(event, "overview")
     if error:
         return error
-    return overview.overview(event, visible=_visibility(event, subject))
+    return overview.overview(event)
 
 
 def runs_api(event, run_id=None):
     """Operator-only run history mirroring the console Runs view.
 
     Without a run id: the recent-run list, one row per workflow handling of a
-    trigger event (G17 read-filtered for non-operators like the console
-    route). With one: the run's step-by-step flow (status, input,
+    trigger event. With one: the run's step-by-step flow (status, input,
     output, duration, error per step).
     """
     subject, error = require_operator(event, "runs")
     if error:
         return error
     if run_id:
-        status, payload = runs.api_get(run_id, visible=_visibility(event, subject))
+        status, payload = runs.api_get(run_id)
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_list(
@@ -62,10 +60,6 @@ def runs_api(event, run_id=None):
         before=query.get("before") or None,
         q=query.get("q") or None,
         next_token=query.get("next") or None,
-        visible=_visibility(event, subject),
-        owner=query.get("owner") or None,
-        as_id=query.get("as") or None,
-        assignee=query.get("assignee") or None,
     )
     return _no_store(_json_response(status, payload))
 
@@ -80,9 +74,12 @@ def _hidden_from_agent(event, subject, run_id):
     """404 when an operator agent asks to change a run it does not own."""
     if not actors.is_agent(_agent_payload(event, subject)):
         return None
-    status, body = runs.api_get(run_id, visible=_visibility(event, subject))
+    status, body = runs.api_get(run_id)
     if status != 200:
         return _no_store(_json_response(status, body))
+    denied = _visibility(event, subject).can_write(str(body.get("workflow_id") or ""))
+    if denied:
+        return _no_store(_json_response(*denied))
     return None
 
 
@@ -122,10 +119,6 @@ def runs_export_api(event):
         since=query.get("since") or None,
         before=query.get("before") or None,
         q=query.get("q") or None,
-        visible=_visibility(event, subject),
-        owner=query.get("owner") or None,
-        as_id=query.get("as") or None,
-        assignee=query.get("assignee") or None,
     )
     if status == 200:
         audit.emit("runs", "runs.export", subject, outcome="ok")
@@ -136,16 +129,13 @@ def usage_api(event):
     """Operator-only task usage rollup: tasks per workflow per month.
 
     Carries the quota block alongside the rollup so one read shows both the
-    spend and the budget it counts against. The per-workflow rows are G17
-    read-filtered for non-operators like the console route; the quota block
-    is account-wide and untouched.
+    spend and the budget it counts against.
     """
     subject, error = require_operator(event, "usage")
     if error:
         return error
     query = event.get("queryStringParameters") or {}
-    status, payload = usage.api_usage(query.get("months", 12),
-                                      visible=_visibility(event, subject))
+    status, payload = usage.api_usage(query.get("months", 12))
     payload["quota"] = usage.quota_status()
     return _no_store(_json_response(status, payload))
 
@@ -186,8 +176,7 @@ def errors_summary_api(event):
     if error:
         return error
     query = event.get("queryStringParameters") or {}
-    status, payload = errors_api.api_summary(query.get("days", 7),
-                                             visible=_visibility(event, subject))
+    status, payload = errors_api.api_summary(query.get("days", 7))
     return _no_store(_json_response(status, payload))
 
 
@@ -256,12 +245,10 @@ def storage_read_api(event, workflow_id):
     query = event.get("queryStringParameters") or {}
     key = str(query.get("key") or "").strip()
     if key:
-        status, payload = storage_api.get(workflow_id, key,
-                                          visible=_visibility(event, subject))
+        status, payload = storage_api.get(workflow_id, key)
     else:
         status, payload = storage_api.find(workflow_id, query.get("prefix"),
-                                           query.get("limit"),
-                                           visible=_visibility(event, subject))
+                                           query.get("limit"))
     return _no_store(_json_response(status, payload))
 
 
@@ -393,23 +380,20 @@ def inbox_api(event, inbox_id=None):
     """Operator-only trigger inbox: every inbound event, matched or not.
 
     Without an id: recent events, filterable by connector — the row the run
-    history never shows for events no workflow claimed (G17 read-filtered
-    for non-operators like the console route). With one: the stored
+    history never shows for events no workflow claimed. With one: the stored
     envelope (data, matched workflows, status).
     """
     subject, error = require_operator(event, "triggers.inbox")
     if error:
         return error
     if inbox_id:
-        status, payload = inbox.api_get(inbox_id,
-                                        visible=_visibility(event, subject))
+        status, payload = inbox.api_get(inbox_id)
         return _no_store(_json_response(status, payload))
     query = event.get("queryStringParameters") or {}
     status, payload = inbox.api_list(
         query.get("connector"), query.get("limit", 25),
         next_token=query.get("next") or None,
         outcome=query.get("outcome") or None,
-        visible=_visibility(event, subject),
     )
     return _no_store(_json_response(status, payload))
 
@@ -437,5 +421,5 @@ def costs_api(event):
     if error:
         return error
     query = event.get("queryStringParameters") or {}
-    status, payload = api_costs(query.get("months", 1), visible=_visibility(event, subject))
+    status, payload = api_costs(query.get("months", 1))
     return _no_store(_json_response(status, payload))

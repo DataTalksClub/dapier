@@ -29,7 +29,7 @@ def _route_designer(event, method, path, operator_payload, operator_subject):
     """The designer collection endpoints: list, catalog, save, test,
 bulk, and export."""
     if method == "GET" and path == "/api/admin/designer/workflows":
-        return routes.designer_list(event, visible=_read_scope(operator_payload))
+        return routes.designer_list(event)
     if method == "GET" and path == "/api/admin/designer/catalog":
         from ...connectors import registry
 
@@ -47,8 +47,7 @@ bulk, and export."""
         return routes.bulk_designer_workflow(event, operator_subject,
                                              visible=_read_scope(operator_payload))
     if method == "GET" and path == "/api/admin/designer/export":
-        return routes.export_designer_workflows(event, operator_subject,
-                                                visible=_read_scope(operator_payload))
+        return routes.export_designer_workflows(event, operator_subject)
     return None
 
 
@@ -57,8 +56,7 @@ def _route_designer_item(event, method, path, operator_payload, operator_subject
 folder, test, test-step, duplicate."""
     designer_match = re.fullmatch(r"/api/admin/designer/workflows/" + _WORKFLOW_REF, path)
     if method == "GET" and designer_match:
-        return routes.designer_get(designer_match.group(1),
-                                   visible=_read_scope(operator_payload))
+        return routes.designer_get(designer_match.group(1))
     if method == "PUT" and designer_match:
         return routes.toggle_designer_workflow(event, operator_subject, designer_match.group(1),
                                                visible=_read_scope(operator_payload))
@@ -102,13 +100,11 @@ def _route_designer_versions(event, method, path, operator_payload, operator_sub
     designer_versions_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions", path)
     if method == "GET" and designer_versions_match:
-        return routes.versions_designer_workflow(designer_versions_match.group(1),
-                                                 visible=_read_scope(operator_payload))
+        return routes.versions_designer_workflow(designer_versions_match.group(1))
     designer_versions_diff_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/versions/diff", path)
     if method == "GET" and designer_versions_diff_match:
-        return routes.diff_designer_workflow(event, designer_versions_diff_match.group(1),
-                                             visible=_read_scope(operator_payload))
+        return routes.diff_designer_workflow(event, designer_versions_diff_match.group(1))
     designer_rollback_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/rollback", path)
     if method == "POST" and designer_rollback_match:
@@ -129,15 +125,13 @@ and the draft diff."""
     designer_draft_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft", path)
     if method == "GET" and designer_draft_match:
-        return routes.draft_designer_workflow(designer_draft_match.group(1),
-                                              visible=_read_scope(operator_payload))
+        return routes.draft_designer_workflow(designer_draft_match.group(1))
     if method == "DELETE" and designer_draft_match:
         return routes.discard_designer_draft(event, operator_subject, designer_draft_match.group(1),
                                              visible=_read_scope(operator_payload))
     designer_draft_diff_match = re.fullmatch(
         r"/api/admin/designer/workflows/([a-z0-9][a-z0-9._-]*\.yaml)/draft/diff", path)
     if method == "GET" and designer_draft_diff_match:
-        return routes.draft_diff_designer_workflow(designer_draft_diff_match.group(1),
-                                                   visible=_read_scope(operator_payload))
+        return routes.draft_diff_designer_workflow(designer_draft_diff_match.group(1))
     return None
 

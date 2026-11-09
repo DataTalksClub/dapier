@@ -26,15 +26,14 @@ def discover_samples(event, operator):
     return http._json_response(status, payload)
 
 
-def trigger_sample(event, operator, visible=None):
+def trigger_sample(event, operator):
     """The workflow's own last trigger input, for the inspector's template
     autofill: the newest run's recorded input, else the trigger-discovery
     sample for its connector (runs.api_trigger_sample, shared verbatim with
-    the agent route the CLI calls). ``visible`` hides a workflow the caller
-    may not see behind the same 404 an unknown one gets."""
+    the agent route the CLI calls)."""
     query = event.get("queryStringParameters") or {}
     status, payload = runs.api_trigger_sample(
-        query.get("workflow") or query.get("workflow_id"), visible=visible)
+        query.get("workflow") or query.get("workflow_id"))
     session._audit_event(
         str(query.get("workflow") or query.get("workflow_id") or "unknown"),
         "triggers.sample", operator or "unknown",
