@@ -7,18 +7,16 @@ from ...auth import session
 from .gates import _save_denied, _write_denied
 
 
-def designer_list(event, visible=None):
-    """The designer list, G17 read-filtered for non-operators (``visible``
-    is built by the dispatcher from the session; None = unrestricted)."""
+def designer_list(event):
+    """The designer list: every caller sees every workflow."""
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_list(query.get("q") or None,
                                               tag=query.get("tag") or None,
-                                              folder=query.get("folder") or None,
-                                              visible=visible)
+                                              folder=query.get("folder") or None)
     return http._json_response(status, payload)
 
-def designer_get(source, visible=None):
-    status, payload = designer_store.api_get(source, visible=visible)
+def designer_get(source):
+    status, payload = designer_store.api_get(source)
     return http._json_response(status, payload)
 
 def save_designer_workflow(event, operator, visible=None):
@@ -195,18 +193,18 @@ def test_designer_code(event, operator, source=None, visible=None):
     return http._json_response(status, payload)
 
 
-def versions_designer_workflow(source, visible=None):
+def versions_designer_workflow(source):
     """Console mirror of the CLI versions list: one workflow's history."""
-    status, payload = designer_store.api_versions(source, visible=visible)
+    status, payload = designer_store.api_versions(source)
     return http._json_response(status, payload)
 
 
-def diff_designer_workflow(event, source, visible=None):
+def diff_designer_workflow(event, source):
     """Console mirror of the CLI diff: the unified diff between two
     published versions, for the Versions dialog's Diff button."""
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_diff(source, query.get("from"),
-                                              query.get("to"), visible=visible)
+                                              query.get("to"))
     return http._json_response(status, payload)
 
 
@@ -252,13 +250,13 @@ def discard_designer_draft(event, operator, source, visible=None):
                  outcome="ok" if status == 200 else "error", error=payload.get("error"))
     return http._json_response(status, payload)
 
-def draft_designer_workflow(source, visible=None):
+def draft_designer_workflow(source):
     """Console mirror of the draft read: one workflow's drafted definition."""
-    status, payload = designer_store.api_draft(source, visible=visible)
+    status, payload = designer_store.api_draft(source)
     return http._json_response(status, payload)
 
-def draft_diff_designer_workflow(source, visible=None):
+def draft_diff_designer_workflow(source):
     """Console mirror of `workflows draft-diff`: draft vs live, api_diff shape."""
-    status, payload = designer_store.api_draft_diff(source, visible=visible)
+    status, payload = designer_store.api_draft_diff(source)
     return http._json_response(status, payload)
 

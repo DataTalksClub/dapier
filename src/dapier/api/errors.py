@@ -15,7 +15,7 @@ DEFAULT_DAYS = 7
 MAX_DAYS = 90
 
 
-def api_summary(days=DEFAULT_DAYS, now=None, visible=None):
+def api_summary(days=DEFAULT_DAYS, now=None):
     """Unresolved failed-run counts by workflow for the last ``days`` days.
 
     The window is the runs list's own filter (newest-first scan, bounded
@@ -24,11 +24,6 @@ def api_summary(days=DEFAULT_DAYS, now=None, visible=None):
     along: a failure a later completed run of the workflow recovered, or one
     an operator marked fixed, is not counted.
 
-    ``visible`` (G17 auth.visibility, None = unrestricted) scopes the
-    counts to the workflows the caller may see, like the runs list does.
-    The bounded flag still reads the raw scan length: a window filled with
-    other owners' failures stays bounded even when every visible count
-    below is small.
     """
     from . import runs
 
@@ -41,10 +36,6 @@ def api_summary(days=DEFAULT_DAYS, now=None, visible=None):
     failed = runs.recent(runs.MAX_LIMIT, status="problems", since=since,
                          lean=True)
     bounded = len(failed) >= runs.MAX_LIMIT
-    owners = runs.visibility.owners_for(visible)
-    if visible is not None:
-        failed = [run for run in failed
-                  if visible.workflow_visible(run.get("workflow_id"), owners)]
     counts = {}
     for run in failed:
         workflow_id = run.get("workflow_id") or "unknown"

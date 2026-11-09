@@ -293,9 +293,9 @@ Administration is open to every account that completes DTC sign-in — the DTC
 identity provider only issues datatalks.club accounts. One exception is an
 operator agent: `orin@datatalks.club` is role `agent` (workflows, runs, and
 agent tasks it owns; no credentials, grants, or tokens). See
-[docs/operator-agents.md](docs/operator-agents.md). A full operator can
-still read that work with `dapier runs list --owner orin` or the console
-View as control. To restrict everyone else to a subset, configure an
+[docs/operator-agents.md](docs/operator-agents.md). Reads are not
+scoped: every signed-in user sees the same Home, workflows, runs, failures
+and connections, with no per-identity views. To restrict everyone else to a subset, configure an
 allowlist at deploy time:
 
 ```bash

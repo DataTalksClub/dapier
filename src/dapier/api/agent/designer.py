@@ -32,13 +32,12 @@ def designer_api(event, method, source=None):
     if method == "GET":
         if source:
             status, payload = designer_store.api_get(
-                source, visible=_visibility(event, subject))
+                source)
         else:
             query = event.get("queryStringParameters") or {}
             status, payload = designer_store.api_list(query.get("q") or None,
                                                       tag=query.get("tag") or None,
-                                                      folder=query.get("folder") or None,
-                                                      visible=_visibility(event, subject))
+                                                      folder=query.get("folder") or None)
         return _json_response(status, payload)
     try:
         body = json.loads(event.get("body") or "{}")
@@ -70,8 +69,7 @@ def designer_export_api(event):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_export(tag=query.get("tag"),
-                                                folder=query.get("folder"),
-                                                visible=_visibility(event, subject))
+                                                folder=query.get("folder"))
     if status == 200:
         audit.emit("workflows", "workflow.export", subject, outcome="ok")
         return _no_store(_json_response(status, payload, headers={
@@ -180,8 +178,7 @@ def designer_bulk_api(event):
     Each id toggles through the same api_toggle semantics and answers per id;
     one audit row covers the batch, with the id list as the subject. The G17
     write gate rides along per id (api_bulk's ``visible``): a foreign id
-    fails alone, and the tag/search/all scopes only ever target what the
-    caller can see."""
+    fails alone."""
     subject, error = require_operator(event, "workflow.bulk-toggle")
     if error:
         return error
@@ -206,7 +203,7 @@ def designer_versions_api(event, source):
     if error:
         return error
     status, payload = designer_store.api_versions(
-        source, visible=_visibility(event, subject))
+        source)
     return _json_response(status, payload)
 
 
@@ -220,8 +217,7 @@ def designer_versions_diff_api(event, source):
         return error
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_diff(source, query.get("from"),
-                                              query.get("to"),
-                                              visible=_visibility(event, subject))
+                                              query.get("to"))
     return _json_response(status, payload)
 
 
@@ -314,7 +310,7 @@ def designer_draft_api(event, source):
     if error:
         return error
     status, payload = designer_store.api_draft(
-        source, visible=_visibility(event, subject))
+        source)
     return _json_response(status, payload)
 
 
@@ -325,7 +321,7 @@ def designer_draft_diff_api(event, source):
     if error:
         return error
     status, payload = designer_store.api_draft_diff(
-        source, visible=_visibility(event, subject))
+        source)
     return _json_response(status, payload)
 
 

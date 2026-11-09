@@ -75,7 +75,7 @@ def _published_by_file(source):
     return published_workflows.get_item(source.removesuffix(".yaml"))
 
 
-def api_list(q=None, tag=None, folder=None, visible=None):
+def api_list(q=None, tag=None, folder=None):
     """Managed workflows in the live published store.
 
     A workflow saved but not yet picked up by the deploy pipeline shows up
@@ -86,18 +86,12 @@ def api_list(q=None, tag=None, folder=None, visible=None):
     view. ``folder`` narrows to workflows sitting in exactly that folder
     (case-insensitive) — Zapier's folder view.
 
-    ``visible`` (an auth.visibility.Visibility, None = unrestricted — the
-    bulk-toggle scope) read-filters the list, G17 Phase 2: a non-operator
-    sees the workflows it owns — live rows by their owner, draft-only rows
-    by their drafted_by — and unowned workflows stay visible to everyone. A
-    hidden live item hides its draft pair too (one workflow, one
-    visibility); the write-side gate is visibility.ensure_can_write
-    (Phase 3), applied by the route layers.
+    Every caller sees every workflow; the write-side gate is
+    visibility.ensure_can_write, applied by the route layers.
     """
     summaries = {}
     drafts = {}
     if published_workflows.configured():
-        hidden = set()
         for item in published_workflows.load_items(include_drafts=True):
             if item.get("draft_of"):
                 drafts[str(item["draft_of"])] = item
@@ -105,15 +99,8 @@ def api_list(q=None, tag=None, folder=None, visible=None):
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue
-            if visible is not None and not visible.owner_visible(
-                    visibility.owner_of_item(item)):
-                # Not this caller's workflow — remember the id so its draft
-                # pair (collected below) dies with the row.
-                hidden.add(str(workflow["id"]))
-                continue
             summary = _summary(workflow, item.get("file") or f"{workflow['id']}.yaml")
-            # Informational G17 owner (resolved on read; published_by before
-            # the stamp) — Phase 2 read-filters this list by it.
+            # Informational owner stamp; nothing filters by it.
             summaries[summary["id"]] = {**summary, "published": True,
                                         "owner": item.get("owner") or ""}
         # A workflow with a draft but nothing live still lists — Zapier shows
@@ -123,11 +110,6 @@ def api_list(q=None, tag=None, folder=None, visible=None):
         for workflow_id, item in drafts.items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
-                continue
-            if workflow_id in hidden:
-                continue
-            if visible is not None and not visible.owner_visible(
-                    visibility.owner_of_item(item)):
                 continue
             if workflow_id in summaries:
                 summaries[workflow_id]["has_draft"] = True
@@ -177,28 +159,7 @@ class _NoAliasDumper(yaml.SafeDumper):
         return True
 
 
-def _read_denied(source, visible):
-    """The G17 read rule for one file-keyed read: True when ``visible`` may
-    not see this workflow. The owner resolves from the live item, else the
-    draft row (a draft-only workflow's owner, the write gate's resolution);
-    nothing stored under the id is unclaimed and stays visible — the
-    read-side default that never hides data, so a deleted workflow's
-    surviving version history reads like every no-owner item."""
-    if visible is None:
-        return False
-    item = _published_by_file(source)
-    if item is None:
-        try:
-            item = published_workflows.get_draft(
-                str(source or "").removesuffix(".yaml"))
-        except Exception:  # noqa: BLE001 — the gate must not fail the read
-            return False
-    if item is None:
-        return False
-    return not visible.owner_visible(visibility.owner_of_item(item))
-
-
-def api_get(source, visible=None):
+def api_get(source):
     """One workflow from the live published store.
 
     The payload carries ``yaml``, the canonical text rendered from the stored
@@ -207,13 +168,8 @@ def api_get(source, visible=None):
     not served here (this is the live read — the toggle/tags/folder/delete
     verbs resolve through it); the list rows carry ``has_draft`` /
     ``published: false`` and the versions list carries the ``draft`` block.
-    ``visible`` (G17 auth.visibility, None = unrestricted) scopes the read:
-    a workflow the caller may not see answers exactly like a missing one.
     """
     item = _published_by_file(source)
-    if visible is not None and item is not None and not visible.owner_visible(
-            visibility.owner_of_item(item)):
-        item = None
     if item and isinstance(item.get("workflow"), dict):
         from ...engine import naming
 

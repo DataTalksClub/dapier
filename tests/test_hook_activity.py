@@ -285,7 +285,6 @@ def test_agent_routes(env, monkeypatch):
 
     monkeypatch.setattr("src.dapier.api.agent.authenticate", lambda event: ("sub-1", None))
     monkeypatch.setattr("src.dapier.api.agent.authz.is_operator", lambda payload: True)
-    monkeypatch.setattr("src.dapier.api.agent.triggers._visibility", lambda event, subject: None)
     response = agent_api.route({"headers": {}, "body": json.dumps({"name": "orders"})},
                                "POST", "/api/agent/hook-triggers/test")
     assert response["statusCode"] == 200

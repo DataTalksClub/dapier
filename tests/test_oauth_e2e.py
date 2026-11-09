@@ -246,8 +246,7 @@ def test_me_names_the_signed_in_person_from_the_id_token(monkeypatch):
     assert body["name"] == "Alexey Grigorev"
     assert body["operator"] is True
     assert body["role"] == "operator"
-    assert any(person["alias"] == "orin" and person["role"] == "operator"
-               for person in body["view_as"])
+    assert "view_as" not in body
 
 
 def test_display_name_prefers_the_name_claim_and_tidies_it():
@@ -274,7 +273,7 @@ def test_operator_login_and_provider_oauth_end_to_end(monkeypatch):
     assert body["name"] == ""
     assert body["operator"] is True
     assert body["role"] == "operator"
-    assert body["view_as"]
+    assert "view_as" not in body
 
     seed_youtube_connection(dynamo.tables["connections"])
 

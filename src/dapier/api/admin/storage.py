@@ -5,18 +5,16 @@ from .. import storage as storage_api
 from .gates import _save_denied, _write_denied
 
 
-def storage_read(event, workflow_id, visible=None):
+def storage_read(event, workflow_id):
     """Workflow storage: one key (``key=``) or the keys under ``prefix=``.
-
-    ``visible`` scopes the reads exactly as the writes gate: a hidden
-    partition answers like an empty one."""
+"""
     query = event.get("queryStringParameters") or {}
     key = str(query.get("key") or "").strip()
     if key:
-        status, payload = storage_api.get(workflow_id, key, visible=visible)
+        status, payload = storage_api.get(workflow_id, key)
     else:
         status, payload = storage_api.find(workflow_id, query.get("prefix"),
-                                           query.get("limit"), visible=visible)
+                                           query.get("limit"))
     return http._json_response(status, payload)
 
 

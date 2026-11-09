@@ -8,17 +8,16 @@ import zipfile
 
 import yaml
 
-from ...auth import visibility
 from ...triggers import published_workflows
 from .github import sync_status
 from .validation import (FILE_PATTERN, WorkflowError, ordered_workflow,
                          parse_workflow)
-from .listing import _folder_of, _read_denied, _tags_of, workflow_yaml_text
+from .listing import _folder_of, _tags_of, workflow_yaml_text
 
 MAX_EXPORT_WORKFLOWS = 500
 
 
-def api_export(tag=None, folder=None, now=None, visible=None):
+def api_export(tag=None, folder=None, now=None):
     """Every workflow's canonical YAML as one zip bundle: ``(status, payload)``.
 
     The one-shot bundle behind `workflows export --all` and the console's
@@ -42,17 +41,11 @@ def api_export(tag=None, folder=None, now=None, visible=None):
     The API has no binary channel, so the archive travels base64 in the JSON
     payload (``b64``) and the callers decode it; the routes carry the
     ``content-disposition`` attachment header with the dated filename.
-    ``visible`` (G17 auth.visibility, None = unrestricted) leaves out the
-    workflows the caller may not see, exactly like the list does.
     """
     managed = {}
     versions = {}
     if published_workflows.configured():
-        items = published_workflows.load_items()
-        if visible is not None:
-            items = [item for item in items
-                     if visible.owner_visible(visibility.owner_of_item(item))]
-        for item in items:
+        for item in published_workflows.load_items():
             workflow = item.get("workflow")
             if not isinstance(workflow, dict) or not workflow.get("id"):
                 continue

@@ -28,7 +28,6 @@ import uuid
 from datetime import datetime, timezone
 from email.utils import parseaddr
 
-from ..auth import visibility
 from ..clock import now_iso
 from ..paging import decode_token, encode_token
 from .dynamo import decode_numbers
@@ -515,7 +514,7 @@ def _outcomes(value):
 
 
 def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None,
-             visible=None, outcome=None, hook=None):
+             outcome=None, hook=None):
     """Recent inbox events, newest first; ``connector`` filters when given.
 
     ``paging.next`` carries the last returned row's sort key; the follow-up
@@ -523,11 +522,6 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     after that row, so the connector filter and paging compose. The scan
     covers the whole retention window up to SCAN_WINDOW_ITEMS rows — events
     past that cap age out of the list but stay reachable through api_get.
-
-    ``visible`` (an auth.visibility.Visibility, None = unrestricted)
-    read-filters the list, G17 Phase 2: a non-operator keeps the events that
-    matched at least one workflow it owns. An event nothing matched is
-    nobody's row — visible to everyone, like every no-owner item.
 
     ``outcome`` (comma-separated :data:`OUTCOMES` values) keeps the events
     with that outcome, composing with the connector filter and paging.
@@ -544,7 +538,6 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     if unknown:
         return 400, {"error": f"Unknown outcome {', '.join(unknown)}; use "
                               f"{', '.join(sorted(set(OUTCOMES.values())))}"}
-    owners = visibility.owners_for(visible)
     # Scan the whole retention window (paginated, item-capped) before
     # sorting: a single-page scan reads an arbitrary slice of the hash-key
     # space, so freshly written rows could be invisible until enough older
@@ -572,8 +565,6 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
                   if isinstance(event.get("data"), dict) and event["data"].get("hook") == hook]
     if outcomes:
         events = [event for event in events if event.get("outcome") in outcomes]
-    if visible is not None:
-        events = [event for event in events if _visible_event(event, visible, owners)]
     events.sort(key=_sort_key, reverse=True)
     if token_key is not None:
         events = [event for event in events if _sort_key(event) < token_key]
@@ -588,16 +579,6 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
             "filtered": bool(connector or outcomes or hook or next_token),
         },
     }
-
-
-def _visible_event(event, visible, owners):
-    """The G17 rule for one inbox row: visible when it matched a workflow
-    the caller may see, and when it matched nothing at all (no owner — the
-    defensive rule that never hides an unclaimed event)."""
-    matched = event.get("matched") or []
-    if not matched:
-        return True
-    return any(visible.workflow_visible(m, owners) for m in matched)
 
 
 def _run_status(run_id):
@@ -625,18 +606,13 @@ def _with_run_status(view, run_status):
     return view
 
 
-def api_get(inbox_id, *, table_ref=None, visible=None, run_status=None):
+def api_get(inbox_id, *, table_ref=None, run_status=None):
     inbox_id = str(inbox_id or "").strip()
     if not inbox_id:
         return 400, {"error": "inbox_id is required"}
     item = (table_ref if table_ref is not None else _table()).get_item(
         Key={"inbox_id": inbox_id}).get("Item")
     if not item:
-        return 404, {"error": "Inbox event not found"}
-    if visible is not None and not _visible_event(
-            _view(item), visible, visibility.owners_for(visible)):
-        # Same answer as a missing row: the list dropped it, the single
-        # read must not reveal it either.
         return 404, {"error": "Inbox event not found"}
     return 200, {"event": _with_run_status(_view(item, body=True),
                                            run_status or _run_status)}

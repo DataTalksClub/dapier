@@ -6,12 +6,11 @@ import re
 
 import yaml
 
-from ...auth import visibility
 from ...triggers import published_workflows
 from .github import SyncConfigError, SyncError, TOKEN_SECRET_ENV
 from .validation import (FILE_PATTERN, WorkflowError, _LateBinding, shared,
                          parse_workflow)
-from .listing import _read_denied, workflow_yaml_text
+from .listing import workflow_yaml_text
 
 
 def save_gate_ids(body):
@@ -247,19 +246,15 @@ def api_discard(source, *, operator=None):
     return 200, {"file": source, "workflow_id": workflow_id, "discarded": True}
 
 
-def api_draft(source, visible=None):
+def api_draft(source):
     """One workflow's draft (the designer's load path for a draft-only
     workflow, and the "you have a draft" indicator): the drafted definition,
-    its canonical YAML, and the draft block. 404 when nothing is drafted —
-    or when ``visible`` (G17 auth.visibility, None = unrestricted) may not
-    see the workflow, same answer."""
+    its canonical YAML, and the draft block. 404 when nothing is drafted."""
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
     workflow_id = source.removesuffix(".yaml")
-    if _read_denied(source, visible):
-        return 404, {"error": f"no draft of workflow {workflow_id}"}
     draft = published_workflows.get_draft(workflow_id)
     if not draft or not isinstance(draft.get("workflow"), dict):
         return 404, {"error": f"no draft of workflow {workflow_id}"}
@@ -277,20 +272,16 @@ def api_draft(source, visible=None):
     }
 
 
-def api_draft_diff(source, visible=None):
+def api_draft_diff(source):
     """Draft vs live in the api_diff shape: ``from`` is the live definition
     (revision 0, empty YAML, when the workflow is draft-only — the diff shows
     it all as new), ``to`` is the draft at revision ``"draft"``. ``same``
-    flags a draft identical to live (safe to publish; it refreshes nothing).
-    ``visible`` (G17 auth.visibility, None = unrestricted) hides both sides
-    when the caller may not see the workflow — same 404 as no draft."""
+    flags a draft identical to live (safe to publish; it refreshes nothing)."""
     if not published_workflows.configured():
         return 503, {"error": "published workflows are not configured"}
     if not FILE_PATTERN.fullmatch(source or ""):
         return 400, {"error": f"invalid workflow file name: {source!r}"}
     workflow_id = source.removesuffix(".yaml")
-    if _read_denied(source, visible):
-        return 404, {"error": f"no draft of workflow {workflow_id}"}
     draft = published_workflows.get_draft(workflow_id)
     if not draft or not isinstance(draft.get("workflow"), dict):
         return 404, {"error": f"no draft of workflow {workflow_id}"}

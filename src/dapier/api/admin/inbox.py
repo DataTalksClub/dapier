@@ -4,28 +4,22 @@ from ...triggers import inbox
 from ...auth import session
 
 
-def list_inbox(event, visible=None):
+def list_inbox(event):
     """Trigger inbox: every inbound event, matched or not.
 
-    ``visible`` (G17 auth.visibility) read-filters the list for
-    non-operators: events that matched at least one workflow they own;
-    unmatched events stay visible to everyone."""
+"""
     query = event.get("queryStringParameters") or {}
     status, payload = inbox.api_list(
         query.get("connector"), query.get("limit", 25),
         next_token=query.get("next") or None,
         outcome=query.get("outcome") or None,
-        visible=visible,
     )
     return http._json_response(status, payload)
 
 
-def get_inbox_event(inbox_id, visible=None):
-    """One inbox event: the stored envelope and the workflows that matched.
-
-    ``visible`` scopes the single read exactly as the list does: a hidden
-    event answers like a missing one."""
-    status, payload = inbox.api_get(inbox_id, visible=visible)
+def get_inbox_event(inbox_id):
+    """One inbox event: the stored envelope and the workflows that matched."""
+    status, payload = inbox.api_get(inbox_id)
     return http._json_response(status, payload)
 
 

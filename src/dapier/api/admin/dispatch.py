@@ -64,10 +64,9 @@ def _pre_routes(event, method, path):
             "email": email,
             "name": str(payload.get("name") or ""),
             # An operator agent may open the console. `role` says how much
-            # of it they get; `view_as` is only for a full operator.
+            # of it they get.
             "operator": bool(full_operator or actor),
             "role": actor["role"] if actor else ("operator" if full_operator else ""),
-            "view_as": actors.public_directory() if full_operator else [],
         })
     if not session._csrf_ok(event, method):
         return http._json_response(403, {"error": "Cross-site request rejected"})
@@ -91,16 +90,15 @@ def _gate(event, method, path):
 def _route_overview_runs(event, method, path, operator_payload, operator_subject):
     """The overview, audit trail, and run endpoints."""
     if method == "GET" and path == "/api/admin/overview":
-        return overview.overview(event, visible=_read_scope(operator_payload))
+        return overview.overview(event)
     if method == "GET" and path == "/api/admin/audit/export":
         return routes.export_audit(event, operator_subject)
     if method == "GET" and path == "/api/admin/audit":
         return routes.list_audit(event)
     if method == "GET" and path == "/api/admin/runs":
-        return routes.list_runs(event, visible=_read_scope(operator_payload))
+        return routes.list_runs(event)
     if method == "GET" and path == "/api/admin/runs/export":
-        return routes.export_runs(event, operator_subject,
-                                  visible=_read_scope(operator_payload))
+        return routes.export_runs(event, operator_subject)
     if method == "POST" and path == "/api/admin/runs/replay-failed":
         return routes.replay_failed_runs(event, operator_subject)
     return None
@@ -109,15 +107,15 @@ def _route_overview_runs(event, method, path, operator_payload, operator_subject
 def _route_usage_errors(event, method, path, operator_payload, operator_subject):
     """Usage, quota, error digests, and the per-run lookups."""
     if method == "GET" and path == "/api/admin/costs":
-        return routes.costs(event, visible=_read_scope(operator_payload))
+        return routes.costs(event)
     if method == "GET" and path == "/api/admin/usage":
-        return routes.usage(event, visible=_read_scope(operator_payload))
+        return routes.usage(event)
     if method == "GET" and path == "/api/admin/quota":
         return routes.quota_get(event)
     if method == "PUT" and path == "/api/admin/quota":
         return routes.quota_save(event, operator_subject)
     if method == "GET" and path == "/api/admin/errors/summary":
-        return routes.errors_summary(event, visible=_read_scope(operator_payload))
+        return routes.errors_summary(event)
     if method == "POST" and path == "/api/admin/errors/digest":
         return routes.send_error_digest(event, operator_subject)
     run_replay_match = re.fullmatch(r"/api/admin/runs/([^/]+)/replay", path)
@@ -133,25 +131,22 @@ def _route_usage_errors(event, method, path, operator_payload, operator_subject)
                                   operator_subject, event)
     run_match = re.fullmatch(r"/api/admin/runs/([^/]+)", path)
     if method == "GET" and run_match:
-        return routes.get_run(unquote(run_match.group(1)),
-                              visible=_read_scope(operator_payload))
+        return routes.get_run(unquote(run_match.group(1)))
     return None
 
 
 def _route_inbox(event, method, path, operator_payload, operator_subject):
     """The trigger inbox and the trigger sample pull."""
     if method == "GET" and path == "/api/admin/triggers/inbox":
-        return routes.list_inbox(event, visible=_read_scope(operator_payload))
+        return routes.list_inbox(event)
     if method == "GET" and path == "/api/admin/triggers/sample":
-        return routes.trigger_sample(event, operator_subject,
-                                     visible=_read_scope(operator_payload))
+        return routes.trigger_sample(event, operator_subject)
     inbox_replay_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)/replay", path)
     if method == "POST" and inbox_replay_match:
         return routes.replay_inbox_event(unquote(inbox_replay_match.group(1)), operator_subject)
     inbox_match = re.fullmatch(r"/api/admin/triggers/inbox/([^/]+)", path)
     if method == "GET" and inbox_match:
-        return routes.get_inbox_event(unquote(inbox_match.group(1)),
-                                      visible=_read_scope(operator_payload))
+        return routes.get_inbox_event(unquote(inbox_match.group(1)))
     return None
 
 
@@ -220,8 +215,7 @@ def _route_storage(event, method, path, operator_payload, operator_subject):
     """Per-workflow key/value storage."""
     storage_match = re.fullmatch(r"/api/admin/storage/([^/]+)", path)
     if method == "GET" and storage_match:
-        return routes.storage_read(event, unquote(storage_match.group(1)),
-                                   visible=_read_scope(operator_payload))
+        return routes.storage_read(event, unquote(storage_match.group(1)))
     if method == "POST" and storage_match:
         return routes.storage_write(event, unquote(storage_match.group(1)),
                                     visible=_read_scope(operator_payload),
@@ -240,11 +234,10 @@ def _route_triggers(event, method, path, operator_payload, operator_subject):
     if method == "PUT" and path == "/api/admin/hook-triggers":
         return routes.save_hook_trigger(event, operator_subject)
     if method == "GET" and path == "/api/admin/hook-triggers/deliveries":
-        return routes.list_hook_deliveries(event, visible=_read_scope(operator_payload))
+        return routes.list_hook_deliveries(event)
     delivery_match = re.fullmatch(r"/api/admin/hook-triggers/deliveries/([^/]+)", path)
     if method == "GET" and delivery_match:
-        return routes.get_hook_delivery(unquote(delivery_match.group(1)),
-                                        visible=_read_scope(operator_payload))
+        return routes.get_hook_delivery(unquote(delivery_match.group(1)))
     if method == "POST" and path == "/api/admin/hook-triggers/test":
         return routes.test_hook_trigger(event, operator_subject)
     if method == "DELETE" and path == "/api/admin/hook-triggers":

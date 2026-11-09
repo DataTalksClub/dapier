@@ -29,19 +29,19 @@ def list_hook_triggers(event):
     return http._json_response(status, payload)
 
 
-def list_hook_deliveries(event, visible=None):
+def list_hook_deliveries(event):
     """Recent webhook deliveries (the trigger inbox's webhook rows) with
     their run outcomes; ``hook`` narrows to one endpoint."""
     query = event.get("queryStringParameters") or {}
     status, payload = hook_activity.api_deliveries(
         query.get("hook"), query.get("limit", 25),
-        next_token=query.get("next") or None, visible=visible)
+        next_token=query.get("next") or None)
     return http._json_response(status, payload)
 
 
-def get_hook_delivery(delivery_id, visible=None):
+def get_hook_delivery(delivery_id):
     """One webhook delivery: request headers, payload, run outcomes."""
-    status, payload = hook_activity.api_delivery(delivery_id, visible=visible)
+    status, payload = hook_activity.api_delivery(delivery_id)
     return http._json_response(status, payload)
 
 

@@ -4,21 +4,19 @@ from ... import http
 from ...auth import session
 
 
-def export_designer_workflows(event, operator, visible=None):
+def export_designer_workflows(event, operator):
     """Every workflow's canonical YAML as one zip (designer_store.api_export),
     optionally narrowed with ``?tag=`` / ``?folder=`` like the designer list.
 
     Same domain function the agent route serves `workflows export --all`; the
     response carries {filename, count, skipped, b64} and an attachment
     content-disposition carrying the dated filename — the console decodes the
-    base64 zip into that download. ``visible`` leaves out the workflows the
-    caller may not see. The bulk export is audited like the audit CSV export:
+    base64 zip into that download. The bulk export is audited like the audit CSV export:
     bulk reads leave a mark in the trail.
     """
     query = event.get("queryStringParameters") or {}
     status, payload = designer_store.api_export(tag=query.get("tag"),
-                                                folder=query.get("folder"),
-                                                visible=visible)
+                                                folder=query.get("folder"))
     if status == 200:
         session._audit_event("workflows", "workflow.export", operator or "unknown",
                              outcome="ok")

@@ -29,7 +29,6 @@ def stores(monkeypatch):
 
     monkeypatch.setenv('EXECUTIONS_TABLE', 'executions')
     monkeypatch.setenv('CONNECTIONS_TABLE', 'connections')
-    monkeypatch.setattr(overview.visibility, 'owners_for', lambda visible: {})
     monkeypatch.setattr(overview, '_workflows', read('workflows', [
         {'id': 'mail', 'description': 'Email routing', 'tags': ['Inbox'], 'folder': 'Messages'},
         {'id': 'other', 'tags': [], 'folder': ''},
@@ -82,15 +81,6 @@ def test_workflow_filters_still_apply_without_other_reads(stores):
 def test_invalid_section_reads_nothing(stores):
     assert overview.overview({'queryStringParameters': {'section': 'invalid'}})['statusCode'] == 400
     assert stores == []
-
-
-def test_activity_section_keeps_visibility_filter(stores):
-    class Scope:
-        def workflow_visible(self, workflow_id, owners):
-            return False
-
-    data = json.loads(overview.overview({'queryStringParameters': {'section': 'activity'}}, visible=Scope())['body'])
-    assert data['executions'] == []
 
 
 def test_cli_section_reaches_shared_agent_handler(monkeypatch, capsys):

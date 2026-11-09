@@ -92,9 +92,8 @@ def record_response(*, provider, model, response, connection_id='', workflow_id=
     return metadata
 
 
-def api_costs(months=1, now=None, visible=None):
+def api_costs(months=1, now=None):
     from boto3.dynamodb.conditions import Key
-    from .auth import visibility
     try:
         months = int(months)
         if not 1 <= months <= 24:
@@ -107,13 +106,11 @@ def api_costs(months=1, now=None, visible=None):
     now = now or datetime.now(timezone.utc)
     year, month = now.year, now.month
     rows, truncated = [], False
-    owners = visibility.owners_for(visible)
     for _ in range(months):
         kwargs = {'KeyConditionExpression': Key('month').eq(f'{year:04d}{month:02d}')}
         while True:
             result = _table().query(**kwargs)
-            rows.extend(row for row in result.get('Items', [])
-                        if visible is None or (row.get('workflow_id') and visible.workflow_visible(row['workflow_id'], owners)))
+            rows.extend(result.get('Items', []))
             if len(rows) >= 5000:
                 rows = rows[:5000]
                 truncated = True

@@ -195,13 +195,13 @@ def delivery_view(event, *, with_runs=True, budget=None, detail=False):
     return view
 
 
-def api_deliveries(hook=None, limit=25, next_token=None, visible=None):
+def api_deliveries(hook=None, limit=25, next_token=None):
     """Recent hook deliveries (webhook, Telegram), newest
     first, optionally for one hook."""
     hook = str(hook or "").strip() or None
     try:
         status, payload = inbox.api_list(tuple(HOOK_CONNECTORS.values()), limit,
-                                         next_token=next_token, visible=visible, hook=hook)
+                                         next_token=next_token, hook=hook)
     except inbox.InboxError as exc:
         return 503, {"error": str(exc)}
     if status != 200:
@@ -214,10 +214,10 @@ def api_deliveries(hook=None, limit=25, next_token=None, visible=None):
     }
 
 
-def api_delivery(delivery_id, visible=None):
+def api_delivery(delivery_id):
     """One delivery with its request headers, payload and run outcomes."""
     try:
-        status, payload = inbox.api_get(delivery_id, visible=visible)
+        status, payload = inbox.api_get(delivery_id)
     except inbox.InboxError as exc:
         return 503, {"error": str(exc)}
     if status != 200:
