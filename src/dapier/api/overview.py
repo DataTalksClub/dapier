@@ -216,7 +216,8 @@ def overview(event=None):
                               str(item.get("execution_id") or "")),
             reverse=True,
         )
-        payload.update(executions=executions[:25], runs=runs.recent(25))
+        payload.update(executions=executions[:25], runs=runs.recent(25),
+                       latest_runs=runs.latest_by_workflow())
     if "usage" in selected:
         payload.update(usage=_usage(), quota=_quota())
     if "connections" in selected:

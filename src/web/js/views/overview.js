@@ -199,7 +199,8 @@ function paintWorkflows() {
     locationCol.remove();
   }
   $('#workflow-table').innerHTML = shown.map((workflow, index) => {
-    const recent = runs.find((run) => run.workflow_id === workflow.id);
+    const recent = state.data?.latest_runs?.[workflow.id]
+      || runs.find((run) => run.workflow_id === workflow.id);
     const id = escapeHtml(workflow.id);
     const name = escapeHtml(workflowName(workflow));
     const opensDesigner = workflow.source;

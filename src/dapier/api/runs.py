@@ -558,6 +558,28 @@ def recent(limit=25, workflow_id=None, status=None, since=None, before=None,
     return payload["runs"] if status_code == 200 else []
 
 
+def latest_by_workflow():
+    """``{workflow_id: run summary}``: each workflow's newest run in the
+    scanned window.
+
+    The overview's recent-runs block is the newest N runs across every
+    workflow, so one chatty workflow fills it and every quieter one reads
+    "No runs yet". This asks per workflow instead, over the same bounded
+    (filtered-budget) scan a ``?workflow_id=`` list uses.
+    """
+    items, _ = _scan_items(filtered=True, lean=True)
+    grouped = _grouped(items)
+    runs = [run_summary(run_id, group) for run_id, group in grouped.items()]
+    _derive_recovered(runs)
+    latest = {}
+    for run in runs:
+        workflow_id = run.get("workflow_id")
+        if workflow_id and (workflow_id not in latest
+                            or _sort_key(run) > _sort_key(latest[workflow_id])):
+            latest[workflow_id] = run
+    return latest
+
+
 def api_list(limit=25, workflow_id=None, status=None, since=None, before=None,
              q=None, next_token=None, lean=False):
     """The list response: runs plus a ``paging`` block.
