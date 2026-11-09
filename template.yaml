@@ -79,12 +79,13 @@ Parameters:
     Description: Comma-separated stable DTC subjects allowed to administer connections
   GmailScopes:
     Type: String
-    Default: ''
+    Default: gmail.modify
     Description: >
       Extra Gmail OAuth scopes (GMAIL_SCOPES) added to the grant of any
       Google connection that touches Gmail, comma- or whitespace-separated
-      full URLs or short names (gmail.modify); empty grants only the
-      connector's declared gmail.readonly and gmail.send
+      full URLs or short names (gmail.modify backs `dapier gmail mark` and
+      label changes); empty grants only the connector's declared
+      gmail.readonly and gmail.send
   TriggerEmailDomain:
     Type: String
     Default: dtcdev.click
