@@ -24,7 +24,11 @@ let deliveries = [];
 let healthRows = []; // the latest unfiltered page: endpoint health ignores the chip filter
 let nextToken = null;
 let filter = ''; // hook name, '' = every hook
-let outcomeFilter = 'all'; // the family's outcome chips
+/* Hooks default to Active: calls nothing listens to ("No workflow", e.g. a bot
+   whose updates no workflow uses) are logged but would bury the real traffic.
+   They stay one chip away, counted in the summary. */
+const HOOK_FILTERS = [['active', 'Active'], ...OUTCOME_FILTERS];
+let outcomeFilter = 'active';
 let fetchingHooks = false;
 let fetchingDeliveries = false;
 let loaded = false;
@@ -60,7 +64,7 @@ function outcomeLine(row) {
   if (key === 'handled' || (key === 'failed' && runs.length)) {
     return outcomeCell(key, { by: runLinks(runs), error: key === 'failed' ? deliveryError(row) : '' });
   }
-  if (key === 'none') return outcomeCell(key, { note: 'Logged; nothing ran' });
+  if (key === 'none') return outcomeCell(key, { note: 'No workflow listens on this hook, so nothing ran' });
   return outcomeCell(key, { error: deliveryError(row), note: key === 'filtered' ? 'Did not pass the workflow filters' : '' });
 }
 
@@ -153,14 +157,19 @@ function deliveryRow(row) {
 }
 
 function shownDeliveries() {
-  return outcomeFilter === 'all' ? deliveries : deliveries.filter((row) => outcomeKey(row) === outcomeFilter);
+  if (outcomeFilter === 'all') return deliveries;
+  if (outcomeFilter === 'active') return deliveries.filter((row) => outcomeKey(row) !== 'none');
+  return deliveries.filter((row) => outcomeKey(row) === outcomeFilter);
 }
+
+const unlistened = () => deliveries.filter((row) => outcomeKey(row) === 'none').length;
 
 function renderSummary() {
   const shown = shownDeliveries().length;
   const failed = deliveries.filter((row) => outcomeKey(row) === 'failed').length;
   const parts = [`${shown}${nextToken ? '+' : ''} ${shown === 1 ? 'delivery' : 'deliveries'}${filter ? ` to ${filter}` : ''}`];
-  if (failed && outcomeFilter === 'all') parts.push(`${failed} failed`);
+  if (failed && ['all', 'active'].includes(outcomeFilter)) parts.push(`${failed} failed`);
+  if (outcomeFilter === 'active' && unlistened()) parts.push(`${unlistened()} with no workflow hidden`);
   $('#hooks-summary').textContent = loaded ? parts.join(' · ') : 'Loading…';
   $('#hooks-clear-filter').hidden = !filter;
 }
@@ -173,7 +182,7 @@ function renderNow() {
   const any = hooks.length > 0;
   $('#hook-empty').hidden = any || !loaded;
   $('#hooks-layout').hidden = !any;
-  $('#hooks-outcome-chips').innerHTML = filterSegments(OUTCOME_FILTERS, outcomeFilter, 'hook-outcome');
+  $('#hooks-outcome-chips').innerHTML = filterSegments(HOOK_FILTERS, outcomeFilter, 'hook-outcome');
   if (!any) return;
   renderSummary();
   $('#hook-endpoints').innerHTML = hooks.map(endpointRow).join('');
@@ -183,7 +192,9 @@ function renderNow() {
   $('#hook-deliveries-empty').hidden = !empty;
   $('#hook-deliveries').hidden = empty;
   $('#hook-deliveries-empty-text').textContent = deliveries.length
-    ? 'No delivery matches this filter.'
+    ? (outcomeFilter === 'active' && unlistened()
+      ? `Only calls that reached no workflow so far (${unlistened()}). Pick "No workflow" to see them.`
+      : 'No delivery matches this filter.')
     : filter
       ? `Nothing has called ${filter} in the last 30 days. Send a test request to see one arrive.`
       : 'No hook has been called in the last 30 days. Send a test request to see one arrive.';
