@@ -88,12 +88,38 @@ def test_google_tools_opens_for_paged_connection_outside_overview():
     with console_server() as origin, sync_playwright() as playwright:
         browser = _chromium(playwright)
         page = browser.new_page()
-        page.route('**/api/admin/connections?*', lambda route: route.fulfill(json={
-            'connections': [{'connection_id': 'paged-google', 'provider': 'google',
-                             'status': 'connected', 'verified_account_id': 'paged@example.com',
-                             'granted_scopes': ['https://www.googleapis.com/auth/gmail.readonly']}]}))
+        body = {'connections': [{'connection_id': 'paged-google', 'provider': 'google',
+                                 'status': 'connected', 'verified_account_id': 'paged@example.com',
+                                 'granted_scopes': ['https://www.googleapis.com/auth/gmail.readonly']}]}
+        page.route('**/api/admin/connections?*', lambda route: route.fulfill(json=body))
+        page.route('**/api/admin/overview*', lambda route: route.fulfill(json=body))
         page.goto(origin + '/connections')
-        page.locator('.connection-google-tools').first.click()
+        page.locator('.service-account').first.wait_for(state='visible')
+        assert page.locator('.connection-google-tools').count() == 0
+        page.locator('.connection-edit', has_text='Manage').first.click()
+        page.locator('#edit-connection-google-tools').click()
         page.locator('#google-tools-dialog').wait_for(state='visible')
         assert 'paged@example.com' in page.locator('#google-tools-dialog').inner_text()
+        browser.close()
+
+
+def test_connected_row_missing_scopes_shows_reconnect():
+    pytest.importorskip('playwright.sync_api')
+    from playwright.sync_api import sync_playwright
+    from test_console_boot import console_server, _chromium
+    gmail = 'https://www.googleapis.com/auth/gmail.'
+    with console_server() as origin, sync_playwright() as playwright:
+        browser = _chromium(playwright)
+        page = browser.new_page()
+        page.route('**/api/admin/connections?*', lambda route: route.fulfill(json={
+            'connections': [{'connection_id': 'google-gmail-datatalks', 'provider': 'google',
+                             'status': 'connected', 'oauth_consent': True,
+                             'verified_account_id': 'a@example.com',
+                             'scopes': [gmail + 'readonly', gmail + 'modify'],
+                             'granted_scopes': [gmail + 'readonly']}]}))
+        page.goto(origin + '/connections')
+        row = page.locator('.service-account').first
+        row.wait_for(state='visible')
+        assert 'Missing permissions: gmail.modify' in row.inner_text()
+        assert row.locator('a.connection-oauth', has_text='Reconnect').count() == 1
         browser.close()

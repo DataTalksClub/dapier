@@ -55,7 +55,7 @@ function statusKind(value) {
   return ['completed', 'succeeded', 'reused', 'connected', 'configured', 'enabled', 'active'].includes(value) ? 'ok'
     : ['processing', 'running', 'ready', 'queued', 'delayed'].includes(value) ? 'run'
     : ['failed', 'timed_out', 'interrupted', 'error', 'expired', 'stalled', 'auto-paused'].includes(value) ? 'err'
-    : ['expiring'].includes(value) ? 'warn'
+    : ['expiring', 'missing_scopes'].includes(value) ? 'warn'
     : 'off';
 }
 

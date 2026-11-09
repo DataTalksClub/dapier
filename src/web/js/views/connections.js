@@ -338,13 +338,46 @@ const tokenExpiringSoon = (connection) => {
    'connected' — the API flags a lapse via health; the horizon flags the
    ones that still work. Treat both as needing attention everywhere the
    list aggregates, not just in the row rendering. */
+/* A scope Google grants implicitly through a broader one it did grant. */
+const SCOPE_COVERED_BY = {
+  'gmail.readonly': ['gmail.modify', 'mail.google.com'],
+  'gmail.labels': ['gmail.modify', 'mail.google.com'],
+  'gmail.modify': ['mail.google.com'],
+  'drive.readonly': ['drive'],
+  'drive.file': ['drive'],
+  'calendar.readonly': ['calendar'],
+  'calendar.events': ['calendar'],
+};
+const shortScope = (scope) => String(scope).replace(/^https:\/\/www\.googleapis\.com\/auth\//, '').replace(/^https:\/\//, '');
+
+/* Requested permissions the provider did not grant. Only OAuth accounts that
+   recorded a grant are judged; a connected row must not read healthy while
+   it lacks a scope its workflows need. */
+const missingScopes = (connection) => {
+  if (connection.status !== 'connected' || !usesOAuthConsent(connection)) return [];
+  const granted = new Set((connection.granted_scopes || []).map(shortScope));
+  if (!granted.size) return [];
+  return (connection.scopes || []).map(shortScope).filter((scope) =>
+    !granted.has(scope) && !(SCOPE_COVERED_BY[scope] || []).some((wider) => granted.has(wider)));
+};
+
 const effectiveStatus = (connection) => {
   if (connection.health === 'expired' && connection.status === 'connected') return 'expired';
+  if (missingScopes(connection).length) return 'missing_scopes';
   if (connection.status === 'connected' && tokenExpiringSoon(connection)) return 'expiring';
   return connection.status;
 };
 const needsAttention = (connection) =>
-  ['ready', 'expired', 'revoked', 'expiring'].includes(effectiveStatus(connection));
+  ['ready', 'expired', 'revoked', 'expiring', 'missing_scopes'].includes(effectiveStatus(connection));
+
+/* The status pill; a row missing permissions names them. */
+const connectionStatusHtml = (connection) => {
+  const missing = missingScopes(connection);
+  const labels = missing.length
+    ? { ...CONNECTION_STATUS_LABELS, missing_scopes: `Missing permissions: ${missing.join(', ')}` }
+    : CONNECTION_STATUS_LABELS;
+  return statusLine(effectiveStatus(connection), labels);
+};
 
 /* Server-paged accounts register: the overview snapshot clips at its scan
    limit, so once this page is open the view fetches /api/admin/connections
@@ -742,7 +775,7 @@ export function openEditConnection(connectionId) {
   form.dataset.kind = provider === 'zoom' ? (zoomWebhook ? 'webhook' : 'api') : '';
   form.dataset.pastesToken = tokenProvider ? '1' : '';
   $('#edit-connection-title').textContent = accountLabel(connection);
-  $('#edit-connection-meta').innerHTML = statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS);
+  $('#edit-connection-meta').innerHTML = connectionStatusHtml(connection);
   renderManageDetails(connection, usageRefs(connection));
 
   form.scopes.value = scopesForEditing(connection);
@@ -795,6 +828,7 @@ export function openEditConnection(connectionId) {
   reconnect.hidden = !usesOAuthConsent(connection) || connection.status === 'ready';
   reconnect.href = `/api/admin/oauth/${encodeURIComponent(connectionId)}/start`;
   $('#edit-connection-access').hidden = zoomWebhook;
+  $('#edit-connection-google-tools').hidden = provider !== 'google';
   const revocable = ['connected', 'expired'].includes(connection.status)
     || (zoomWebhook && connection.status === 'ready');
   $('#edit-revoke-row').hidden = !revocable;
@@ -901,10 +935,6 @@ function renderConnectionsNow(connections) {
   }));
   $$('.connection-remove').forEach((button) => button.addEventListener('click', () => deleteConnection(button.dataset.connection)));
   $$('.connection-finish').forEach((button) => button.addEventListener('click', () => openZoomWebhookSetup(button.dataset.connection)));
-  $$('.connection-google-tools').forEach((button) => button.addEventListener('click', () => {
-    const connection = connections.find((c) => c.connection_id === button.dataset.connection);
-    if (connection) openGoogleTools(connection);
-  }));
   bindConnectButtons();
   bindOAuthLinks();
 }
@@ -993,9 +1023,7 @@ function accountActions(connection, { unfinished = false, title } = {}) {
   const manage = `<button class="dk-button dk-button--secondary dk-button--sm connection-edit" data-connection="${id}" type="button">Manage</button>`;
   const test = connection.provider === 'llm'
     ? `<button class="dk-button dk-button--secondary dk-button--sm connection-test" data-connection="${id}" type="button">Test</button>` : '';
-  const tools = connection.provider === 'google'
-    ? `<button class="dk-button dk-button--secondary dk-button--sm connection-google-tools" data-connection="${id}" type="button">Google tools</button>` : '';
-  return { html: remove + next + test + tools + manage, many: Boolean(remove || next || test || tools) };
+  return { html: remove + next + test + manage, many: Boolean(remove || next || test) };
 }
 
 /* Another service's view of a shared sign-in: the account, Details, status,
@@ -1007,7 +1035,7 @@ function accountRef(connection, primaryGroup, serviceId) {
     <div class="service-account-main">
       ${identityHead(connection, { serviceId, primaryGroup })}
     </div>
-    <div class="service-account-status">${statusLine(effectiveStatus(connection), CONNECTION_STATUS_LABELS)}</div>
+    <div class="service-account-status">${connectionStatusHtml(connection)}</div>
     <div class="row-actions service-account-actions">${actions.html}</div>
   </li>`;
 }
@@ -1037,7 +1065,7 @@ function accountRow(connection, serviceId, { twin = false } = {}) {
     <div class="service-account-main">
       ${identityHead(connection, { serviceId, twin })}
     </div>
-    <div class="service-account-status">${statusLine(status, CONNECTION_STATUS_LABELS)}</div>
+    <div class="service-account-status">${connectionStatusHtml(connection)}</div>
     <div class="row-actions service-account-actions">${actions.html}</div>
   </li>`;
 }
@@ -1286,6 +1314,14 @@ $('#discover-run').addEventListener('click', async (event) => {
     button.disabled = false;
     button.textContent = 'Fetch items';
   }
+});
+
+$('#edit-connection-google-tools').addEventListener('click', () => {
+  const connectionId = $('#edit-connection-form').dataset.connectionId;
+  const connection = ((state.data || {}).connections || []).find((item) => item.connection_id === connectionId);
+  if (!connection) return;
+  $('#edit-connection-dialog').close();
+  openGoogleTools(connection);
 });
 
 $('#edit-connection-discover').addEventListener('click', (event) => {

@@ -775,7 +775,7 @@ Provider references: [Gmail threading](https://developers.google.com/workspace/g
 [Drive metadata updates](https://developers.google.com/workspace/drive/api/guides/manage-uploads),
 [Calendar attachment and notification parameters](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert).
 
-The console exposes these same operations from **Connections → Google tools**.
+The console exposes these same operations from **Connections → Manage → Google tools**.
 Choose a service and operation, fill in IDs and JSON parameters, attach local
 files when applicable, then Preview or Fetch/Apply. The selected connection ID
 is fixed for the request. Admin routes pass session, CSRF and role checks before
