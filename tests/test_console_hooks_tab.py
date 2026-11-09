@@ -38,3 +38,13 @@ def test_every_hooks_tab_endpoint_has_a_cli_counterpart():
     # Replay reuses the trigger inbox endpoint, which `dapier hooks replay` wraps.
     assert "/api/admin/triggers/inbox/" in HOOKS_JS
     assert "inbox_replay" in (ROOT / "dapier_cli" / "cli" / "hooks.py").read_text()
+
+
+def test_hooks_hide_unlistened_deliveries_by_default_but_keep_them_one_chip_away():
+    # Active (the default) hides "No workflow" calls, counts them, and explains them.
+    assert "const HOOK_FILTERS = [['active', 'Active'], ...OUTCOME_FILTERS];" in HOOKS_JS
+    assert "let outcomeFilter = 'active';" in HOOKS_JS
+    assert "outcomeKey(row) !== 'none'" in HOOKS_JS
+    assert "with no workflow hidden" in HOOKS_JS
+    assert "No workflow listens on this hook, so nothing ran" in HOOKS_JS
+    assert "filterSegments(HOOK_FILTERS, outcomeFilter, 'hook-outcome')" in HOOKS_JS
