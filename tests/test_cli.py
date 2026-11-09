@@ -432,6 +432,28 @@ def test_connect_prints_provider_webhook_setup(monkeypatch, capsys):
     assert "pubsubhubbub.appspot.com/subscribe" in out
 
 
+def test_connect_flushes_consent_url_before_polling(monkeypatch):
+    flushed = []
+    real_print = print
+
+    def spy(*args, **kwargs):
+        flushed.append((args, kwargs.get("flush")))
+        real_print(*args, **kwargs)
+
+    _connect_run(monkeypatch, [
+        {"connection_id": "g", "updated_at": "old"},
+        {"authorize_url": "https://oauth.example.test/x", "attempt": "t1",
+         "requested_scopes": []},
+    ])
+    monkeypatch.setattr("builtins.print", spy)
+    monkeypatch.setattr(webbrowser, "open", lambda url: (_ for _ in ()).throw(RuntimeError))
+    try:
+        commands.connections_connect("https://api.example.test", "g", "x")
+    except RuntimeError:
+        pass
+    assert (("https://oauth.example.test/x",), True) in flushed
+
+
 def test_connect_ignores_stale_connected_status(monkeypatch, capsys):
     """An already-connected connection must not report success before the
     callback for this run's attempt lands; no callback → loud timeout."""

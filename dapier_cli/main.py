@@ -17,7 +17,7 @@ def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
-            reconfigure(encoding="utf-8")
+            reconfigure(encoding="utf-8", line_buffering=True)
     raw = list(sys.argv[1:] if argv is None else argv)
     # Split the child command on the first `--` before argparse sees it, so
     # child flags never confuse option parsing (nargs=REMAINDER would swallow
