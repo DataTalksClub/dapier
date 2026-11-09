@@ -55,10 +55,27 @@ def _status_from(detail):
 
 
 def _scope_hint(status, detail):
-    if status == 403 and ("insufficient" in detail.lower() or "not authorized" in detail.lower()):
-        return (" — the connection lacks the Gmail scope for this operation; "
+    if status == 403:
+        return (" — the connection likely lacks the Gmail scope for this operation; "
                 "update its scopes (dapier connections edit --scopes) and reconnect")
     return ""
+
+
+_SCOPE_URL_PREFIX = "https://www.googleapis.com/auth/"
+GMAIL_MODIFY_SCOPE = _SCOPE_URL_PREFIX + "gmail.modify"
+
+
+def _require_scope(connection_id, connection, scope, operation):
+    """Fail loud before calling Gmail when the connection's grant lacks
+    ``scope``, naming the missing scope and the fix instead of relaying a
+    generic 403. Connections without recorded grants are left to Gmail."""
+    granted = {str(item) for item in (connection.get("granted_scopes") or []) if item}
+    if granted and scope not in granted:
+        raise GmailOpsError(
+            f"Gmail {operation} needs the missing scope {scope}, which connection "
+            f"{connection_id} was not granted — add it (dapier connections edit "
+            f"{connection_id} --scopes ...) and re-consent (dapier connections "
+            f"connect {connection_id})", status=403)
 
 
 def _connection_and_token(account):
@@ -327,7 +344,8 @@ def modify(account, message_id, *, add_labels=None, remove_labels=None,
     """Labels/trash on one message: the CLI's flag names map onto Gmail's
     system labels (read/unread → UNREAD, archive → INBOX) and the
     trash/untrash endpoints."""
-    _connection_id, _connection, token = _connection_and_token(account)
+    connection_id, connection, token = _connection_and_token(account)
+    _require_scope(connection_id, connection, GMAIL_MODIFY_SCOPE, "message modify")
 
     quoted = quote(str(message_id), safe="")
     if trash:

@@ -68,6 +68,10 @@ OperatorEmails: "$OPERATOR_EMAILS"
 NotifyEmail: "${NOTIFY_EMAIL:-dev@dtcdev.click}"
 AlertEmailSender: "${ALERT_EMAIL_SENDER:-DTC Alerts <alerts@dtcdev.click>}"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
+# Gmail scopes beyond the declared gmail.readonly/gmail.send: gmail.modify
+# backs `dapier gmail mark/draft`. Like NotifyEmail above, a template default
+# alone never reaches the live stack, so deploy sets it explicitly.
+GmailScopes: "${GMAIL_SCOPES:-gmail.modify}"
 # Hub session integration (t1603u): the DataOps team store entry holding the
 # Dapier service bearer token for hub.dtcdev.click (agent credential with
 # fleet:launch + an intake write grant on project dapier-agents). The hub_session

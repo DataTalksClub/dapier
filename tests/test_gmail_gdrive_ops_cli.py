@@ -860,3 +860,20 @@ def test_large_drive_cli_api_init_provider_and_account_readback(
     result = json.loads(capsys.readouterr().out)
     assert result["id"] == "file1" and result["md5_checksum"] == md5
     assert all(call["token"] == "token-google-a" for call in gdrive_provider.calls)
+
+
+def test_gmail_modify_without_modify_scope_names_the_missing_scope(google_world, gmail_provider):
+    with pytest.raises(gmail_ops.GmailOpsError) as denied:
+        gmail_ops.modify(ACCOUNT_B, "m1", mark_read=True)
+    assert denied.value.status == 403
+    assert GMAIL_MODIFY in str(denied.value)
+    assert "google-b" in str(denied.value)
+    assert not gmail_provider.calls  # refused before any Gmail call
+
+
+def test_gmail_bare_403_still_hints_at_scope(google_world, gmail_provider):
+    gmail_provider.on("GET", "/users/me/messages", None, status=403,
+                      raw=json.dumps({"error": {"message": "Forbidden"}}).encode())
+    with pytest.raises(gmail_ops.GmailOpsError) as denied:
+        gmail_ops.list_messages(ACCOUNT_A)
+    assert "lacks the Gmail scope" in str(denied.value)
