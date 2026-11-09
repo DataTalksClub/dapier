@@ -538,12 +538,13 @@ def start_connect(event, connection_id):
         return _json_response(400, {"error": str(exc)})
     verifier = _b64encode(os.urandom(48))
     challenge = _b64encode(hashlib.sha256(verifier.encode()).digest())
+    attempt = _b64encode(os.urandom(16))
     state = session._sign({
         "kind": "oauth",
         "connection_id": connection_id,
         "redirect_uri": redirect_uri,
         "code_verifier": verifier,
-        "jti": _b64encode(os.urandom(16)),
+        "jti": attempt,
         "operator_subject": subject,
         "exp": int(time.time()) + 600,
     })
@@ -554,6 +555,8 @@ def start_connect(event, connection_id):
     audit.emit(connection_id, audit.CALLBACK, subject, agent=agent, outcome="connect-started")
     return _json_response(200, {
         "connection_id": connection_id,
+        "attempt": attempt,
+        "requested_scopes": scopes,
         "authorize_url": oauth_providers.authorization_url(
             connection["provider"],
             client_id=client_id,

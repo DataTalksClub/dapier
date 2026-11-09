@@ -162,10 +162,49 @@ def connections_show(api_url, connection_id, agent=None, debug=False):
     return 0
 
 
+CONSENT_FAILURES = {
+    "missing_scopes": "the provider granted fewer scopes than requested",
+    "access_denied": "consent was denied or cancelled in the browser",
+    "session_expired": "the consent link expired or was already used",
+    "wrong_operator": "consent was completed by a different operator session",
+    "wrong_account": "the signed-in provider account does not match this connection's account",
+    "exchange_failed": "the provider rejected the authorization code",
+    "verification_failed": "the provider account could not be verified",
+    "client_configuration": "the OAuth client for this provider is not configured",
+    "incomplete": "the provider callback carried no authorization code",
+}
+
+
+def _consent_failure(connection_id, report, requested):
+    outcome = report.get("outcome", "unknown")
+    print(f"NOT connected: {connection_id} kept its previous grant. "
+          f"{CONSENT_FAILURES.get(outcome, outcome)} (callback outcome: {outcome}).")
+    missing = report.get("missing") or []
+    if missing:
+        print("Missing scopes: " + " ".join(missing))
+        print("Google withholds a scope when the Workspace admin restricts it "
+              "(Admin console > Security > API controls) or the OAuth client's consent "
+              "screen does not list it; granular consent also lets the user untick it.")
+    if report.get("granted"):
+        print("Granted this time: " + " ".join(report["granted"]))
+    return 6
+
+
 def connections_connect(api_url, connection_id, agent, timeout=300, debug=False):
+    """Start consent and report success only for the grant this run started.
+
+    A connection that was connected before stays ``status: connected`` while a
+    new consent is pending or failing, so status alone proves nothing: the
+    callback's outcome for this run's attempt id decides, and a stored grant
+    must also carry every requested scope and a fresh ``updated_at``.
+    """
+    show = f"/api/agent/connections/{connection_id}?agent={agent}"
+    before = api.call(api_url, "GET", show, debug=debug)
     data = api.call(api_url, "POST", f"/api/agent/connections/{connection_id}/connect",
                     {"agent": agent}, debug=debug)
     url = data.get("authorize_url", "")
+    attempt = data.get("attempt")
+    requested = data.get("requested_scopes") or before.get("scopes") or []
     print("Opened the browser for provider consent.")
     print("If it did not open, visit this URL (it expires in 10 minutes):")
     print(url)
@@ -174,16 +213,28 @@ def connections_connect(api_url, connection_id, agent, timeout=300, debug=False)
     while time.time() < deadline:
         time.sleep(5)
         try:
-            item = api.call(api_url, "GET",
-                            f"/api/agent/connections/{connection_id}?agent={agent}")
+            item = api.call(api_url, "GET", show)
         except api.ApiError:
             continue
-        if item.get("status") == "connected":
-            print(f"Connected {connection_id} "
-                  f"({item.get('account_title') or item.get('verified_account_id')}).")
-            print_hook_setup(item.get("provider", ""), api_url)
-            return 0
-    print("Timed out waiting for consent. Re-run `dapier connections connect` to retry.")
+        report = item.get("last_consent") or {}
+        if not attempt or report.get("attempt") != attempt:
+            continue
+        if report.get("outcome") != "connected":
+            return _consent_failure(connection_id, report, requested)
+        missing = sorted(set(requested) - set(item.get("granted_scopes") or []))
+        if item.get("updated_at") == before.get("updated_at") or missing:
+            print(f"NOT connected: {connection_id} reported success but the stored "
+                  f"grant is unchanged or incomplete (updated_at {item.get('updated_at')}"
+                  + (f"; missing scopes: {' '.join(missing)}" if missing else "") + ").")
+            return 6
+        print(f"Connected {connection_id} "
+              f"({item.get('account_title') or item.get('verified_account_id')}); "
+              f"new grant stored at {item.get('updated_at')}.")
+        print_hook_setup(item.get("provider", ""), api_url)
+        return 0
+    print(f"ERROR: no consent callback for {connection_id} within {timeout}s; the grant "
+          f"is unchanged (updated_at {before.get('updated_at')}). Re-run "
+          "`dapier connections connect` to retry.")
     return 5
 
 
