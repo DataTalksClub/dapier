@@ -11,7 +11,7 @@
 import { state } from '../state.js';
 import { $, $$, notice, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, pad2 } from '../format.js';
+import { escapeHtml, formatClock, formatDay, formatTimestamp, TIME_ZONE } from '../format.js';
 import { workflowName } from '../workflow-names.js';
 import { openRun } from './runs.js';
 import { OUTCOME_FILTERS, filterSegments, whenHtml, workflowNames, outcomeCell, activityRow } from './activity.js';
@@ -34,29 +34,12 @@ const HEALTH = {
 /* A fire's outcome in the family vocabulary (activity.js). */
 const OUTCOME_KEY = { ran: 'handled', no_listeners: 'none', failed: 'failed', retrying: 'failed', paused: 'paused', resumed: 'resumed' };
 const fireKey = (fire) => OUTCOME_KEY[fire.outcome] || 'ignored';
-const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/* Times read in the viewer's own clock, like every console timestamp. */
-const toDate = (value) => (value ? new Date(value) : null);
-const clock = (date) => `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-function dayLabel(date) {
-  const today = new Date();
-  const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diff = Math.round((start(date) - start(today)) / 86400000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  if (diff === -1) return 'Yesterday';
-  return `${DAY[date.getDay()]} ${date.getDate()} ${MONTH[date.getMonth()]}`;
-}
-function when(value) {
-  const date = toDate(value);
-  if (!date || Number.isNaN(date.getTime())) return '';
-  return `${dayLabel(date)} ${clock(date)}`;
-}
-function zoneName() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'; } catch { return 'local time'; }
-}
+/* Absolute Europe/Berlin times everywhere, like every console timestamp;
+   relative wording only rides in tooltips. */
+const clock = (value) => formatClock(value);
+const dayLabel = (value) => formatDay(value);
+const when = (value) => formatTimestamp(value) || '';
+const zoneName = () => TIME_ZONE;
 
 function healthOf(item) {
   const health = item.health || {};
@@ -84,10 +67,9 @@ function shownFires() {
 /* --- Coming up -------------------------------------------------------------- */
 
 function upcomingRow(entry) {
-  const date = toDate(entry.at);
   return `<li class="source-row sched-up-row">
     <div class="source-head">
-      <time class="sched-up-time" datetime="${escapeHtml(entry.at)}">${entry.approximate ? '~' : ''}${escapeHtml(clock(date))}</time>
+      <time class="sched-up-time" datetime="${escapeHtml(entry.at)}">${entry.approximate ? '~' : ''}${escapeHtml(clock(entry.at))}</time>
       <button type="button" class="source-name mono" data-schedule="${escapeHtml(entry.schedule_id)}" title="Open ${escapeHtml(entry.schedule_id)}">${escapeHtml(entry.schedule_id)}</button>
     </div>
     <div class="source-line">${(entry.workflows || []).length ? `Starts ${workflowNames(entry.workflows)}` : '<span class="status warn"><span class="status-dot" aria-hidden="true"></span>No workflow listening</span>'}</div>
@@ -111,7 +93,7 @@ function renderUpcoming() {
   const rows = [];
   let lastDay = '';
   shown.forEach((entry) => {
-    const label = dayLabel(toDate(entry.at));
+    const label = dayLabel(entry.at);
     if (label !== lastDay) { rows.push(`<li class="sched-day">${escapeHtml(label)}</li>`); lastDay = label; }
     rows.push(upcomingRow(entry));
   });
@@ -358,9 +340,9 @@ function openDialog(item) {
   if (!item) form.name.focus();
 }
 
-/* "Schedules [+ New schedule] ... 2 schedules": the create rides on the
-   register it creates into; the empty state repeats it. */
-collectionCreate($('#sched-register-lead'), { id: 'new-schedule', label: 'New schedule', onClick: () => openDialog(null) });
+/* Toolbar, like Hooks and Polls: [Fires | Coming up] [outcome filters] [+ New schedule];
+   the empty state repeats the create. */
+collectionCreate($('#sched-toolbar-lead'), { id: 'new-schedule', label: 'New schedule', onClick: () => openDialog(null) });
 $('#schedule-empty-create').addEventListener('click', () => openDialog(null));
 
 $('#schedule-form').addEventListener('submit', async (event) => {

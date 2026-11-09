@@ -135,16 +135,16 @@ def test_workflows_create_follows_the_list_search(console):
     page.wait_for_url("**/workflows/new")
 
 
-def test_schedules_create_follows_the_schedules_register_title(console):
+def test_schedules_create_sits_in_the_toolbar_after_the_filters(console):
     from playwright.sync_api import expect
 
     page = console("/schedules")
     create = page.locator("#new-schedule")
     _assert_dakit_create(create, "New schedule")
-    assert _lead_children(page, "#sched-register-lead") == ["sched-register-title", "new-schedule"]
+    # Same pattern as Hooks and Polls: filters, then the create; no duplicate "Schedules" title.
+    assert _lead_children(page, "#sched-toolbar-lead") == ["sched-outcome-chips", "new-schedule"]
     expect(page.locator("#sched-summary")).to_have_text("1 schedule")
-    # The fires toolbar keeps only its filters.
-    expect(page.locator('[data-page="schedules"] > .dk-toolbar .dk-button')).to_have_count(0)
+    expect(page.locator("#sched-register-title")).to_have_count(0)
     _assert_page_header_has_no_actions(page)
 
     page.keyboard.press("c")

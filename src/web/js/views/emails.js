@@ -13,7 +13,7 @@
 import { state } from '../state.js';
 import { $, $$, icons, notice, whenMenusClosed } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, statusLine, formatTimestamp } from '../format.js';
+import { escapeHtml, statusLine, formatTimestamp, timeTitle } from '../format.js';
 import { refresh } from './overview.js';
 import { openDesigner } from './designer.js';
 import { openRun } from './runs.js';
@@ -318,7 +318,7 @@ function readHtml(event) {
   const from = isFeedback(event) ? (email.from || '') : senderName(email);
   const to = (email.to || []).join(', ');
   const when = event.received_at
-    ? `<time datetime="${escapeHtml(event.received_at)}" title="${escapeHtml(formatTimestamp(event.received_at) || '')}">${escapeHtml(ago(event.received_at))}</time>`
+    ? `<time datetime="${escapeHtml(event.received_at)}" title="${escapeHtml(timeTitle(event.received_at))}">${escapeHtml(formatTimestamp(event.received_at) || '')}</time>`
     : '';
   const rows = [
     ['From', email.from],
