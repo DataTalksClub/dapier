@@ -8,7 +8,7 @@ from dapier_cli import commands, main
 
 SECTIONS = {
     'workflows': {'workflows', 'workflow_tags', 'workflow_folders'},
-    'activity': {'executions', 'runs'},
+    'activity': {'executions', 'runs', 'latest_runs'},
     'usage': {'usage', 'quota'},
     'connections': {'connections'},
     'credentials': {'credentials', 'oauth_clients'},
@@ -43,6 +43,7 @@ def stores(monkeypatch):
     monkeypatch.setattr(overview, '_connection_views', lambda items: items)
     monkeypatch.setattr(overview.connection_usage, 'attach', lambda items: items)
     monkeypatch.setattr(overview.runs, 'recent', read('activity', []))
+    monkeypatch.setattr(overview.runs, 'latest_by_workflow', read('activity', {}))
     monkeypatch.setattr(overview, '_usage', read('usage', []))
     monkeypatch.setattr(overview, '_quota', read('usage', None))
     monkeypatch.setattr(overview, '_credential_status', read('credentials', {}))

@@ -1256,6 +1256,7 @@ def test_overview_q_filters_the_workflow_list(monkeypatch):
     monkeypatch.setattr(overview_api, "_email_triggers",
                         lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.setattr(overview_api.runs, "latest_by_workflow", lambda: {})
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
     event = operator_request("GET", "/api/admin/overview")
     event["queryStringParameters"] = {"q": "Slack"}
@@ -1306,6 +1307,7 @@ def test_overview_connections_carry_token_health(monkeypatch):
     monkeypatch.setattr(overview_api, "_email_triggers",
                         lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.setattr(overview_api.runs, "latest_by_workflow", lambda: {})
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
 
     payload = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])
@@ -1339,6 +1341,7 @@ def test_overview_executions_are_newest_first_by_started_at(monkeypatch):
     monkeypatch.setattr(overview_api, "_email_triggers",
                         lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.setattr(overview_api.runs, "latest_by_workflow", lambda: {})
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
 
     payload = json.loads(overview_api.overview(operator_request("GET", "/api/admin/overview"))["body"])

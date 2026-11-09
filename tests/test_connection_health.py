@@ -236,6 +236,7 @@ def _overview(monkeypatch, connections, credential_items):
     monkeypatch.setattr(overview_api, "_scan",
                         lambda *args, **kwargs: connections if args and args[0] == "connections" else [])
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.setattr(overview_api.runs, "latest_by_workflow", lambda: {})
     monkeypatch.setattr(overview_api, "_credential_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api, "_oauth_client_status", lambda provider: {"provider": provider})
     monkeypatch.setattr(overview_api.api_tokens, "list_all", lambda: [])

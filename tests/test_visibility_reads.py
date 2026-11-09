@@ -231,3 +231,23 @@ def test_console_designer_get_denies_non_operators(monkeypatch, published):
         "GET", "/api/admin/designer/workflows/mine.yaml")
     assert own["statusCode"] == 403
     assert _json.loads(own["body"]) == {"error": "Operator authorization required"}
+
+
+# --- runs.latest_by_workflow -------------------------------------------------
+
+def test_latest_by_workflow_finds_quiet_workflows_behind_a_chatty_one(runs_env):
+    """The overview's newest-25 sample is all dev-mailbox; every other
+    workflow must still get its own latest run (the "No runs yet" bug)."""
+    for n in range(30):
+        runs_env.put_item(Item=execution("dev-mailbox", f"d{n}", f"2026-11-09T12:{n:02d}:00"))
+    runs_env.put_item(Item=execution("zoom-s3", "z1", "2026-11-05T10:00:00"))
+    runs_env.put_item(Item=execution("zoom-s3", "z2", "2026-11-06T18:21:34"))
+    runs_env.put_item(Item=execution("drive-s3", "g1", "2026-11-04T21:17:32"))
+
+    sample = {run["workflow_id"] for run in runs_api.recent(25)}
+    assert sample == {"dev-mailbox"}
+
+    latest = runs_api.latest_by_workflow()
+    assert set(latest) == {"dev-mailbox", "zoom-s3", "drive-s3"}
+    assert latest["zoom-s3"]["started_at"] == "2026-11-06T18:21:34"
+    assert latest["drive-s3"]["run_id"] == "drive-s3:evt-g1"

@@ -506,6 +506,7 @@ def test_overview_tag_filter_and_aggregate(monkeypatch):
     monkeypatch.setattr(overview_api, "_email_triggers",
                         lambda: {"domain": "", "triggers": [], "managed_routes": []})
     monkeypatch.setattr(overview_api.runs, "recent", lambda *args, **kwargs: [])
+    monkeypatch.setattr(overview_api.runs, "latest_by_workflow", lambda: {})
     monkeypatch.delenv("TASK_USAGE_TABLE", raising=False)
 
     event = admin_request("GET", "/api/admin/overview")
