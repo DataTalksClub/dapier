@@ -15,7 +15,7 @@
 import { state } from '../state.js';
 import { $, $$, icons, notice, openWhenReady, collectionCreate } from '../ui.js';
 import { api } from '../api.js';
-import { escapeHtml, formatTimestamp, dataBlock } from '../format.js';
+import { escapeHtml, formatTimestamp, dataBlock, timeTitle } from '../format.js';
 import { workflowName } from '../workflow-names.js';
 import { OUTCOME_FILTERS, filterSegments, whenHtml, workflowNames, outcomeCell, activityRow, sourceRow } from './activity.js';
 
@@ -96,7 +96,7 @@ function ago(value) {
 
 function when(value, empty = 'Never') {
   if (!value) return `<span class="poll-muted">${escapeHtml(empty)}</span>`;
-  return `<time datetime="${escapeHtml(value)}" title="${escapeHtml(formatTimestamp(value) || '')}">${escapeHtml(ago(value))}</time>`;
+  return `<time datetime="${escapeHtml(value)}" title="${escapeHtml(timeTitle(value))}">${escapeHtml(formatTimestamp(value) || String(value))}</time>`;
 }
 
 function every(poll) {

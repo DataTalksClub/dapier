@@ -156,17 +156,54 @@ export function triggerLabel(workflow) {
   return extra > 0 ? `${base} +${extra}` : base;
 }
 
-/* One timestamp family everywhere: YYYY-MM-DD HH:MM (24h, local). */
+/* One timestamp family everywhere: YYYY-MM-DD HH:MM (24h) in Europe/Berlin.
+   Relative wording ("4 min ago") is only ever a tooltip, never the cell. */
+export const TIME_ZONE = 'Europe/Berlin';
 function toDate(value) {
   return /^\d+$/.test(String(value)) ? new Date(Number(value) * 1000) : new Date(value);
 }
 
-export function formatTimestamp(value) {
+const BERLIN_PARTS = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+function berlin(value) {
   if (value == null || value === '') return null;
   const date = toDate(value);
-  return Number.isNaN(date.getTime()) ? String(value)
-    : `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = Object.fromEntries(BERLIN_PARTS.formatToParts(date).map((part) => [part.type, part.value]));
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
 }
+
+export function formatTimestamp(value) {
+  if (value == null || value === '') return null;
+  const parts = berlin(value);
+  return parts ? `${parts.date} ${parts.time}` : String(value);
+}
+
+export const formatClock = (value) => berlin(value)?.time ?? '';
+export const formatDay = (value) => berlin(value)?.date ?? '';
+
+/* "4 min ago" — tooltip wording next to the absolute time. */
+export function relativeAgo(value) {
+  if (value == null || value === '') return '';
+  const then = toDate(value).getTime();
+  if (Number.isNaN(then)) return '';
+  const seconds = Math.round((Date.now() - then) / 1000);
+  const future = seconds < 0;
+  const abs = Math.abs(seconds);
+  const unit = abs < 60 ? null : abs < 3600 ? [Math.round(abs / 60), 'min']
+    : abs < 172800 ? [Math.round(abs / 3600), 'h'] : [Math.round(abs / 86400), 'days'];
+  if (!unit) return 'just now';
+  return future ? `in ${unit[0]} ${unit[1]}` : `${unit[0]} ${unit[1]} ago`;
+}
+
+/* The tooltip for any timestamp cell: relative first, zone named. */
+export const timeTitle = (value) => {
+  const stamp = formatTimestamp(value);
+  return stamp ? `${relativeAgo(value)} · ${stamp} ${TIME_ZONE}` : '';
+};
 
 /* Step timing: sub-second stays in ms, everything else in seconds. */
 export function formatDuration(ms) {

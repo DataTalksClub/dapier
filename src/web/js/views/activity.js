@@ -6,7 +6,7 @@
    polls) beside it. Each source of activity maps its own outcome codes onto
    ONE vocabulary, so "Handled", "Failed", "Refused" and "No workflow" mean
    the same on every tab. Rendering only; every tab keeps its own API calls. */
-import { escapeHtml, formatTimestamp } from '../format.js';
+import { escapeHtml, formatTimestamp, timeTitle } from '../format.js';
 import { workflowName } from '../workflow-names.js';
 
 export const OUTCOMES = {
@@ -58,7 +58,7 @@ export function ago(value) {
 
 export function whenHtml(value, empty = '—') {
   if (!value) return `<span class="muted-cell">${escapeHtml(empty)}</span>`;
-  return `<time datetime="${escapeHtml(value)}" title="${escapeHtml(formatTimestamp(value) || '')}">${escapeHtml(ago(value))}</time>`;
+  return `<time datetime="${escapeHtml(value)}" title="${escapeHtml(timeTitle(value))}">${escapeHtml(formatTimestamp(value) || String(value))}</time>`;
 }
 
 /* The workflows a row reached, by name (ids in the title). Plain text: the
