@@ -205,9 +205,11 @@ def connections_connect(api_url, connection_id, agent, timeout=300, debug=False)
     url = data.get("authorize_url", "")
     attempt = data.get("attempt")
     requested = data.get("requested_scopes") or before.get("scopes") or []
-    print("Opened the browser for provider consent.")
-    print("If it did not open, visit this URL (it expires in 10 minutes):")
-    print(url)
+    # Flushed explicitly: background runs pipe stdout, and the consent URL
+    # must show before the poll loop blocks.
+    print("Opened the browser for provider consent.", flush=True)
+    print("If it did not open, visit this URL (it expires in 10 minutes):", flush=True)
+    print(url, flush=True)
     webbrowser.open(url)
     deadline = time.time() + timeout
     while time.time() < deadline:
