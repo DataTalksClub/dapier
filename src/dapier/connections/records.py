@@ -339,6 +339,7 @@ def public_view(item, stored=None):
         "provider": item.get("provider"),
         "scopes": item.get("scopes", []),
         "granted_scopes": item.get("granted_scopes", []),
+        **({"last_consent": item["last_consent"]} if item.get("last_consent") else {}),
         "expected_account_id": item.get("expected_account_id"),
         "root_path": item.get("root_path") or "",
         "url": item.get("url") or "",

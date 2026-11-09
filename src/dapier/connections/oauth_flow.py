@@ -1,6 +1,7 @@
 """Provider consent: the signed-state OAuth start/callback flow."""
 import hashlib
 import hmac
+import logging
 import os
 import time
 import urllib.parse
@@ -11,10 +12,13 @@ from .. import audit as audit_log
 from .. import http
 from ..auth import session
 from ..auth.session import OAUTH_COOKIE
+from ..clock import now_iso
 from . import records as connection_model
 from . import credentials
 from .providers import oauth_clients, oauth_providers
 from .providers.oauth_providers import connection_grant_scopes
+
+logger = logging.getLogger(__name__)
 
 
 def _connection(connection_id):
@@ -108,6 +112,29 @@ def oauth_start(event, connection_id):
         cookies=[f"{OAUTH_COOKIE}={state}; Path=/oauth/callback; Max-Age=600; HttpOnly; Secure; SameSite=Lax"],
     )
 
+def _record_consent_attempt(connection_id, attempt, outcome, **detail):
+    """Store the outcome of one consent attempt on the connection item.
+
+    The browser only ever sees a redirect, so this is the CLI's (and the
+    console's) way to learn why a connect did not produce a new grant. Only
+    the ``last_consent`` attribute is written: no version or ``updated_at``
+    bump, so a failed attempt never looks like a stored grant.
+    """
+    if not connection_id:
+        return
+    record = {"attempt": attempt, "outcome": outcome, "at": now_iso(),
+              **{key: value for key, value in detail.items() if value is not None}}
+    try:
+        boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).update_item(
+            Key={"connection_id": connection_id},
+            UpdateExpression="SET last_consent = :record",
+            ConditionExpression="attribute_exists(connection_id)",
+            ExpressionAttributeValues={":record": record},
+        )
+    except Exception:  # noqa: BLE001 — reporting must not mask the callback result
+        logger.warning("consent attempt record failed", extra={"connection_id": connection_id})
+
+
 def oauth_callback(event):
     query = event.get("queryStringParameters") or {}
     state = query.get("state", "")
@@ -126,22 +153,26 @@ def oauth_callback(event):
     connection_id = payload.get("connection_id")
     if not payload.get("jti") or not _claim_oauth_state(payload["jti"]):
         return _callback_result("session_expired", connection_id)
+    def finish(code, **detail):
+        _record_consent_attempt(connection_id, payload["jti"], code, **detail)
+        return _callback_result(code, None if code == "connected" else connection_id)
+
     if query.get("error"):
-        return _callback_result("access_denied", connection_id)
+        return finish("access_denied")
     session_subject = session._session_subject(event)
     operator = payload.get("operator_subject") or session_subject or "unknown"
     if session_subject and payload.get("operator_subject") != session_subject:
         session._audit_event(payload.get("connection_id", "unknown"), audit_log.CALLBACK,
                      session_subject, outcome="denied-wrong-operator")
-        return _callback_result("wrong_operator", connection_id)
+        return finish("wrong_operator")
     connection = _connection(payload["connection_id"])
     if not connection or not query.get("code"):
-        return _callback_result("incomplete", connection_id)
+        return finish("incomplete")
 
     try:
         client_id, client_secret = oauth_clients.get(connection["provider"])
     except oauth_clients.ClientConfigError as exc:
-        return _callback_result("client_configuration", connection_id)
+        return finish("client_configuration")
     try:
         previous = credentials.get_credential(connection["credential_id"])
     except KeyError:
@@ -159,7 +190,7 @@ def oauth_callback(event):
     except oauth_providers.ProviderError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
-        return _callback_result("exchange_failed", connection_id)
+        return finish("exchange_failed")
     try:
         requested = set(connection_grant_scopes(
             connection["provider"], connection.get("scopes")))
@@ -176,7 +207,8 @@ def oauth_callback(event):
         if missing:
             session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                          outcome="error", error="missing scopes")
-            return _callback_result("missing_scopes", connection_id)
+            return finish("missing_scopes", requested=sorted(requested),
+                      granted=sorted(granted), missing=missing)
     else:
         granted = requested
     try:
@@ -186,13 +218,13 @@ def oauth_callback(event):
     except oauth_providers.ProviderError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
-        return _callback_result("verification_failed", connection_id)
+        return finish("verification_failed")
     try:
         connection_model.check_binding(connection, account_id)
     except connection_model.BindingError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="denied-account-mismatch", error=str(exc))
-        return _callback_result("wrong_account", connection_id)
+        return finish("wrong_account")
     stored = oauth_providers.normalize_token_data(
         token_data, previous_refresh_token=previous.get("refresh_token"),
     )
@@ -214,7 +246,7 @@ def oauth_callback(event):
     except connection_model.BindingError as exc:
         session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator,
                      outcome="error", error=str(exc))
-        return _callback_result("wrong_account", connection_id)
+        return finish("wrong_account")
     boto3.resource("dynamodb").Table(os.environ["CONNECTIONS_TABLE"]).put_item(Item=updated)
     session._audit_event(connection["connection_id"], audit_log.CALLBACK, operator, outcome="ok")
-    return _callback_result("connected")
+    return finish("connected", granted=sorted(granted))

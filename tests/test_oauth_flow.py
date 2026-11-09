@@ -24,6 +24,10 @@ class ConnectionsTable:
         item = self.items.get(kwargs["Key"]["connection_id"])
         return {"Item": dict(item)} if item else {}
 
+    def update_item(self, **kwargs):
+        item = self.items[kwargs["Key"]["connection_id"]]
+        item["last_consent"] = kwargs["ExpressionAttributeValues"][":record"]
+
 
 class ExecutionsTable:
     def __init__(self):
@@ -263,6 +267,11 @@ def test_callback_rejects_missing_scopes(monkeypatch):
     assert result["headers"]["location"] == "/connections?oauth=missing_scopes&connection=youtube-personal"
     assert writes == []
     assert connections.items["youtube-personal"]["status"] == "ready"
+    report = connections.items["youtube-personal"]["last_consent"]
+    assert report["outcome"] == "missing_scopes"
+    assert report["missing"] and report["granted"] == ["https://www.googleapis.com/auth/youtube.upload"]
+    assert "updated_at" not in connections.items["youtube-personal"] or \
+        connections.items["youtube-personal"]["version"] == 1
 
 
 def test_callback_rejects_expired_state(monkeypatch):

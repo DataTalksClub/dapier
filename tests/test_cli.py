@@ -408,19 +408,56 @@ def test_import_prints_dropbox_webhook_setup(monkeypatch, tmp_path, capsys):
     assert "Webhook URI" in out
 
 
-def test_connect_prints_provider_webhook_setup(monkeypatch, capsys):
-    responses = [
-        {"authorize_url": "https://oauth.example.test/authorize"},
-        {"connection_id": "yt", "status": "connected", "provider": "youtube",
-         "account_title": "My channel"},
-    ]
+def _connect_run(monkeypatch, responses):
     monkeypatch.setattr(commands.api, "call", lambda *args, **kwargs: responses.pop(0))
     monkeypatch.setattr(webbrowser, "open", lambda url: True)
     monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    clock = iter(range(0, 10000, 100))
+    monkeypatch.setattr(time, "time", lambda: next(clock))
+
+
+def test_connect_prints_provider_webhook_setup(monkeypatch, capsys):
+    _connect_run(monkeypatch, [
+        {"connection_id": "yt", "status": "connected", "updated_at": "old", "scopes": ["a"]},
+        {"authorize_url": "https://oauth.example.test/authorize", "attempt": "t1",
+         "requested_scopes": ["a"]},
+        {"connection_id": "yt", "status": "connected", "provider": "youtube",
+         "account_title": "My channel", "updated_at": "new", "granted_scopes": ["a"],
+         "last_consent": {"attempt": "t1", "outcome": "connected"}},
+    ])
     assert commands.connections_connect("https://api.example.test", "yt", "agent-1") == 0
     out, _ = capsys.readouterr()
+    assert "new grant stored at new" in out
     assert "/hooks/youtube" in out
     assert "pubsubhubbub.appspot.com/subscribe" in out
+
+
+def test_connect_ignores_stale_connected_status(monkeypatch, capsys):
+    """An already-connected connection must not report success before the
+    callback for this run's attempt lands; no callback → loud timeout."""
+    stale = {"connection_id": "g", "status": "connected", "updated_at": "old",
+             "granted_scopes": ["a"], "last_consent": {"attempt": "earlier", "outcome": "connected"}}
+    _connect_run(monkeypatch, [stale, {"authorize_url": "u", "attempt": "t1",
+                                       "requested_scopes": ["a", "b"]}] + [stale] * 10)
+    assert commands.connections_connect("https://api.example.test", "g", "x", timeout=300) == 5
+    out, _ = capsys.readouterr()
+    assert "Connected" not in out
+    assert "ERROR: no consent callback" in out
+
+
+def test_connect_names_missing_scopes(monkeypatch, capsys):
+    item = {"connection_id": "g", "status": "connected", "updated_at": "old",
+            "granted_scopes": ["a"],
+            "last_consent": {"attempt": "t1", "outcome": "missing_scopes",
+                             "missing": ["gmail.modify"], "granted": ["a"]}}
+    _connect_run(monkeypatch, [
+        {"connection_id": "g", "updated_at": "old"},
+        {"authorize_url": "u", "attempt": "t1", "requested_scopes": ["a", "gmail.modify"]},
+        item,
+    ])
+    assert commands.connections_connect("https://api.example.test", "g", "x") == 6
+    out, _ = capsys.readouterr()
+    assert "NOT connected" in out and "Missing scopes: gmail.modify" in out
 
 
 TRIGGER = {
