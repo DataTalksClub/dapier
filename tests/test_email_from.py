@@ -219,6 +219,38 @@ def test_route_allowlist_uses_its_list_not_the_default(monkeypatch):
     assert not email_from.rejected(_mail("alexey@datatalks.club"))
 
 
+def test_cli_allows_sns_on_dev_without_widening_other_mailboxes(monkeypatch):
+    _bind(monkeypatch)
+    existing = SEED + ["alerts@dtcdev.click", "noreply@datatalks.club",
+                       "no-reply@dtcdev.click"]
+    for address in existing:
+        email_from.api_add(address, route="dev")
+    before = email_from.api_list()[1]
+    sender = "no-reply@sns.amazonaws.com"
+    event = _mail("AWS Notifications <" + sender + ">", route="dev")
+    assert email_from.rejected(event)
+
+    def call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("POST", "/api/agent/email-from")
+        assert body == {"address": sender, "route": "dev"}
+        return email_from.api_save(body)[1]
+
+    monkeypatch.setattr(commands.api, "call", call)
+    assert main.main(["emails", "from", "add", sender, "--route", "dev"]) == 0
+    after = email_from.api_list()[1]
+    assert after["default"] == before["default"]
+    assert after["routes"]["dev"] == {"mode": "allowlist", "addresses": existing + [sender]}
+    assert not email_from.rejected(event)
+    # Both subscription confirmations and subsequent SNS alerts use this sender.
+    for subject in ("AWS Notification - Subscription Confirmation", "ALARM: operator alert"):
+        event["data"]["subject"] = subject
+        assert not email_from.rejected(event)
+    for route in ("tofu", "orin", "invoice"):
+        assert email_from.rejected(_mail(sender, route=route))
+    assert email_from.rejected(_mail("stranger@example.com", route="dev"))
+    assert email_from.rejected(_mail("", route="dev"))
+
+
 def test_ses_like_event_resolves_route_from_source_or_to(monkeypatch):
     _bind(monkeypatch)
     email_from.api_save({"route": "newsletter", "mode": "anyone"})

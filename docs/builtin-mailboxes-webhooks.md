@@ -48,6 +48,22 @@ explicitly when provisioning each bot mailbox. The bot's own outgoing/notificati
 these allowlists, and the mailbox workflows send no email, so a bot reply
 cannot re-trigger its own mailbox.
 
+The `dev` oncall mailbox also allows `no-reply@sns.amazonaws.com` for SNS
+subscription confirmations and alerts. Add it only to `dev`, preserving the
+five senders above and the default policy:
+
+```bash
+dapier emails from add no-reply@sns.amazonaws.com --route dev
+dapier emails from list --route dev
+```
+
+On 2026-11-10, this missing sender blocked confirmations for the SNS topics
+`operator-alerts` and `course-management-operator-alerts` in AWS account
+`387546586013`. Both messages remain in the inbox with outcome `refused`;
+neither contained an alarm payload. Allowing the sender accepts future mail;
+it does not confirm subscriptions or replay previous deliveries. Check the
+subscriptions separately before relying on their alert delivery.
+
 Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
 the address, sender, owning workflows, policy rule, and event id, and emit `EmailSenderPolicyRefused`
 in `Dapier/Triggers`. Atomic claims in the cursors table dedupe each
