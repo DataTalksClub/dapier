@@ -13,7 +13,7 @@ description: >
   for the transcript or transcribing when needed). DataTalks.Club and other
   recordings need no further action.
 enabled: true
-notify: [alexey@datatalks.club]
+notify: [dev@dtcdev.click]
 actions:
   - id: recording-files
     type: for_each
