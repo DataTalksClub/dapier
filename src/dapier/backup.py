@@ -12,6 +12,10 @@ owned by another service and is excluded from these snapshots. The bucket's
 lifecycle rule expires every object after 30 days, giving a rolling month of
 daily snapshots.
 
+Snapshots stream one scan page at a time into a temporary gzip file; peak
+Python memory does not grow with table size. The compressed snapshot must
+fit in Lambda's /tmp storage (512 MB by default).
+
 A failed run also emails the operator through the AWS mail
 service SES with the function's IAM role: report failures, stay silent on
 success. No mailer API key is needed. Without BACKUP_ALERT_EMAIL the email
@@ -32,6 +36,7 @@ import json
 import os
 from datetime import datetime, timezone
 from decimal import Decimal
+from tempfile import TemporaryFile
 
 import boto3
 
@@ -59,19 +64,25 @@ class _Encoder(json.JSONEncoder):
 
 def backup_table(dynamodb, s3, name, bucket, day):
     """Scan one table into backups/<day>/<name>.json.gz and return its stats."""
-    items = []
-    for page in dynamodb.get_paginator("scan").paginate(TableName=name):
-        items.extend(page.get("Items", []))
-    payload = "".join(
-        json.dumps(item, cls=_Encoder, separators=(",", ":")) + "\n" for item in items
-    )
-    body = gzip.compress(payload.encode("utf-8"))
     key = f"backups/{day}/{name}.json.gz"
-    s3.put_object(
-        Bucket=bucket, Key=key, Body=body,
-        ContentType="application/x-ndjson", ContentEncoding="gzip",
-    )
-    return {"key": key, "items": len(items), "bytes": len(body)}
+    # Keep only a scan page and one encoded item in memory. Building a list,
+    # joined JSON string and UTF-8 copy of the whole table exhausted 256 MB.
+    # Disk-backed gzip also avoids retaining the compressed table in RAM.
+    count = 0
+    with TemporaryFile() as body:
+        with gzip.GzipFile(fileobj=body, mode="wb") as compressed:
+            for page in dynamodb.get_paginator("scan").paginate(TableName=name):
+                for item in page.get("Items", []):
+                    line = json.dumps(item, cls=_Encoder, separators=(",", ":")) + "\n"
+                    compressed.write(line.encode("utf-8"))
+                    count += 1
+        size = body.tell()
+        body.seek(0)
+        s3.put_object(
+            Bucket=bucket, Key=key, Body=body,
+            ContentType="application/x-ndjson", ContentEncoding="gzip",
+        )
+    return {"key": key, "items": count, "bytes": size}
 
 
 def _claim_email(day):

@@ -1608,6 +1608,8 @@ Resources:
       Handler: src.dapier.backup.handler
       Runtime: python3.12
       Architectures: [arm64]
+      # SDK/page buffers have headroom; table snapshots stream through /tmp.
+      MemorySize: 512
       Timeout: 300
       Environment:
         Variables:
