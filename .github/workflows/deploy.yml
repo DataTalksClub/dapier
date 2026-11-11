@@ -189,5 +189,69 @@ jobs:
             *) echo "Unexpected dapier stack status: $status"; exit 1 ;;
           esac
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
+      - name: Inspect DynamoDB backup health (read-only)
+        # Missing inspection permissions must be reported as unverified,
+        # without hiding the result of the infrastructure deployment.
+        continue-on-error: true
+        run: |
+          uv run --with boto3 python - <<'PY'
+          import json
+          import time
+          from contextlib import contextmanager
+          from datetime import datetime, timezone
+          import boto3
+          from botocore.exceptions import ClientError
+
+          @contextmanager
+          def inspect(label):
+              try:
+                  yield
+              except ClientError as exc:
+                  print('BACKUP_UNVERIFIED', label, exc.response['Error']['Code'])
+
+          cf = boto3.client('cloudformation')
+          def physical(logical):
+              return cf.describe_stack_resource(StackName='dapier', LogicalResourceId=logical)['StackResourceDetail']['PhysicalResourceId']
+          fn = physical('BackupFunction')
+          bucket = physical('BackupBucket')
+          alarm = physical('BackupErrorAlarm')
+          config = {}
+          with inspect('config'):
+              config = boto3.client('lambda').get_function_configuration(FunctionName=fn)
+              print('BACKUP_CONFIG', json.dumps({k: config[k] for k in ('FunctionName', 'MemorySize', 'LastModified', 'CodeSha256')}))
+              assert config['MemorySize'] >= 512
+          cw = boto3.client('cloudwatch')
+          with inspect('alarm'):
+              states = cw.describe_alarms(AlarmNames=[alarm])['MetricAlarms']
+              print('BACKUP_ALARM', json.dumps([{k: a[k] for k in ('AlarmName', 'StateValue', 'StateUpdatedTimestamp')} for a in states], default=str))
+          logs = boto3.client('logs')
+          # Only runtime reports and aggregate backup counts, never table items.
+          for pattern in ('"REPORT"', '"backup" "items" "across"'):
+              with inspect('logs'):
+                  result = logs.filter_log_events(logGroupName='/aws/lambda/' + fn, startTime=int((time.time() - 3 * 86400) * 1000), filterPattern=pattern, limit=50)
+                  print('BACKUP_LOGS', json.dumps({'events': [{'timestamp': e['timestamp'], 'message': e['message']} for e in result.get('events', [])], 'morePages': bool(result.get('nextToken'))}))
+          dynamo = boto3.client('dynamodb')
+          names = sorted({v for k, v in config.get('Environment', {}).get('Variables', {}).items() if k.endswith('_TABLE') and k != 'TEAM_SECRETS_TABLE' and v})
+          for name in names:
+              with inspect('table-size ' + name):
+                  table = dynamo.describe_table(TableName=name)['Table']
+                  print('BACKUP_TABLE_SIZE', json.dumps({k: table[k] for k in ('TableName', 'ItemCount', 'TableSizeBytes')}))
+          s3 = boto3.client('s3')
+          day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+          key = f'backups/{day}/manifest.json'
+          with inspect('snapshot'):
+              obj = s3.get_object(Bucket=bucket, Key=key)
+              manifest = json.loads(obj['Body'].read())
+              print('BACKUP_MANIFEST', json.dumps({'path': f's3://{bucket}/{key}', 'lastModified': str(obj['LastModified']), 'date': manifest['date'], 'tables': manifest['tables']}))
+              assert manifest['date'] == day
+              if config:
+                  assert set(manifest['tables']) == set(names)
+              for name, stats in manifest['tables'].items():
+                  assert 'error' not in stats, name
+                  head = s3.head_object(Bucket=bucket, Key=stats['key'])
+                  assert head['ContentLength'] == stats['bytes'], name
+              print('BACKUP_SNAPSHOT_OBJECTS_VERIFIED', len(manifest['tables']))
+              print('Scheduled success requires a manifest and successful runtime report after deployment; alarm OK alone is insufficient.')
+          PY
       - name: Inspect YouTube renewal infrastructure (read-only)
         run: bash scripts/inspect-youtube-renewal.sh

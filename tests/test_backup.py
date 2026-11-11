@@ -1,11 +1,75 @@
 import gzip
 import json
+import tracemalloc
+from pathlib import Path
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
 
 import src.dapier.backup as backup
+
+
+def test_backup_memory_is_bounded_across_scan_pages():
+    class PagedDynamo:
+        def get_paginator(self, operation):
+            assert operation == "scan"
+            return self
+
+        def paginate(self, **kwargs):
+            # 64 MiB of distinct items, generated lazily like DynamoDB pages.
+            for page in range(64):
+                yield {"Items": [{"payload": {"S": f"{page}:{item}:" + "x" * 65536}}
+                                 for item in range(16)]}
+
+    class StreamingS3:
+        def put_object(self, **kwargs):
+            assert kwargs["ContentEncoding"] == "gzip"
+            # Consume the seekable file exactly as the SDK does, without
+            # retaining the uploaded object in this memory measurement.
+            body = kwargs["Body"]
+            with gzip.GzipFile(fileobj=body, mode="rb") as snapshot:
+                self.items = sum(1 for _ in snapshot)
+
+    s3 = StreamingS3()
+    tracemalloc.start()
+    try:
+        stats = backup.backup_table(PagedDynamo(), s3, "table", "bucket", "day")
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert stats["items"] == s3.items == 1024
+    assert stats["bytes"] > 0
+    # The old whole-table implementation exceeds 128 MiB on this fixture.
+    assert peak < 12 * 1024 * 1024
+
+
+def test_backup_has_explicit_memory_headroom():
+    import yaml
+
+    class TemplateLoader(yaml.SafeLoader):
+        pass
+
+    TemplateLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+    template = yaml.load(Path("template.yaml").read_text(), Loader=TemplateLoader)
+    assert template["Resources"]["BackupFunction"]["Properties"]["MemorySize"] >= 512
+
+
+def test_backup_file_body_round_trips_through_s3():
+    import boto3
+    from moto import mock_aws
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="eu-west-1")
+        s3.create_bucket(Bucket="backup-test", CreateBucketConfiguration={
+            "LocationConstraint": "eu-west-1"})
+        items = [{"id": {"S": "first"}}, {"id": {"S": "second"}}]
+        stats = backup.backup_table(FakeDynamo({"table": items}), s3,
+                                    "table", "backup-test", "day")
+        obj = s3.get_object(Bucket="backup-test", Key=stats["key"])
+        assert obj["ContentLength"] == stats["bytes"]
+        assert obj["ContentEncoding"] == "gzip"
+        assert [json.loads(line) for line in gzip.decompress(obj["Body"].read()).splitlines()] == items
 
 
 class FakeDynamo:
@@ -27,7 +91,7 @@ class FakeS3:
         self.objects = {}
 
     def put_object(self, Bucket, Key, Body, **kwargs):
-        self.objects[Key] = Body
+        self.objects[Key] = Body.read() if hasattr(Body, "read") else Body
 
 
 class BrokenManifestS3(FakeS3):
@@ -36,7 +100,7 @@ class BrokenManifestS3(FakeS3):
     def put_object(self, Bucket, Key, Body, **kwargs):
         if "manifest.json" in Key:
             raise RuntimeError("The specified bucket does not exist")
-        self.objects[Key] = Body
+        super().put_object(Bucket, Key, Body, **kwargs)
 
 
 @pytest.fixture
