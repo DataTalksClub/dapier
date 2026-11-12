@@ -26,6 +26,7 @@ from urllib.parse import quote, urlencode
 
 from ...connections import discovery as provider
 from ...connections import tokens
+from ...engine.actions import email as agent_mail_guard
 from ...engine.actions.email import _raw_message
 from . import google_accounts
 
@@ -47,6 +48,14 @@ class GmailOpsError(Exception):
     def __init__(self, message, status=400):
         super().__init__(message)
         self.status = status
+
+
+def refuse_agent_mail(sender, recipients=(), subject=None):
+    """Raise loudly (HTTP 403) when an Alexey mailbox would send agent mail."""
+    try:
+        agent_mail_guard.refuse_agent_mail(sender, recipients, subject)
+    except agent_mail_guard.AgentMailRefused as exc:
+        raise GmailOpsError(str(exc), status=403) from None
 
 
 def _status_from(detail):
@@ -413,6 +422,7 @@ def _compose(token, *, to, cc=None, bcc=None, subject, text=None, html=None,
     if not text and not html:
         raise GmailOpsError("a text or html body is required")
     sender = _sender(token)
+    refuse_agent_mail(sender, [to, cc, bcc], subject)
     message = _raw_message(sender, _parse_addresses(to), _parse_addresses(cc),
                            _parse_addresses(bcc), [], subject, text or "", html or "",
                            _attachments_b64(attachments), "", in_reply_to=in_reply_to,
@@ -553,6 +563,9 @@ def send_draft(account, draft_id):
     _connection_id, _connection, token = _connection_and_token(account)
 
     stored = _call(token, "GET", f"/users/me/drafts/{quote(str(draft_id), safe='')}")
+    headers = _headers_of((stored.get("message") or {}).get("payload") or {})
+    refuse_agent_mail(_sender(token), [headers.get("to"), headers.get("cc"), headers.get("bcc")],
+                      headers.get("subject"))
     data = _call(token, "POST", "/users/me/drafts/send", {"id": stored.get("id")})
     sent = data if data.get("id") else (data.get("message") or {})
     return {"message_id": sent.get("id"), "thread_id": sent.get("threadId"),

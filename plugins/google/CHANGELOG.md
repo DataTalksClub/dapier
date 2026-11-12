@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+The `gmail_send` workflow action refuses to send agent-to-agent or `[handoff]` mail from an Alexey mailbox (resolved from the Gmail profile), pointing senders at Hub notes, SendToAgent or the dev@dtcdev.click -> orin@dtcdev.click dev relay (intake a7a0e545).
+
 New operator CLI nouns `dapier gmail` and `dapier gdrive` over the new
 operator-gated `/api/agent/gmail/*` and `/api/agent/gdrive/*` routes.
 Every operation names its Google account explicitly (`--account

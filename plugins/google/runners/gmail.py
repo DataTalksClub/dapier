@@ -15,7 +15,7 @@ import json
 
 from src.dapier.connections import tokens
 from src.dapier.engine.actions import base
-from src.dapier.engine.actions.email import _addresses, _raw_message
+from src.dapier.engine.actions.email import AgentMailRefused, _addresses, _raw_message, refuse_agent_mail
 from src.dapier.engine.actions.templating import render
 
 GMAIL_API_URL = "https://gmail.googleapis.com/gmail/v1"
@@ -83,6 +83,10 @@ def run_gmail_send(action, event, *, transport=None, steps=None):
     if not sender:
         raise RuntimeError("gmail_send could not resolve the connection's "
                            "address: users/me/profile returned no emailAddress")
+    try:
+        refuse_agent_mail(sender, [to] + cc + bcc, subject)
+    except AgentMailRefused as exc:
+        raise RuntimeError(str(exc)) from None
     message = _raw_message(sender, addresses, cc, bcc, [], subject, text, html,
                            [], "")
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
