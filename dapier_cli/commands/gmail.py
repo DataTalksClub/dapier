@@ -28,6 +28,44 @@ __all__ = [
 BASE = "/api/agent/gmail"
 
 
+# Agent-to-agent mail must never leave Alexey's own mailboxes (intake a7a0e545,
+# Alexey t2167u-t2169u). The only email fallback between agents is
+# dev@dtcdev.click -> orin@dtcdev.click through the dev relay.
+AGENT_DOMAIN = "dtcdev.click"
+
+
+def _is_alexey_account(account):
+    value = (account or "").strip().lower()
+    if not value:
+        return True  # unspecified account could resolve to Alexey's mailbox
+    local = value.split("@", 1)[0]
+    return local.startswith("alexey") or "grigoriev" in local
+
+
+def refuse_agent_mail(account, recipients=(), subject=None):
+    """Raise loudly when an Alexey mailbox would send agent-to-agent mail."""
+    if not _is_alexey_account(account):
+        return
+    addresses = [a.strip().lower() for r in recipients if r for a in str(r).replace(";", ",").split(",") if a.strip()]
+    agent = [a for a in addresses if a.rsplit("@", 1)[-1].strip("> ") == AGENT_DOMAIN]
+    handoff = "[handoff]" in (subject or "").lower()
+    if agent or handoff:
+        raise api.ApiError(
+            "REFUSED: agent-to-agent/handoff mail is never sent from Alexey's mailbox "
+            f"(account {account or '<default>'}; to {', '.join(agent) or 'n/a'}). "
+            "Use Hub intake notes or SendToAgent; the only email fallback is "
+            "dev@dtcdev.click -> orin@dtcdev.click via bots-management scripts/dev-relay-mail.py")
+
+
+def _guard_message(api_url, message_id, account, debug):
+    """Reply guard: the recipients are resolved server-side, so read the original."""
+    if not _is_alexey_account(account):
+        return
+    path = BASE + "/messages/" + message_id + ("?" + urlencode({"account": account}) if account else "")
+    data = api.call(api_url, "GET", path, debug=debug)
+    refuse_agent_mail(account, [data.get("from"), data.get("to"), data.get("cc")], data.get("subject"))
+
+
 def _body_text(text, file):
     if text is not None:
         return text
@@ -327,6 +365,7 @@ def _print_sent(data, as_json):
 def gmail_send(api_url, account=None, to=None, cc=None, bcc=None, subject=None,
                text=None, file=None, attach=None, as_json=False, preview=False,
                debug=False):
+    refuse_agent_mail(account, [to, cc, bcc], subject)
     body = {
         "to": to,
         "subject": subject,
@@ -351,6 +390,8 @@ def gmail_send(api_url, account=None, to=None, cc=None, bcc=None, subject=None,
 def gmail_reply(api_url, message_id, account=None, reply_all=False, text=None,
                 file=None, attach=None, draft=False, as_json=False, preview=False,
                 debug=False, to=None, cc=None, bcc=None):
+    refuse_agent_mail(account, [to, cc, bcc])
+    _guard_message(api_url, message_id, account, debug)
     body = {"message_id": message_id, "reply_all": bool(reply_all),
             "draft": bool(draft), "attachments": _attachments(attach)}
     for name, value in (("to", to), ("cc", cc), ("bcc", bcc)):
@@ -420,6 +461,11 @@ def gmail_draft_delete(api_url, draft_id, account=None, debug=False):
 
 
 def gmail_draft_send(api_url, draft_id, account=None, as_json=False, debug=False):
+    if _is_alexey_account(account):
+        params = {"account": account} if account else None
+        draft = api.call(api_url, "GET", BASE + f"/drafts/{draft_id}"
+                         + ("?" + urlencode(params) if params else ""), debug=debug)
+        refuse_agent_mail(account, [draft.get("to"), draft.get("cc"), draft.get("bcc")], draft.get("subject"))
     body = {"account": account} if account else None
     data = api.call(api_url, "POST", BASE + f"/drafts/{draft_id}/send",
                     body=body or {}, debug=debug)
@@ -448,6 +494,7 @@ def _draft_body(account, to, cc, bcc, subject, text, file, attach, html_file=Non
 def gmail_draft_create(api_url, account=None, to=None, cc=None, bcc=None,
                        subject=None, text=None, file=None, attach=None,
                        as_json=False, preview=False, debug=False, html_file=None):
+    refuse_agent_mail(account, [to, cc, bcc], subject)
     if preview:
         return preview_body(_draft_body(account, to, cc, bcc, subject, text, file, attach, html_file))
     data = api.call(api_url, "POST", BASE + "/drafts",
@@ -464,6 +511,7 @@ def gmail_draft_create(api_url, account=None, to=None, cc=None, bcc=None,
 def gmail_draft_update(api_url, draft_id, account=None, to=None, cc=None,
                        bcc=None, subject=None, text=None, file=None, attach=None,
                        as_json=False, preview=False, debug=False, html_file=None):
+    refuse_agent_mail(account, [to, cc, bcc], subject)
     if preview:
         return preview_body(_draft_body(account, to, cc, bcc, subject, text, file, attach, html_file))
     params = {"account": account} if account else None
