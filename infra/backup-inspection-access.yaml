@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Read-only backup inspection permissions for the GitHub deploy role. The
+  deploy workflow's "Inspect DynamoDB backup health" step verifies the daily
+  snapshots (alarm state, recent run logs, error metrics, snapshot manifests);
+  without these grants every check reports BACKUP_UNVERIFIED and a failing
+  backup reaches the operator only through the alarm email.
+
+Resources:
+  GithubDeployBackupInspectionAccess:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DapierBackupInspectionAccess
+      Roles:
+        - dapier-github-actions-deploy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - cloudformation:DescribeStackResource
+            Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/dapier/*
+          - Effect: Allow
+            Action:
+              - lambda:GetFunctionConfiguration
+            Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*
+          - Effect: Allow
+            Action:
+              - cloudwatch:DescribeAlarms
+              - cloudwatch:GetMetricStatistics
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - logs:FilterLogEvents
+            Resource:
+              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*
+              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*:*
+          - Effect: Allow
+            Action:
+              - dynamodb:DescribeTable
+            Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/dapier-*
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !Sub arn:${AWS::Partition}:s3:::dapier-backups-${AWS::AccountId}
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::dapier-backups-${AWS::AccountId}/backups/*

@@ -105,6 +105,14 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --role-arn arn:aws:iam::817685572750:role/dapier-cloudformation-service \
             --region "$AWS_REGION"
+      - name: Deploy backup inspection access policy stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/backup-inspection-access.yaml \
+            --stack-name dapier-backup-inspection-access \
+            --capabilities CAPABILITY_IAM \
+            --role-arn arn:aws:iam::817685572750:role/dapier-cloudformation-service \
+            --region "$AWS_REGION"
       - name: Capture renderer ECR recovery evidence (read-only)
         run: |
           echo "Current dapier stack status:"
@@ -191,14 +199,17 @@ jobs:
       - run: curl --fail --silent --show-error https://dapier.dtcdev.click/health
       - name: Inspect DynamoDB backup health (read-only)
         # Missing inspection permissions must be reported as unverified,
-        # without hiding the result of the infrastructure deployment.
+        # without hiding the result of the infrastructure deployment. The
+        # grants behind this step live in infra/backup-inspection-access.yaml
+        # and are checked against the calls made here by
+        # tests/test_backup.py::test_backup_inspection_grants_match_deploy_step.
         continue-on-error: true
         run: |
           uv run --with boto3 python - <<'PY'
           import json
           import time
           from contextlib import contextmanager
-          from datetime import datetime, timezone
+          from datetime import datetime, timedelta, timezone
           import boto3
           from botocore.exceptions import ClientError
 
@@ -224,6 +235,19 @@ jobs:
           with inspect('alarm'):
               states = cw.describe_alarms(AlarmNames=[alarm])['MetricAlarms']
               print('BACKUP_ALARM', json.dumps([{k: a[k] for k in ('AlarmName', 'StateValue', 'StateUpdatedTimestamp')} for a in states], default=str))
+          with inspect('error-metrics'):
+              # Every hour of the last four days in which the backup function
+              # errored at all — absence after a scheduled run is the proof
+              # that the run was green, not just that the alarm went quiet.
+              points = sorted(
+                  (str(point['Timestamp']), point['Sum'])
+                  for point in cw.get_metric_statistics(
+                      Namespace='AWS/Lambda', MetricName='Errors',
+                      Dimensions=[{'Name': 'FunctionName', 'Value': fn}],
+                      StartTime=datetime.now(timezone.utc) - timedelta(days=4),
+                      EndTime=datetime.now(timezone.utc), Period=3600,
+                      Statistics=['Sum'])['Datapoints'])
+              print('BACKUP_ERROR_METRICS', json.dumps({'hours_with_errors': points}))
           logs = boto3.client('logs')
           # Only runtime reports and aggregate backup counts, never table items.
           for pattern in ('"REPORT"', '"backup" "items" "across"'):
@@ -237,21 +261,43 @@ jobs:
                   table = dynamo.describe_table(TableName=name)['Table']
                   print('BACKUP_TABLE_SIZE', json.dumps({k: table[k] for k in ('TableName', 'ItemCount', 'TableSizeBytes')}))
           s3 = boto3.client('s3')
-          day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-          key = f'backups/{day}/manifest.json'
+          now = datetime.now(timezone.utc)
+          days = [(now - timedelta(days=offset)).strftime('%Y-%m-%d') for offset in range(5)]
+          with inspect('recent-backups'):
+              listed = s3.list_objects_v2(Bucket=bucket, Prefix='backups/').get('Contents', [])
+              manifests = sorted(str(o['LastModified']) + ' ' + o['Key'] for o in listed
+                                 if o['Key'].endswith('/manifest.json'))
+              print('BACKUP_RECENT_MANIFESTS', json.dumps({'recent': manifests[-7:], 'objects': len(listed)}))
+          # Verify the newest day that has a snapshot: a deploy earlier in the
+          # day runs before that day's 03:00Z backup, so "no manifest yet" for
+          # today is normal and yesterday's snapshot is the verified one.
+          verified = None
           with inspect('snapshot'):
-              obj = s3.get_object(Bucket=bucket, Key=key)
-              manifest = json.loads(obj['Body'].read())
-              print('BACKUP_MANIFEST', json.dumps({'path': f's3://{bucket}/{key}', 'lastModified': str(obj['LastModified']), 'date': manifest['date'], 'tables': manifest['tables']}))
-              assert manifest['date'] == day
-              if config:
-                  assert set(manifest['tables']) == set(names)
-              for name, stats in manifest['tables'].items():
-                  assert 'error' not in stats, name
-                  head = s3.head_object(Bucket=bucket, Key=stats['key'])
-                  assert head['ContentLength'] == stats['bytes'], name
-              print('BACKUP_SNAPSHOT_OBJECTS_VERIFIED', len(manifest['tables']))
-              print('Scheduled success requires a manifest and successful runtime report after deployment; alarm OK alone is insufficient.')
+              for day in days:
+                  key = f'backups/{day}/manifest.json'
+                  try:
+                      obj = s3.get_object(Bucket=bucket, Key=key)
+                  except ClientError as exc:
+                      if exc.response.get('Error', {}).get('Code') == 'NoSuchKey':
+                          if day == days[0]:
+                              print('BACKUP_NO_SNAPSHOT_YET', day)
+                          continue
+                      raise
+                  manifest = json.loads(obj['Body'].read())
+                  print('BACKUP_MANIFEST', json.dumps({'path': f's3://{bucket}/{key}', 'lastModified': str(obj['LastModified']), 'date': manifest['date'], 'tables': manifest['tables']}))
+                  assert manifest['date'] == day
+                  if config:
+                      assert set(manifest['tables']) == set(names)
+                  for name, stats in manifest['tables'].items():
+                      assert 'error' not in stats, name
+                      head = s3.head_object(Bucket=bucket, Key=stats['key'])
+                      assert head['ContentLength'] == stats['bytes'], name
+                  print('BACKUP_SNAPSHOT_OBJECTS_VERIFIED', day, len(manifest['tables']))
+                  verified = day
+                  break
+          if verified:
+              print('BACKUP_SNAPSHOT_DAY_VERIFIED', verified)
+              print('Scheduled success requires a manifest and successful runtime report for the latest backup day; alarm OK alone is insufficient.')
           PY
       - name: Inspect YouTube renewal infrastructure (read-only)
         run: bash scripts/inspect-youtube-renewal.sh

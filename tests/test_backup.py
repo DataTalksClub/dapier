@@ -55,6 +55,112 @@ def test_backup_has_explicit_memory_headroom():
     assert template["Resources"]["BackupFunction"]["Properties"]["MemorySize"] >= 512
 
 
+def test_backup_alarm_notifies_on_recovery():
+    """A fired backup alarm only emails on the way up; without OKActions the
+    operator never learns that a scheduled backup went green again."""
+    template = _load_yaml("template.yaml")
+    alarm = template["Resources"]["BackupErrorAlarm"]["Properties"]
+    topic = [{"Ref": "AlarmTopic"}]
+    assert alarm["AlarmActions"] == topic
+    assert alarm["OKActions"] == topic
+
+
+def _load_yaml(path):
+    """Load a YAML file, mapping !Ref values to {'Ref': name} and dropping
+    every other tag's value."""
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    def construct(loader, suffix, node):
+        if suffix == "Ref":
+            return {"Ref": node.value}
+        if suffix == "Sub":
+            return {"Fn::Sub": node.value}
+        return None
+
+    Loader.add_multi_constructor("!", construct)
+    return yaml.load(Path(path).read_text(), Loader=Loader)
+
+
+INSPECTION_GRANTS = {
+    ("cloudformation", "describe_stack_resource"): "cloudformation:DescribeStackResource",
+    ("lambda", "get_function_configuration"): "lambda:GetFunctionConfiguration",
+    ("cloudwatch", "describe_alarms"): "cloudwatch:DescribeAlarms",
+    ("cloudwatch", "get_metric_statistics"): "cloudwatch:GetMetricStatistics",
+    ("logs", "filter_log_events"): "logs:FilterLogEvents",
+    ("dynamodb", "describe_table"): "dynamodb:DescribeTable",
+    ("s3", "get_object"): "s3:GetObject",
+    ("s3", "head_object"): "s3:GetObject",
+    ("s3", "list_objects_v2"): "s3:ListBucket",
+}
+
+
+def _inspection_step(deploy_workflow):
+    steps = deploy_workflow["jobs"]["deploy"]["steps"]
+    named = {step.get("name"): i for i, step in enumerate(steps) if step.get("name")}
+    i = named["Inspect DynamoDB backup health (read-only)"]
+    j = named["Deploy backup inspection access policy stack"]
+    assert j < i, "the access policy stack must deploy before the inspection step"
+    return steps[i]["run"]
+
+
+def test_backup_inspection_grants_match_deploy_step():
+    """The deploy-time backup health step can only verify while its IAM
+    grants cover every boto3 call it makes — until 2026-11-12 they did not,
+    so a failing backup's only evidence line was BACKUP_UNVERIFIED. This
+    fails when the step script and infra/backup-inspection-access.yaml
+    drift apart."""
+    import re
+
+    workflow = _load_yaml(".github/workflows/deploy.yml")
+    script = _inspection_step(workflow)
+
+    clients = dict(re.findall(
+        r"^(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
+    calls = set(re.findall(r"boto3\.client\('([^']+)'\)\.(\w+)\(", script))
+    for var, service in clients.items():
+        calls.update((service, method) for method in re.findall(rf"\b{var}\.(\w+)\(", script))
+
+    infra = _load_yaml("infra/backup-inspection-access.yaml")
+    policy = infra["Resources"]["GithubDeployBackupInspectionAccess"]["Properties"]
+    assert policy["Roles"] == ["dapier-github-actions-deploy"]
+    granted = {action
+               for statement in policy["PolicyDocument"]["Statement"]
+               for action in statement["Action"]}
+
+    used = set()
+    for service, method in sorted(calls):
+        assert (service, method) in INSPECTION_GRANTS, \
+            f"boto3 call {service}.{method} is not mapped — extend the map and the grants"
+        action = INSPECTION_GRANTS[service, method]
+        assert action in granted, f"{action} missing from backup inspection grants"
+        used.add(action)
+
+    unneeded = granted - used
+    assert not unneeded, f"grants the inspection step never uses: {sorted(unneeded)}"
+    # Snapshot reads stay scoped to the backup bucket's backups/ prefix; the
+    # function-config and log grants name the backup function only.
+    def arns(actions):
+        found = []
+        for statement in policy["PolicyDocument"]["Statement"]:
+            if any(action in statement["Action"] for action in actions):
+                for resource in statement["Resource"] if isinstance(
+                        statement["Resource"], list) else [statement["Resource"]]:
+                    found.append(resource["Fn::Sub"])
+        return found
+
+    assert arns(["s3:GetObject"]) == [
+        "arn:${AWS::Partition}:s3:::dapier-backups-${AWS::AccountId}/backups/*"]
+    assert arns(["lambda:GetFunctionConfiguration",
+                 "logs:FilterLogEvents"]) == [
+        "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*",
+        "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*",
+        "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*:*",
+    ]
+
+
 def test_backup_file_body_round_trips_through_s3():
     import boto3
     from moto import mock_aws
