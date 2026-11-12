@@ -153,12 +153,17 @@ def test_backup_inspection_grants_match_deploy_step():
 
     assert arns(["s3:GetObject"]) == [
         "arn:${AWS::Partition}:s3:::dapier-backups-${AWS::AccountId}/backups/*"]
-    assert arns(["lambda:GetFunctionConfiguration",
-                 "logs:FilterLogEvents"]) == [
-        "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*",
-        "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*",
-        "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*:*",
-    ]
+    assert arns(["lambda:GetFunctionConfiguration"]) == [
+        "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*"]
+    # The physical function/log-group names carry a random CloudFormation
+    # suffix (dapier-BackupFunction-XXXXXXXX), so every name pattern must
+    # wildcard inside the name. A pattern ending "...BackupFunction:*" only
+    # matches a function literally named dapier-BackupFunction, and the live
+    # calls stay AccessDenied — that is exactly how 2026-11-12's first
+    # version of the log grant failed.
+    (log_group_arn,) = arns(["logs:FilterLogEvents"])
+    name = log_group_arn.split("log-group:", 1)[1]
+    assert name == "/aws/lambda/dapier-BackupFunction*"
 
 
 def test_backup_file_body_round_trips_through_s3():

@@ -32,9 +32,11 @@ Resources:
           - Effect: Allow
             Action:
               - logs:FilterLogEvents
-            Resource:
-              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*
-              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction:*:*
+            # The physical log group is dapier-BackupFunction-<suffix>, so the
+            # wildcard must sit inside the group name: a pattern ending
+            # "dapier-BackupFunction:*" matches only a group literally named
+            # dapier-BackupFunction and FilterLogEvents stayed AccessDenied.
+            Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dapier-BackupFunction*
           - Effect: Allow
             Action:
               - dynamodb:DescribeTable
