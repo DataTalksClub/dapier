@@ -1643,6 +1643,9 @@ Resources:
     Properties:
       AlarmDescription: Dapier daily DynamoDB backup Lambda errors
       AlarmActions: [!Ref AlarmTopic]
+      # The recovery notice is the operator's proof a scheduled backup went
+      # green again after a fired alarm — describe_alarms is CI-only.
+      OKActions: [!Ref AlarmTopic]
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions:
