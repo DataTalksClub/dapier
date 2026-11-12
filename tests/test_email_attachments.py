@@ -195,6 +195,15 @@ class AttachmentSendTests(unittest.TestCase):
         self.assertEqual(output, {"message_id": "raw-1", "to": ["ops@example.com"],
                                   "subject": "report"})
 
+    def test_default_client_uses_the_configured_ses_region(self):
+        from unittest import mock
+
+        with mock.patch.dict("os.environ", {"DAPIER_EMAIL_REGION": "us-east-1"}), \
+                mock.patch("boto3.client") as client:
+            email_action.run_email_send(
+                {"to": "ops@example.com", "subject": "s", "text": "t"}, {})
+        client.assert_called_once_with("ses", region_name="us-east-1")
+
 
 if __name__ == "__main__":
     import pytest

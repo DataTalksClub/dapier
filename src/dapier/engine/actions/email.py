@@ -53,9 +53,11 @@ def run_email_send(action, event, *, ses=None, steps=None, transport=None):
     :func:`_raw_message` stamps them for every raw send.
     """
     if ses is None:
-        import boto3
+        # Region-pinned: EmailSender is verified only in DAPIER_EMAIL_REGION,
+        # not necessarily the Lambda's own region.
+        from ..notify import ses_client
 
-        ses = boto3.client("ses")
+        ses = ses_client()
     from ...triggers.email_triggers import trigger_domain
 
     to = render(action.get("to") or "", event, steps)
