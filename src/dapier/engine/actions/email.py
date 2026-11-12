@@ -28,6 +28,54 @@ from .templating import render
 
 DOWNLOAD_TIMEOUT = 30
 
+# Agent-to-agent mail must never leave Alexey's own mailboxes (intake a7a0e545,
+# Alexey t2167u-t2169u). The only email fallback between agents is
+# dev@dtcdev.click -> orin@dtcdev.click through the dev relay. Every Gmail
+# send path (agent ops and the workflow runner) resolves the real sender from
+# the Gmail profile and checks it here, so a connection naming an Alexey
+# mailbox is covered whatever label the caller passes.
+AGENT_DOMAIN = "dtcdev.click"
+
+
+class AgentMailRefused(Exception):
+    """An Alexey mailbox tried to send agent-to-agent/handoff mail."""
+
+
+def _is_alexey_address(address):
+    value = str(address or "").strip().lower()
+    if not value:
+        return False
+    local = value.rsplit("@", 1)[0].strip("< ")
+    return local.startswith("alexey") or "grigoriev" in local
+
+
+def _flatten_addresses(values):
+    addresses = []
+    for value in values:
+        if value in (None, "", []):
+            continue
+        if isinstance(value, str):
+            addresses.extend(part.strip() for part in value.replace(";", ",").split(",") if part.strip())
+        elif isinstance(value, (list, tuple)):
+            addresses.extend(str(item).strip() for item in value if str(item).strip())
+    return addresses
+
+
+def refuse_agent_mail(sender, recipients=(), subject=None):
+    """Raise AgentMailRefused when an Alexey mailbox would send agent mail."""
+    if not _is_alexey_address(sender):
+        return
+    addresses = [address.lower() for address in _flatten_addresses(recipients)]
+    agent = [address for address in addresses
+             if address.rsplit("@", 1)[-1].strip("> ") == AGENT_DOMAIN]
+    handoff = "[handoff]" in str(subject or "").lower()
+    if agent or handoff:
+        raise AgentMailRefused(
+            "REFUSED: agent-to-agent/handoff mail is never sent from Alexey's mailbox "
+            f"(account {sender}; to {', '.join(agent) or 'n/a'}). "
+            "Use Hub intake notes or SendToAgent; the only email fallback is "
+            "dev@dtcdev.click -> orin@dtcdev.click via bots-management scripts/dev-relay-mail.py")
+
 
 def run_email_send(action, event, *, ses=None, steps=None, transport=None):
     """Send an email through SES, with {field} templates filled from the event
