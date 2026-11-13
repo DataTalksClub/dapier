@@ -64,6 +64,23 @@ neither contained an alarm payload. Allowing the sender accepts future mail;
 it does not confirm subscriptions or replay previous deliveries. Check the
 subscriptions separately before relying on their alert delivery.
 
+The `dev` oncall mailbox also allows `noreply@aishippinglabs.com`, the AI
+Shipping Labs app's SES sender for operational failure alerts (campaign queue
+and stats-refresh failures, subjects `AISHL campaign ... failed: <id>`). Add it
+only to `dev`:
+
+```bash
+dapier emails from add noreply@aishippinglabs.com --route dev
+dapier emails from list --route dev
+```
+
+On 2026-11-13, this missing sender refused two AISHL alerts for campaign 18
+(inbox events `52445316...` "campaign stats refresh failed" and `59c09af2...`
+"campaign queue failed": Relay preflight recipient count mismatch). Both stay
+in the inbox with outcome `refused`. Allowing the sender accepts future mail;
+replay the refused events (`dapier runs events replay <id>`) to deliver them
+to oncall.
+
 Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
 the address, sender, owning workflows, policy rule, and event id, and emit `EmailSenderPolicyRefused`
 in `Dapier/Triggers`. Atomic claims in the cursors table dedupe each

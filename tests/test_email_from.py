@@ -251,6 +251,41 @@ def test_cli_allows_sns_on_dev_without_widening_other_mailboxes(monkeypatch):
     assert email_from.rejected(_mail("", route="dev"))
 
 
+def test_cli_allows_aishl_alerts_on_dev_without_widening_other_mailboxes(monkeypatch):
+    # 2026-11-13: AI Shipping Labs campaign failure alerts to dev@ were refused.
+    _bind(monkeypatch)
+    existing = SEED + ["alerts@dtcdev.click", "noreply@datatalks.club",
+                       "no-reply@dtcdev.click", "no-reply@sns.amazonaws.com"]
+    for address in existing:
+        email_from.api_add(address, route="dev")
+    before = email_from.api_list()[1]
+    sender = "noreply@aishippinglabs.com"
+    event = _mail("AI Shipping Labs <" + sender + ">", route="dev")
+    event["data"]["subject"] = "AISHL campaign queue failed: 18"
+    assert email_from.rejected(event)
+
+    def call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("POST", "/api/agent/email-from")
+        assert body == {"address": sender, "route": "dev"}
+        return email_from.api_save(body)[1]
+
+    monkeypatch.setattr(commands.api, "call", call)
+    assert main.main(["emails", "from", "add", sender, "--route", "dev"]) == 0
+    after = email_from.api_list()[1]
+    assert after["default"] == before["default"]
+    assert after["routes"]["dev"] == {"mode": "allowlist", "addresses": existing + [sender]}
+    for subject in ("AISHL campaign queue failed: 18",
+                    "AISHL campaign stats refresh failed: 18"):
+        event["data"]["subject"] = subject
+        assert not email_from.rejected(event)
+    for route in ("tofu", "orin", "invoice"):
+        assert email_from.rejected(_mail(sender, route=route))
+    # Only the exact address: lookalikes and other aishippinglabs senders stay refused.
+    for other in ("alerts@aishippinglabs.com", "noreply@aishippinglabs.com.evil.example"):
+        assert email_from.rejected(_mail(other, route="dev"))
+    assert email_from.rejected(_mail("stranger@example.com", route="dev"))
+
+
 def test_ses_like_event_resolves_route_from_source_or_to(monkeypatch):
     _bind(monkeypatch)
     email_from.api_save({"route": "newsletter", "mode": "anyone"})
