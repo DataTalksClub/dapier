@@ -6,6 +6,7 @@ module does not resolve secrets. No agent process runs in Dapier.
 import hashlib
 import json
 import re
+import time
 from pathlib import PurePosixPath
 from uuid import UUID
 
@@ -118,18 +119,84 @@ class DynamoJournal:
 
 
 class HubSessionError(RuntimeError):
-    """Safe error details: never include HTTP bodies containing task data."""
+    """Safe error details: never include arbitrary HTTP bodies containing task data.
+
+    Only Hub's bounded machine ``error`` code and its short human ``message``
+    (or ``detail``) string are surfaced, so the failure email and run record
+    say why Hub refused without echoing request content.
+    """
+
+    def __init__(self, message, *, status=None, code=None):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+
+
+# Backoff between Hub attempts (seconds). Bounded so a refused start fails
+# loudly within the worker's time budget instead of hanging.
+RETRY_DELAYS = (5, 15, 45)
+# 409s that mean "try again later"; other 409s (scope decisions) are final.
+_RETRYABLE_CONFLICTS = {"machine_capacity", "capacity", "busy", "rate_limited"}
+
+
+def _hub_message(body):
+    if not isinstance(body, dict):
+        return ""
+    for name in ("message", "detail"):
+        value = body.get(name)
+        if isinstance(value, str) and value.strip():
+            text = " ".join(value.split())
+            return text[:300]
+    return ""
 
 
 def _response(status, body, phase):
     if not isinstance(status, int) or not 200 <= status < 300:
-        # Only Hub's bounded machine code is safe to expose as an error.
+        # Only Hub's bounded machine code and short message are safe to expose.
         code = body.get("error") if isinstance(body, dict) else None
         code = code if isinstance(code, str) and re.fullmatch(r"[a-z_]{1,80}", code) else "request_failed"
-        raise HubSessionError(f"Hub {phase}: HTTP {status}, {code}")
+        message = _hub_message(body)
+        detail = f": {message}" if message else ""
+        raise HubSessionError(f"Hub {phase}: HTTP {status}, {code}{detail}", status=status, code=code)
     if not isinstance(body, dict):
         raise HubSessionError(f"Hub {phase}: invalid response")
     return body
+
+
+def _retryable(exc):
+    if isinstance(exc, HubSessionError):
+        status = exc.status
+        if not isinstance(status, int):
+            return False
+        if status == 409:
+            return exc.code in _RETRYABLE_CONFLICTS
+        return status == 429 or status >= 500
+    # Transport failures: timeouts, connection resets, DNS. The same Hub keys
+    # and payloads are replayed, so a retry cannot launch a second session.
+    return isinstance(exc, (TimeoutError, ConnectionError, OSError))
+
+
+def _send(post, path, payload, phase, *, sleep, delays):
+    """POST with bounded backoff on capacity refusals, 5xx and timeouts.
+
+    Exhausting the retries raises, which fails the step: the engine's
+    failure notice then emails the workflow's notify list with the error.
+    """
+    attempts = len(delays) + 1
+    for attempt in range(attempts):
+        try:
+            return _response(*post(path, payload), phase)
+        except Exception as exc:
+            if not _retryable(exc) or attempt == attempts - 1:
+                if attempt and isinstance(exc, HubSessionError):
+                    raise HubSessionError(f"{exc} (after {attempt + 1} attempts)",
+                                          status=exc.status, code=exc.code) from exc
+                if attempt:
+                    raise HubSessionError(
+                        f"Hub {phase}: {exc.__class__.__name__}: {exc} (after {attempt + 1} attempts)"
+                    ) from exc
+                raise
+            sleep(delays[attempt])
 
 
 def _uuid(value, field):
@@ -139,19 +206,22 @@ def _uuid(value, field):
         raise HubSessionError(f"Hub returned invalid {field}") from None
 
 
-def launch(action, event, workflow_id, *, journal, post, steps=None):
+def launch(action, event, workflow_id, *, journal, post, steps=None,
+           sleep=None, delays=None):
     """Create and assign using a caller-owned authenticated ``post(path, body)``.
 
     Each HTTP mutation has its exact payload journaled before it is sent.
     Ambiguous timeouts propagate; retry replays the same Hub keys/payloads.
     Assignment is not evidence that a native worker is already running.
     """
+    sleep = sleep or time.sleep
+    delays = RETRY_DELAYS if delays is None else delays
     key = request_key(workflow_id, event.get("id"), action.get("id"))
     completed = journal.get(key + "/assigned")
     if completed is not None:
         return completed
     request = journal.once(key + "/request", lambda: build_request(action, event, workflow_id, steps))
-    created = _response(*post("", request["create"]), "create")
+    created = _send(post, "", request["create"], "create", sleep=sleep, delays=delays)
     task = created.get("task") or {}
     task_id = _uuid(task.get("id"), "task id")
     version = task.get("version")
@@ -164,7 +234,8 @@ def launch(action, event, workflow_id, *, journal, post, steps=None):
     })
     if assignment["task_id"] != task_id:
         raise HubSessionError("Hub create replay changed task identity")
-    assigned = _response(*post(f"/{task_id}/assign", assignment["payload"]), "assign")
+    assigned = _send(post, f"/{task_id}/assign", assignment["payload"], "assign",
+                     sleep=sleep, delays=delays)
     session = assigned.get("assigned_session") or {}
     session_id = _uuid(session.get("hub_session_id"), "session id")
     # Keep held/uncertain results explicit; retries never choose a fresh key.
