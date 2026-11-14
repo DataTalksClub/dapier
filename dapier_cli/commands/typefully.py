@@ -1,8 +1,10 @@
 """Implementation of the `dapier typefully` commands."""
-import base64
+import http.client
 import json
 import sys
+import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .. import api
 from .shared import print_json
@@ -14,6 +16,10 @@ __all__ = [
 ]
 
 DEFAULT_SOCIAL_SET_ID = 182343
+MAX_MEDIA_BYTES = 100 * 1024 * 1024
+MEDIA_UPLOAD_TIMEOUT_SECONDS = 300
+MEDIA_POLL_ATTEMPTS = 90
+MEDIA_POLL_INTERVAL_SECONDS = 2.0
 
 
 def typefully_social_sets(api_url, debug=False):
@@ -123,26 +129,85 @@ def typefully_patch_draft(api_url, draft_id, path, social_set_id=DEFAULT_SOCIAL_
     return 0
 
 
-def typefully_upload_media(api_url, file, alt_text=None, file_name=None,
-                           social_set_id=DEFAULT_SOCIAL_SET_ID, debug=False):
+def _put_presigned_file(url, file_path, size, timeout=MEDIA_UPLOAD_TIMEOUT_SECONDS, debug=False):
+    """Stream file bytes directly to a presigned HTTPS URL with only Content-Length."""
+    if not isinstance(url, str) or not url.startswith("https://"):
+        raise ValueError("direct media upload failed")
+    parsed = urlparse(url)
+    if not parsed.hostname:
+        raise ValueError("direct media upload failed")
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    if debug:
+        print(f"PUT https://{parsed.hostname}{parsed.path or '/'} ({size} bytes)")
     try:
-        content = Path(file).read_bytes()
+        with Path(file_path).open("rb") as handle:
+            conn = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=timeout)
+            try:
+                conn.request("PUT", path, body=handle, headers={"Content-Length": str(size)})
+                response = conn.getresponse()
+                status = response.status
+                response.read()
+            finally:
+                conn.close()
+    except Exception:
+        raise ValueError("direct media upload failed") from None
+    if status not in (200, 201, 204):
+        raise ValueError(f"direct media upload failed (HTTP {status})")
+    return status
+
+
+def typefully_upload_media(api_url, file, alt_text=None, file_name=None,
+                           social_set_id=DEFAULT_SOCIAL_SET_ID, debug=False, sleep=None):
+    path = Path(file)
+    try:
+        if not path.is_file():
+            raise OSError("not a regular file")
+        size = path.stat().st_size
+        with path.open("rb"):
+            pass
     except OSError:
         print(f"Error: cannot read {file}", file=sys.stderr)
         return 2
-    if not content:
+    if size == 0:
         print("Error: media file is empty", file=sys.stderr)
         return 2
-    name = file_name or Path(file).name
-    body = {"file_name": name, "content_base64": base64.b64encode(content).decode("ascii")}
+    if size > MAX_MEDIA_BYTES:
+        print("Error: media file exceeds 100 MB max size", file=sys.stderr)
+        return 2
+    name = file_name or path.name
+    body = {"file_name": name, "size_bytes": size}
     if alt_text is not None:
         body["alt_text"] = alt_text
-    endpoint = f"/api/agent/typefully/social-sets/{int(social_set_id)}/media"
-    data = api.call(api_url, "POST", endpoint, body=body, debug=debug)
-    # Print identifiers only: the signed upload URL never leaves the server,
-    # and file bytes must never reach stdout.
-    safe = {key: data[key] for key in ("media_id", "file_name", "status", "error_reason") if key in data}
-    print_json(safe if safe else {"status": "unknown"})
+    endpoint = f"/api/agent/typefully/social-sets/{int(social_set_id)}/media/upload"
+    upload_info = api.call(api_url, "POST", endpoint, body=body, debug=debug)
+    media_id = upload_info.get("media_id")
+    upload_url = upload_info.get("upload_url")
+    if not isinstance(media_id, str) or not media_id or not isinstance(upload_url, str) or not upload_url:
+        print("Error: invalid media upload response from server", file=sys.stderr)
+        return 2
+    try:
+        _put_presigned_file(upload_url, path, size, debug=debug)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    pause = sleep or time.sleep
+    status_path = f"/api/agent/typefully/social-sets/{int(social_set_id)}/media/{media_id}"
+    final = {}
+    for attempt in range(MEDIA_POLL_ATTEMPTS):
+        final = api.call(api_url, "GET", status_path, debug=debug)
+        if final.get("status") in ("ready", "failed"):
+            break
+        if attempt + 1 < MEDIA_POLL_ATTEMPTS:
+            pause(MEDIA_POLL_INTERVAL_SECONDS)
+    # Print identifiers only: the signed upload URL and file bytes must never reach stdout.
+    safe = {"media_id": media_id, "file_name": upload_info.get("file_name") or name}
+    for key in ("status", "error_reason"):
+        if key in final and final[key] is not None:
+            safe[key] = final[key]
+    safe.setdefault("status", "unknown")
+    print_json(safe)
     return 0
 
 
