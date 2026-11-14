@@ -138,6 +138,39 @@ def _redact_media_result(result):
             if key in result}
 
 
+def request_media_upload_api(event, social_set_id):
+    """Issue a presigned Typefully upload URL so the client uploads bytes directly."""
+    subject, error = require_operator(event, "typefully.upload_media")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, TypeError):
+        return _json_response(400, {"error": "Invalid JSON body"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid JSON body"})
+    file_name = body.get("file_name")
+    if not isinstance(file_name, str) or not file_name.strip():
+        return _json_response(400, {"error": "file_name is required"})
+    alt_text = body.get("alt_text")
+    if alt_text is not None and not isinstance(alt_text, str):
+        return _json_response(400, {"error": "alt_text must be a string"})
+    size_bytes = body.get("size_bytes")
+    if size_bytes is not None and (isinstance(size_bytes, bool) or not isinstance(size_bytes, int)):
+        return _json_response(400, {"error": "size_bytes must be an integer"})
+    try:
+        payload = _plugin().request_media_upload(_connection(), {
+            "social_set_id": social_set_id,
+            "file_name": file_name.strip(),
+            "alt_text": alt_text,
+            "size_bytes": size_bytes,
+        })
+    except ValueError as exc:
+        return _error(exc)
+    audit.emit("typefully", "typefully.upload_media", subject, outcome="ok")
+    return _json_response(201, payload)
+
+
 def upload_media_api(event, social_set_id):
     subject, error = require_operator(event, "typefully.upload_media")
     if error:
@@ -199,6 +232,9 @@ def route_typefully(event, method, path):
         return draft_api(event, match.group(1), match.group(2))
     if match and method == "PATCH":
         return patch_draft_api(event, match.group(1), match.group(2))
+    match = re.fullmatch(r"/api/agent/typefully/social-sets/(\d+)/media/upload", path)
+    if match and method == "POST":
+        return request_media_upload_api(event, match.group(1))
     match = re.fullmatch(r"/api/agent/typefully/social-sets/(\d+)/media", path)
     if match and method == "POST":
         return upload_media_api(event, match.group(1))

@@ -308,12 +308,8 @@ def _poll_media_status(connection, social_set_id, media_id, sleep=None):
     return data
 
 
-def upload_media(connection, params, sleep=None):
-    """Full media flow: presigned URL -> raw PUT -> bounded status poll.
-
-    Returns only identifier/status fields; the presigned upload URL (signed
-    material) is never returned or echoed.
-    """
+def _validate_media_upload_params(params):
+    """Validate common media upload parameters and return (social_set_id, file_name, alt_text)."""
     social_set_id = _social_set_id(params)
     file_name = str((params or {}).get("file_name") or "").strip()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._()\-]*", file_name) or "." not in file_name:
@@ -321,16 +317,24 @@ def upload_media(connection, params, sleep=None):
     ext = "." + file_name.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_MEDIA_EXTENSIONS:
         raise ValueError(f"unsupported media extension {ext}")
-    content = (params or {}).get("content")
-    if not isinstance(content, (bytes, bytearray)) or not content:
-        raise ValueError("media content is required")
-    if len(content) > MAX_MEDIA_BYTES:
-        raise ValueError("media file is too large")
     alt_text = (params or {}).get("alt_text")
+    if alt_text is not None and not isinstance(alt_text, str):
+        raise ValueError("alt_text must be a string")
+    return social_set_id, file_name, alt_text
+
+
+def request_media_upload(connection, params):
+    """Request a presigned media upload URL from Typefully without uploading bytes."""
+    from urllib.parse import urlparse
+    social_set_id, file_name, alt_text = _validate_media_upload_params(params)
+    size_bytes = (params or {}).get("size_bytes")
+    if size_bytes is not None:
+        if isinstance(size_bytes, bool) or not isinstance(size_bytes, int) or size_bytes <= 0:
+            raise ValueError("media content is required")
+        if size_bytes > MAX_MEDIA_BYTES:
+            raise ValueError("media file is too large")
     upload_body = {"file_name": file_name}
     if alt_text is not None:
-        if not isinstance(alt_text, str):
-            raise ValueError("alt_text must be a string")
         upload_body["alt_text"] = alt_text
     data = request(f"/social-sets/{social_set_id}/media/upload", connection,
                    method="POST", body=upload_body)
@@ -338,6 +342,27 @@ def upload_media(connection, params, sleep=None):
     upload_url = data.get("upload_url")
     if not isinstance(media_id, str) or not media_id:
         raise ValueError("Typefully returned an invalid media upload")
+    parsed = urlparse(upload_url) if isinstance(upload_url, str) else None
+    if not isinstance(upload_url, str) or not upload_url.startswith("https://") or not parsed or not parsed.hostname:
+        raise ValueError("Typefully returned an invalid media upload")
+    return {"media_id": media_id, "file_name": file_name, "upload_url": upload_url}
+
+
+def upload_media(connection, params, sleep=None):
+    """Full media flow: presigned URL -> raw PUT -> bounded status poll.
+
+    Returns only identifier/status fields; the presigned upload URL (signed
+    material) is never returned or echoed.
+    """
+    social_set_id, file_name, _ = _validate_media_upload_params(params)
+    content = (params or {}).get("content")
+    if not isinstance(content, (bytes, bytearray)) or not content:
+        raise ValueError("media content is required")
+    if len(content) > MAX_MEDIA_BYTES:
+        raise ValueError("media file is too large")
+    upload_info = request_media_upload(connection, params)
+    media_id = upload_info["media_id"]
+    upload_url = upload_info["upload_url"]
     try:
         _raw_put(upload_url, bytes(content))
     except ValueError:

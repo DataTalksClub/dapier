@@ -387,18 +387,126 @@ def test_cli_upload_media_prints_ids_only(monkeypatch, capsys, tmp_path):
     target = tmp_path / "pic.png"
     target.write_bytes(b"\x89PNG-bytes")
     calls = []
+    puts = []
     def fake_call(api_url, method, path, body=None, debug=False):
         calls.append((method, path, body))
-        return {"media_id": "m-1", "file_name": "pic.png", "status": "ready",
-                "upload_url": "https://signed.example.test/u?sig=HIDDEN"}
+        if method == "POST":
+            return {"media_id": "m-1", "file_name": "pic.png",
+                    "upload_url": "https://signed.example.test/u?sig=HIDDEN"}
+        return {"media_id": "m-1", "status": "ready"}
+    def fake_put(url, file_path, size, debug=False):
+        puts.append((url, file_path.read_bytes(), size))
+        return 200
     monkeypatch.setattr(cli_typefully.api, "call", fake_call)
-    assert cli_typefully.typefully_upload_media("https://api.test", str(target)) == 0
+    monkeypatch.setattr(cli_typefully, "_put_presigned_file", fake_put)
+    assert cli_typefully.typefully_upload_media("https://api.test", str(target), sleep=lambda _: None) == 0
     out = capsys.readouterr().out
     assert "m-1" in out and "HIDDEN" not in out and "signed.example.test" not in out
-    import base64 as _b64
-    assert "PNG-bytes" not in out and _b64.b64encode(b"\x89PNG-bytes").decode() not in out
-    assert calls[0][0] == "POST" and calls[0][1].endswith("/social-sets/182343/media")
-    assert calls[0][2]["file_name"] == "pic.png"
+    assert "PNG-bytes" not in out
+    assert calls[0][0] == "POST" and calls[0][1].endswith("/social-sets/182343/media/upload")
+    assert calls[0][2] == {"file_name": "pic.png", "size_bytes": len(b"\x89PNG-bytes")}
+    assert "content_base64" not in calls[0][2]
+    assert puts[0] == ("https://signed.example.test/u?sig=HIDDEN", b"\x89PNG-bytes", len(b"\x89PNG-bytes"))
+    assert calls[1][0] == "GET" and calls[1][1].endswith("/social-sets/182343/media/m-1")
+
+
+def test_request_media_upload_and_agent_route(monkeypatch):
+    from src.dapier.api.agent import typefully as agent_typefully
+    _operator(monkeypatch)
+    monkeypatch.setattr(plugin, "request", lambda path, connection, method="GET", body=None:
+        {"media_id": "m-77", "upload_url": "https://signed.example.test/put?sig=ABC"})
+    res = plugin.request_media_upload({}, {"file_name": "clip.mp4", "size_bytes": 7 * 1024 * 1024})
+    assert res == {"media_id": "m-77", "file_name": "clip.mp4",
+                   "upload_url": "https://signed.example.test/put?sig=ABC"}
+    with pytest.raises(ValueError):
+        plugin.request_media_upload({}, {"file_name": "clip.mp4", "size_bytes": plugin.MAX_MEDIA_BYTES + 1})
+
+    event = _agent_event("POST", "/api/agent/typefully/social-sets/182343/media/upload",
+                         json.dumps({"file_name": "clip.mp4", "size_bytes": 7 * 1024 * 1024}))
+    response = agent_typefully.route_typefully(
+        event, "POST", "/api/agent/typefully/social-sets/182343/media/upload")
+    assert response["statusCode"] == 201
+    payload = json.loads(response["body"])
+    assert payload["media_id"] == "m-77"
+    assert payload["upload_url"] == "https://signed.example.test/put?sig=ABC"
+
+
+def test_cli_upload_media_large_file_direct_put(monkeypatch, capsys, tmp_path):
+    """Files > 6 MB stream directly to the presigned URL without passing bytes through Dapier API."""
+    from dapier_cli.commands import typefully as cli_typefully
+    large_size = 7 * 1024 * 1024  # 7 MB (> 6 MB API Gateway limit)
+    target = tmp_path / "clip.mp4"
+    with target.open("wb") as handle:
+        handle.seek(large_size - 1)
+        handle.write(b"\x00")
+
+    api_calls = []
+    statuses = iter([{"status": "processing"}, {"status": "ready"}])
+    def fake_call(api_url, method, path, body=None, debug=False):
+        api_calls.append((method, path, body))
+        if method == "POST":
+            assert body == {"file_name": "clip.mp4", "size_bytes": large_size}
+            assert len(json.dumps(body)) < 256
+            return {"media_id": "m-big", "file_name": "clip.mp4",
+                    "upload_url": "https://s3.example.test/presigned?X-Amz-Signature=SECRET"}
+        return next(statuses)
+
+    captured = {}
+    class FakeResponse:
+        status = 200
+        def read(self):
+            return b""
+    class FakeConn:
+        def __init__(self, host, port=None, timeout=60):
+            captured["host"] = host
+            captured["timeout"] = timeout
+        def request(self, method, path, body=None, headers=None):
+            captured["method"] = method
+            captured["path"] = path
+            captured["headers"] = dict(headers or {})
+            captured["streamed_len"] = len(body.read())
+        def getresponse(self):
+            return FakeResponse()
+        def close(self):
+            captured["closed"] = True
+
+    import http.client as http_client_mod
+    monkeypatch.setattr(cli_typefully.api, "call", fake_call)
+    monkeypatch.setattr(http_client_mod, "HTTPSConnection", FakeConn)
+
+    assert cli_typefully.typefully_upload_media("https://api.test", str(target), sleep=lambda _: None) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out == {"media_id": "m-big", "file_name": "clip.mp4", "status": "ready"}
+    assert "SECRET" not in json.dumps(out)
+    assert captured["method"] == "PUT"
+    assert captured["headers"] == {"Content-Length": str(large_size)}
+    assert captured["streamed_len"] == large_size
+    assert captured["closed"] is True
+    assert len(api_calls) == 3  # 1 POST /media/upload + 2 GET /media/{id}
+
+
+def test_cli_upload_media_rejects_oversized_file(monkeypatch, capsys, tmp_path):
+    from dapier_cli.commands import typefully as cli_typefully
+    oversized = tmp_path / "huge.mp4"
+    with oversized.open("wb") as handle:
+        handle.seek(cli_typefully.MAX_MEDIA_BYTES)
+        handle.write(b"\x00")
+    monkeypatch.setattr(cli_typefully.api, "call", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("must reject before HTTP")))
+    assert cli_typefully.typefully_upload_media("https://api.test", str(oversized)) == 2
+    assert "100 MB" in capsys.readouterr().err
+
+
+def test_cli_upload_media_help_mentions_max_size(capsys):
+    import argparse
+    from dapier_cli.cli import typefully as cli_typefully_parser
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="noun")
+    cli_typefully_parser.register(sub)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["typefully", "upload-media", "--help"])
+    help_text = capsys.readouterr().out
+    assert "100 MB" in help_text
 
 
 def test_cli_create_draft_schedule_opt_in(monkeypatch, capsys, tmp_path):

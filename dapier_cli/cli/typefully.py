@@ -35,8 +35,8 @@ def register(sub):
     patch.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
     upload = sub_p.add_parser(
         "upload-media",
-        help="Upload an image/video/GIF/PDF and poll until ready (prints media_id + status only)")
-    upload.add_argument("--file", required=True, help="Media file to upload")
+        help="Upload an image/video/GIF/PDF (max 100 MB) directly via presigned URL and poll until ready (prints media_id + status only)")
+    upload.add_argument("--file", required=True, help="Media file to upload (max 100 MB)")
     upload.add_argument("--alt-text", default=None, help="Accessibility description")
     upload.add_argument("--file-name", default=None, help="Override the uploaded file name")
     upload.add_argument("--social-set-id", type=int, default=DEFAULT_SOCIAL_SET_ID)
