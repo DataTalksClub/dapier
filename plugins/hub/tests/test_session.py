@@ -192,3 +192,63 @@ def test_concurrent_journal_insert_recovers_winning_snapshot(journal, monkeypatc
 
     monkeypatch.setattr(table, "put_item", put_item)
     assert journal.once("raced", lambda: {"winner": False}) == {"winner": True}
+
+
+def _flaky(failures, final=None):
+    """Hub create refuses ``failures`` times, then behaves (or keeps failing)."""
+    calls = []
+
+    def post(path, payload):
+        calls.append(path)
+        if not path and len(calls) <= len(failures):
+            outcome = failures[len(calls) - 1]
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+        return reply(path, payload)
+    return post, calls
+
+
+@pytest.mark.parametrize("failure", [
+    (409, {"error": "machine_capacity", "message": "No machine has capacity"}),
+    (500, {"error": "internal_error"}),
+    (503, "upstream down"),
+    TimeoutError("timed out"),
+])
+def test_transient_hub_refusal_is_retried_with_backoff(journal, failure):
+    post, calls = _flaky([failure, failure])
+    slept = []
+    result = launch(ACTION, EVENT, "flow", journal=journal, post=post,
+                    sleep=slept.append, delays=(1, 2, 4))
+    assert result["hub_session_id"] == SESSION
+    assert slept == [1, 2]
+    assert calls[:3] == ["", "", ""]
+
+
+@pytest.mark.parametrize("failure,expected", [
+    ((409, {"error": "machine_capacity", "message": "No machine has capacity"}),
+     "Hub create: HTTP 409, machine_capacity: No machine has capacity (after 4 attempts)"),
+    ((502, {"error": "bad_gateway"}), "Hub create: HTTP 502, bad_gateway (after 4 attempts)"),
+])
+def test_exhausted_retries_raise_loudly_with_hub_error(journal, failure, expected):
+    post, calls = _flaky([failure] * 10)
+    slept = []
+    with pytest.raises(HubSessionError) as exc:
+        launch(ACTION, EVENT, "flow", journal=journal, post=post,
+               sleep=slept.append, delays=(1, 2, 4))
+    assert str(exc.value) == expected
+    assert exc.value.status == failure[0]
+    assert slept == [1, 2, 4] and len(calls) == 4
+
+
+def test_exhausted_timeouts_raise_hub_session_error(journal):
+    post, _ = _flaky([TimeoutError("timed out")] * 10)
+    with pytest.raises(HubSessionError, match="Hub create: TimeoutError: timed out \\(after 4 attempts\\)"):
+        launch(ACTION, EVENT, "flow", journal=journal, post=post, sleep=lambda s: None, delays=(0, 0, 0))
+
+
+def test_final_conflicts_are_not_retried(journal):
+    post, calls = _flaky([(409, {"error": "scope_decision_required"})] * 10)
+    with pytest.raises(HubSessionError, match="scope_decision_required"):
+        launch(ACTION, EVENT, "flow", journal=journal, post=post, sleep=lambda s: None, delays=(0, 0, 0))
+    assert len(calls) == 1
