@@ -138,8 +138,10 @@ Parameters:
       then list that topic in SesNotificationTopics. Empty sends untagged.
   BackupAlertEmail:
     Type: String
-    Default: alexey.s.grigoriev@gmail.com
-    Description: Recipient of the DynamoDB backup failure email
+    Default: dev@dtcdev.click
+    Description: >
+      Recipient of the DynamoDB backup failure email. Infra alerts go only to
+      the Developer inbox dev@dtcdev.click, never a personal inbox.
 
 
 Globals:

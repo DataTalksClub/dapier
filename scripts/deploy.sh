@@ -67,6 +67,11 @@ OperatorEmails: "$OPERATOR_EMAILS"
 # the live stack — this override is what performs the reroute.
 NotifyEmail: "${NOTIFY_EMAIL:-dev@dtcdev.click}"
 AlertEmailSender: "${ALERT_EMAIL_SENDER:-DTC Alerts <alerts@dtcdev.click>}"
+# DynamoDB backup failure recipient (template.yaml BackupAlertEmail). Like
+# NotifyEmail, the template default alone never reaches the live stack, so
+# deploy pins it to dev@ explicitly; it previously stayed on Alexey's
+# personal Gmail (intake 19fefe6f).
+BackupAlertEmail: "${BACKUP_ALERT_EMAIL:-dev@dtcdev.click}"
 OperatorSubjects: "${OPERATOR_SUBJECTS:-}"
 # Gmail scopes beyond the declared gmail.readonly/gmail.send: gmail.modify
 # backs `dapier gmail mark/draft`. Like NotifyEmail above, a template default
