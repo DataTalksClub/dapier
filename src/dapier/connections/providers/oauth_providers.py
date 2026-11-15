@@ -183,20 +183,13 @@ def connection_grant_scopes(provider_name, scopes):
     for" (``oauth_flow.oauth_start``/``oauth_callback`` and the agent API's
     connect start all go through here).
 
-    The connection's own requested scopes, normalized like every grant; a
-    Google connection that touches Gmail (any ``gmail.`` scope) also
-    carries the effective Gmail scope set above, so the consent screen
-    requests the declaration plus any ``GMAIL_SCOPES`` environment extras
-    and the callback's missing-scope check holds the grant to them. Other
-    providers and Google connections that never touch Gmail come back
-    unchanged. Raises ``ProviderError`` like ``normalize_scopes`` (a
-    Google connection needs at least one scope).
+    Returns the connection's own requested scopes, normalized like every
+    grant. Never widens a connection with extra Gmail scopes (such as
+    ``gmail.modify`` from ``GMAIL_SCOPES``) that the connection did not
+    request. Raises ``ProviderError`` like ``normalize_scopes`` (a Google
+    connection needs at least one scope).
     """
-    cleaned = normalize_scopes(provider_name, scopes)
-    if provider_name != "google" or not any(
-            _GMAIL_SCOPE_MARKER in scope for scope in cleaned):
-        return cleaned
-    return sorted(set(cleaned) | set(effective_gmail_scopes()))
+    return normalize_scopes(provider_name, scopes)
 
 
 def authorization_url(provider_name, *, client_id, redirect_uri, scopes, state, code_challenge=None):

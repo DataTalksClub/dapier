@@ -364,16 +364,16 @@ def test_cookieless_callback_without_subject_is_rejected(monkeypatch):
     assert result["headers"]["location"] == "/connections?oauth=session_expired"
 
 
-# --- the Gmail scope declaration rides the shared google provider --------------------
+# --- Google connection scopes are honored, never widened -------------------------
 #
-# A connection that touches Gmail (any gmail. scope) is granted the whole
-# declared set (GMAIL_SCOPES) plus any GMAIL_SCOPES environment extras at
-# consent, and the callback's missing-scope check holds the grant to that
-# same set (see oauth_providers.connection_grant_scopes).
+# Re-consent and initial consent request and verify against the connection's own
+# normalized scopes, never adding extra Gmail scopes such as gmail.modify from
+# GMAIL_SCOPES (see oauth_providers.connection_grant_scopes).
 
 GMAIL_READ_ONLY = "https://www.googleapis.com/auth/gmail.readonly"
 GMAIL_SEND = "https://www.googleapis.com/auth/gmail.send"
 GMAIL_MODIFY = "https://www.googleapis.com/auth/gmail.modify"
+WEBMASTERS = "https://www.googleapis.com/auth/webmasters"
 DECLARED = sorted([GMAIL_READ_ONLY, GMAIL_SEND])
 
 
@@ -400,31 +400,28 @@ def gmail_location_scope(response):
     return query["scope"][0].split()
 
 
-def test_gmail_consent_requests_the_declaration_and_env_extras(monkeypatch):
+def test_gmail_consent_does_not_add_env_extras_or_unrequested_scopes(monkeypatch):
     connections = configure(
-        monkeypatch, token_payload=gmail_token_payload(" ".join(DECLARED)))[0]
+        monkeypatch, token_payload=gmail_token_payload(GMAIL_READ_ONLY))[0]
     seed_google_connection(connections)
     monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
 
     response = oauth_flow.oauth_start(start_event(), "google")
 
     assert response["statusCode"] == 302
-    assert gmail_location_scope(response) == sorted([GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY])
+    assert gmail_location_scope(response) == [GMAIL_READ_ONLY]
 
 
-def test_gmail_consent_without_env_requests_the_declaration(monkeypatch):
+def test_gmail_consent_without_env_requests_only_stored_scopes(monkeypatch):
     connections = configure(
-        monkeypatch, token_payload=gmail_token_payload(" ".join(DECLARED)))[0]
-    # A connection stored with only the read scope is still granted the
-    # whole declaration — GMAIL_SCOPES is the single source for what a
-    # Gmail connection needs.
+        monkeypatch, token_payload=gmail_token_payload(GMAIL_READ_ONLY))[0]
     seed_google_connection(connections)
     monkeypatch.delenv("GMAIL_SCOPES", raising=False)
 
     response = oauth_flow.oauth_start(start_event(), "google")
 
     assert response["statusCode"] == 302
-    assert gmail_location_scope(response) == DECLARED
+    assert gmail_location_scope(response) == [GMAIL_READ_ONLY]
 
 
 def test_non_gmail_consent_requests_exactly_the_stored_scopes(monkeypatch):
@@ -439,27 +436,31 @@ def test_non_gmail_consent_requests_exactly_the_stored_scopes(monkeypatch):
     assert gmail_location_scope(response) == [YOUTUBE_SCOPE]
 
 
-def test_gmail_callback_rejects_a_grant_missing_the_env_extras(monkeypatch):
+def test_google_reconsent_without_gmail_modify_accepts_grant_covering_requested_scopes(monkeypatch):
+    requested = sorted([GMAIL_READ_ONLY, GMAIL_SEND, WEBMASTERS])
     connections, _, stored, _ = configure(
-        monkeypatch, token_payload=gmail_token_payload(" ".join(DECLARED)))
-    seed_google_connection(connections)
+        monkeypatch, token_payload=gmail_token_payload(" ".join(requested)))
+    seed_google_connection(connections, scopes=requested)
+    connections.items["google"]["status"] = "connected"
+    connections.items["google"]["granted_scopes"] = sorted(requested + [GMAIL_MODIFY])
     monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
-    writes = []
-    monkeypatch.setattr(
-        credentials, "put_credential",
-        lambda credential_id, value, **kwargs: writes.append(credential_id),
-    )
+
     response = oauth_flow.oauth_start(start_event(), "google")
+
+    assert response["statusCode"] == 302
+    assert gmail_location_scope(response) == requested
+    assert GMAIL_MODIFY not in gmail_location_scope(response)
 
     result = oauth_flow.oauth_callback(callback_event(response))
 
     assert result["statusCode"] == 302
-    assert result["headers"]["location"] == "/connections?oauth=missing_scopes&connection=google"
-    assert writes == []
-    assert connections.items["google"]["status"] == "ready"
+    assert result["headers"]["location"] == "/connections?oauth=connected"
+    assert connections.items["google"]["status"] == "connected"
+    assert connections.items["google"]["granted_scopes"] == requested
+    assert connections.items["google"]["verified_account_id"] == "me@gmail.test"
 
 
-def test_gmail_callback_stores_the_extended_grant(monkeypatch):
+def test_gmail_callback_stores_superset_grant(monkeypatch):
     connections, _, stored, _ = configure(
         monkeypatch,
         token_payload=gmail_token_payload(
@@ -513,20 +514,17 @@ def test_effective_gmail_scopes_dedupes_and_keeps_the_declaration_first(monkeypa
         GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY)
 
 
-def test_grant_scopes_hold_a_gmail_connection_to_the_whole_declaration(monkeypatch):
+def test_grant_scopes_preserve_requested_gmail_scopes_without_widening(monkeypatch):
     monkeypatch.delenv("GMAIL_SCOPES", raising=False)
     assert oauth_providers.connection_grant_scopes("google", [GMAIL_READ_ONLY]) == \
-        sorted(oauth_providers.GMAIL_SCOPES)
+        [GMAIL_READ_ONLY]
     assert oauth_providers.connection_grant_scopes("google", [GMAIL_SEND, GMAIL_SEND]) == \
-        sorted(oauth_providers.GMAIL_SCOPES)
+        [GMAIL_SEND]
 
 
-def test_grant_scopes_carry_env_extras_for_gmail_connections(monkeypatch):
+def test_grant_scopes_ignore_env_extras_for_gmail_connections(monkeypatch):
     monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify, gmail.settings")
-    assert oauth_providers.connection_grant_scopes("google", [GMAIL_SEND]) == sorted({
-        GMAIL_READ_ONLY, GMAIL_SEND,
-        "https://www.googleapis.com/auth/gmail.modify",
-        "https://www.googleapis.com/auth/gmail.settings"})
+    assert oauth_providers.connection_grant_scopes("google", [GMAIL_SEND]) == [GMAIL_SEND]
 
 
 def test_grant_scopes_leave_non_gmail_connections_alone(monkeypatch):
