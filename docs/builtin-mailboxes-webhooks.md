@@ -97,6 +97,21 @@ On 2026-11-14/15, six such test confirmations were refused (inbox events
 sign-ups whose single-use confirm links had already served their purpose, so
 they were not replayed to oncall.
 
+The `dev` mailbox also allows `content@aishippinglabs.com`, the AI Shipping
+Labs campaign sender (Relay client `aisl-website`). Campaign test sends
+(`asl campaigns test-send <id> --email dev+<tag>@dtcdev.click`) land here so an
+agent can check that the test arrived and renders before a real send. Add it
+only to `dev`:
+
+```bash
+dapier emails from add content@aishippinglabs.com --route dev
+```
+
+On 2026-11-15, three campaign 25 test sends (Relay messages 42308, 42311,
+42317, SES-delivered to the dtcdev.click MX) were refused with
+`sender_not_in_allowlist` (inbox events `d1b71443...`, `b439e018...`,
+`ac82c892...`). Refused tests are not replayed; send a new test instead.
+
 Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
 the address, sender, owning workflows, policy rule, and event id, and emit `EmailSenderPolicyRefused`
 in `Dapier/Triggers`. Atomic claims in the cursors table dedupe each

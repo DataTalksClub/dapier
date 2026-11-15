@@ -318,6 +318,37 @@ def test_cli_allows_courses_confirmations_on_dev_without_widening_other_mailboxe
         assert email_from.rejected(_mail(other, route="dev"))
 
 
+def test_cli_allows_aishl_campaign_tests_on_dev_without_widening_other_mailboxes(monkeypatch):
+    # 2026-11-15: AISHL campaign 25 test sends from content@aishippinglabs.com to
+    # plus-addressed dev+<tag>@ test aliases were refused.
+    _bind(monkeypatch)
+    existing = SEED + ["alerts@dtcdev.click", "noreply@datatalks.club",
+                       "no-reply@dtcdev.click", "no-reply@sns.amazonaws.com",
+                       "noreply@aishippinglabs.com", "courses@datatalks.club"]
+    for address in existing:
+        email_from.api_add(address, route="dev")
+    before = email_from.api_list()[1]
+    sender = "content@aishippinglabs.com"
+    event = _mail('"AI Shipping Labs" <' + sender + ">", route="dev")
+    event["data"]["subject"] = "[TEST] Upcoming AI Shipping Labs workshops"
+    assert email_from.rejected(event)
+
+    def call(api_url, method, path, body=None, **kwargs):
+        assert (method, path) == ("POST", "/api/agent/email-from")
+        assert body == {"address": sender, "route": "dev"}
+        return email_from.api_save(body)[1]
+
+    monkeypatch.setattr(commands.api, "call", call)
+    assert main.main(["emails", "from", "add", sender, "--route", "dev"]) == 0
+    after = email_from.api_list()[1]
+    assert after["default"] == before["default"]
+    assert after["routes"]["dev"] == {"mode": "allowlist", "addresses": existing + [sender]}
+    assert not email_from.rejected(event)
+    for route in ("tofu", "orin", "invoice"):
+        assert email_from.rejected(_mail(sender, route=route))
+    for other in ("hello@aishippinglabs.com", "content@aishippinglabs.com.evil.example"):
+        assert email_from.rejected(_mail(other, route="dev"))
+
 def test_ses_like_event_resolves_route_from_source_or_to(monkeypatch):
     _bind(monkeypatch)
     email_from.api_save({"route": "newsletter", "mode": "anyone"})
