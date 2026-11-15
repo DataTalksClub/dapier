@@ -457,3 +457,17 @@ def test_backup_excludes_external_team_secrets_table(env, monkeypatch):
     assert set(manifest["tables"]) == set(tables)
     assert len(fake_s3.objects) == len(tables) + 1
     assert all("dataops-v1-secrets" not in key for key in fake_s3.objects)
+
+
+def test_backup_failure_email_routes_only_to_dev_inbox():
+    """Infra alerts go only to dev@dtcdev.click (intake 19fefe6f): the
+    template default and the explicit deploy override must both be dev@,
+    since CloudFormation keeps the previous value when an override is
+    omitted and the old default was a personal inbox."""
+    template = _load_yaml("template.yaml")
+    assert template["Parameters"]["BackupAlertEmail"]["Default"] == "dev@dtcdev.click"
+    deploy = Path("scripts/deploy.sh").read_text()
+    assert 'BackupAlertEmail: "${BACKUP_ALERT_EMAIL:-dev@dtcdev.click}"' in deploy
+    for personal in ("alexey.s.grigoriev@gmail.com", "alexey@datatalks.club", "orin@dtcdev.click"):
+        assert personal not in Path("template.yaml").read_text()
+        assert personal not in deploy
