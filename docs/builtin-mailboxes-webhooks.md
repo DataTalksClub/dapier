@@ -81,6 +81,22 @@ in the inbox with outcome `refused`. Allowing the sender accepts future mail;
 replay the refused events (`dapier runs events replay <id>`) to deliver them
 to oncall.
 
+The `dev` mailbox also allows `courses@datatalks.club`, the DataTalks.Club
+academy/courses app's SES sender. Its signup confirmation mails ("Confirm Your
+Email for ...", "Confirm your registration: ...") go to plus-addressed test
+aliases such as `dev+waitlist-ai-20261115@dtcdev.click` during signup-flow
+checks. Add it only to `dev`:
+
+```bash
+dapier emails from add courses@datatalks.club --route dev
+```
+
+On 2026-11-14/15, six such test confirmations were refused (inbox events
+`db4bc01a...`, `890b096a...`, `83c8d0ae...`, `bd662902...`, `cf3d169d...`,
+`48ca8f15...`) and fired `EmailSenderPolicyRefusalAlarm`. They were test
+sign-ups whose single-use confirm links had already served their purpose, so
+they were not replayed to oncall.
+
 Sender-policy refusals at an enabled workflow mailbox log an ERROR naming
 the address, sender, owning workflows, policy rule, and event id, and emit `EmailSenderPolicyRefused`
 in `Dapier/Triggers`. Atomic claims in the cursors table dedupe each
