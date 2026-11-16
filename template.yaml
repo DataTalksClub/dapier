@@ -368,6 +368,8 @@ Resources:
                   # The zoom webhook intake records refused deliveries here
                   # (triggers.inbox.record/ignore) — writes, not just reads.
                   - !GetAtt TriggerInboxTable.Arn
+                  # The by-connector-received GSI behind inbox.api_list.
+                  - !Sub '${TriggerInboxTable.Arn}/index/*'
         # Read-only tables: cursor failure counts, the usage rollup
         # (DynamoDBReadPolicy, one document).
         - PolicyName: dapier-api-dynamodb-read
