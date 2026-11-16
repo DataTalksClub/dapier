@@ -1,6 +1,7 @@
 """GSI-backed inbox listing: connector queries use by-connector-received."""
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from src.dapier.triggers import inbox
@@ -133,3 +134,39 @@ def test_record_without_connector_succeeds_with_gsi(gsi_table):
     assert inbox_id == "evt-noconn"
     stored = gsi_table.get_item(Key={"inbox_id": "evt-noconn"})["Item"]
     assert "connector" not in stored
+
+
+def test_backfilling_gsi_falls_back_to_projected_scan(gsi_table, monkeypatch):
+    _put(gsi_table, "mail-1", "email", "2026-11-16T10:00:01+00:00")
+    _put(gsi_table, "mail-2", "email", "2026-11-16T10:00:02+00:00")
+    _put(gsi_table, "hook-1", "webhook", "2026-11-16T10:00:03+00:00")
+
+    def backfilling(**_kwargs):
+        raise ClientError(
+            {
+                "Error": {
+                    "Code": "ValidationException",
+                    "Message": "Cannot read from backfilling global secondary index: by-connector-received",
+                }
+            },
+            "Query",
+        )
+
+    monkeypatch.setattr(gsi_table, "query", backfilling)
+
+    status, payload = inbox.api_list("email", limit=100, table_ref=gsi_table)
+    assert status == 200
+    assert [event["inbox_id"] for event in payload["events"]] == ["mail-2", "mail-1"]
+
+
+def test_non_backfilling_gsi_error_is_raised(gsi_table, monkeypatch):
+    def denied(**_kwargs):
+        raise ClientError(
+            {"Error": {"Code": "AccessDeniedException", "Message": "not authorized"}},
+            "Query",
+        )
+
+    monkeypatch.setattr(gsi_table, "query", denied)
+
+    with pytest.raises(ClientError):
+        inbox.api_list("email", limit=100, table_ref=gsi_table)

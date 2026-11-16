@@ -577,6 +577,20 @@ def _query_connector(table, connector, limit, *, token_key=None, outcomes=None, 
     return events
 
 
+def _is_backfilling_gsi_error(exc):
+    """True when DynamoDB rejects a GSI query because the index is not ready yet."""
+    response = getattr(exc, "response", None)
+    if not isinstance(response, dict):
+        return False
+    err = response.get("Error") or {}
+    code = err.get("Code") or ""
+    message = str(err.get("Message") or "").lower()
+    return (
+        (code == "ValidationException" and "backfilling" in message)
+        or code == "ResourceNotFoundException"
+    )
+
+
 def _scan_inbox(table, *, include_data=True):
     """Fallback full-window scan when no connector filter or GSI is available."""
     scan_kwargs = {"Limit": SCAN_PAGE}
@@ -621,14 +635,24 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
                               f"{', '.join(sorted(set(OUTCOMES.values())))}"}
     table = table_ref if table_ref is not None else _table()
     wanted = ((connector,) if isinstance(connector, str) else tuple(connector)) if connector else ()
-    if wanted and hasattr(table, "query"):
-        events = []
-        for conn in wanted:
-            events.extend(_query_connector(
-                table, conn, limit, token_key=token_key,
-                outcomes=outcomes, hook=hook,
-            ))
-    else:
+    use_scan = not (wanted and hasattr(table, "query"))
+    if not use_scan:
+        try:
+            events = []
+            for conn in wanted:
+                events.extend(_query_connector(
+                    table, conn, limit, token_key=token_key,
+                    outcomes=outcomes, hook=hook,
+                ))
+        except Exception as exc:
+            if not _is_backfilling_gsi_error(exc):
+                raise
+            logger.warning(
+                "GSI %s unavailable (%s); falling back to bounded inbox scan",
+                CONNECTOR_RECEIVED_INDEX, exc,
+            )
+            use_scan = True
+    if use_scan:
         events = _scan_inbox(table, include_data=bool(hook))
         if wanted:
             events = [event for event in events if event.get("connector") in wanted]
