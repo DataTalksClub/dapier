@@ -125,6 +125,8 @@ def history(channel, *, connection_id=DEFAULT_CONNECTION_ID, limit=100, cursor=N
                 "subtype": m.get("subtype"),
                 "text": m.get("text") or "",
                 "thread_ts": m.get("thread_ts"),
+                "reply_count": m.get("reply_count"),
+                "latest_reply": m.get("latest_reply"),
             }
             for m in (data.get("messages") or [])
             if isinstance(m, dict) and m.get("ts")
@@ -142,6 +144,97 @@ def history(channel, *, connection_id=DEFAULT_CONNECTION_ID, limit=100, cursor=N
         "count": len(messages[:limit]),
         "next_cursor": next_cursor,
     }
+
+
+def _message(m):
+    return {
+        "ts": m.get("ts"),
+        "user": m.get("user"),
+        "bot_id": m.get("bot_id"),
+        "subtype": m.get("subtype"),
+        "text": m.get("text") or "",
+        "thread_ts": m.get("thread_ts"),
+        "reply_count": m.get("reply_count"),
+    }
+
+
+def replies(channel, thread_ts, *, connection_id=DEFAULT_CONNECTION_ID, limit=200,
+            cursor=None):
+    """conversations.replies for one thread (root message first), paginated."""
+    connection_id, _connection, token = _connection_and_token(connection_id)
+    channel = str(channel or "").strip()
+    thread_ts = str(thread_ts or "").strip()
+    if not channel or not thread_ts:
+        raise SlackOpsError("channel and thread_ts are required")
+    limit = max(1, min(int(limit or 200), 1000))
+    payload = {"channel": channel, "ts": thread_ts, "limit": min(limit, 200)}
+    if cursor:
+        payload["cursor"] = str(cursor)
+    messages = []
+    next_cursor = None
+    while len(messages) < limit:
+        data = _call(token, "conversations.replies", payload)
+        messages.extend(_message(m) for m in (data.get("messages") or [])
+                        if isinstance(m, dict) and m.get("ts"))
+        next_cursor = (data.get("response_metadata") or {}).get("next_cursor") or None
+        if not next_cursor:
+            break
+        payload = {**payload, "cursor": next_cursor}
+    return {
+        "connection": connection_id,
+        "channel": channel,
+        "thread_ts": thread_ts,
+        "messages": messages[:limit],
+        "count": len(messages[:limit]),
+        "next_cursor": next_cursor,
+    }
+
+
+def channels(*, connection_id=DEFAULT_CONNECTION_ID, limit=200, cursor=None,
+             types="public_channel,private_channel"):
+    """conversations.list with a cursor so callers can page past 25."""
+    connection_id, _connection, token = _connection_and_token(connection_id)
+    limit = max(1, min(int(limit or 200), 1000))
+    payload = {"limit": min(limit, 200), "exclude_archived": True, "types": str(types)}
+    if cursor:
+        payload["cursor"] = str(cursor)
+    items = []
+    next_cursor = None
+    while len(items) < limit:
+        data = _call(token, "conversations.list", payload)
+        items.extend(
+            {"id": c.get("id"), "name": c.get("name"),
+             "type": "private" if c.get("is_private") else "channel",
+             "num_members": c.get("num_members")}
+            for c in (data.get("channels") or []) if isinstance(c, dict) and c.get("id"))
+        next_cursor = (data.get("response_metadata") or {}).get("next_cursor") or None
+        if not next_cursor:
+            break
+        payload = {**payload, "cursor": next_cursor}
+    return {"connection": connection_id, "items": items[:limit],
+            "count": len(items[:limit]), "next_cursor": next_cursor}
+
+
+def search(query, *, connection_id=DEFAULT_CONNECTION_ID, count=20, page=1):
+    """search.messages (needs the search:read user scope; bot tokens cannot)."""
+    connection_id, _connection, token = _connection_and_token(connection_id)
+    query = str(query or "").strip()
+    if not query:
+        raise SlackOpsError("query is required")
+    data = _call(token, "search.messages", {
+        "query": query, "count": max(1, min(int(count or 20), 100)),
+        "page": max(1, int(page or 1)), "sort": "timestamp", "sort_dir": "asc"})
+    block = data.get("messages") or {}
+    items = [
+        {"ts": m.get("ts"), "channel_id": (m.get("channel") or {}).get("id"),
+         "channel_name": (m.get("channel") or {}).get("name"),
+         "user": m.get("user") or m.get("username"), "text": m.get("text") or "",
+         "permalink": m.get("permalink")}
+        for m in block.get("matches") or [] if isinstance(m, dict)]
+    paging = block.get("paging") or {}
+    return {"connection": connection_id, "query": query, "items": items,
+            "count": len(items), "page": paging.get("page"), "pages": paging.get("pages"),
+            "total": paging.get("total")}
 
 
 def dm_export(user, *, connection_id=DEFAULT_CONNECTION_ID, limit=200, cursor=None):

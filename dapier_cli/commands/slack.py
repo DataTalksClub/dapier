@@ -7,6 +7,7 @@ from .shared import print_json
 
 __all__ = [
     "slack_find_user", "slack_open_dm", "slack_history", "slack_dm_export",
+    "slack_replies", "slack_channels", "slack_search",
 ]
 
 DEFAULT_CONNECTION_ID = "slack-alexey"
@@ -72,3 +73,29 @@ def slack_dm_export(api_url, user, connection_id=DEFAULT_CONNECTION_ID, limit=20
     data = api.call(api_url, "GET", "/api/agent/slack/dm-export?" + urlencode(params), debug=debug)
     print_json(data)
     return 0
+
+
+def _get(api_url, path, params, debug):
+    params = {k: v for k, v in params.items() if v not in (None, "")}
+    print_json(api.call(api_url, "GET", path + "?" + urlencode(params), debug=debug))
+    return 0
+
+
+def slack_replies(api_url, channel, thread_ts, connection_id=DEFAULT_CONNECTION_ID,
+                  limit=200, cursor=None, debug=False):
+    return _get(api_url, "/api/agent/slack/replies", {
+        "channel": channel, "thread_ts": thread_ts, "connection_id": connection_id,
+        "limit": int(limit), "cursor": cursor}, debug)
+
+
+def slack_channels(api_url, connection_id=DEFAULT_CONNECTION_ID, limit=200, cursor=None,
+                   debug=False):
+    return _get(api_url, "/api/agent/slack/channels", {
+        "connection_id": connection_id, "limit": int(limit), "cursor": cursor}, debug)
+
+
+def slack_search(api_url, query, connection_id=DEFAULT_CONNECTION_ID, count=20, page=1,
+                 debug=False):
+    return _get(api_url, "/api/agent/slack/search", {
+        "q": query, "connection_id": connection_id, "count": int(count),
+        "page": int(page)}, debug)

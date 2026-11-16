@@ -121,3 +121,74 @@ def test_cli_help_registers():
     args = parser.parse_args(["slack", "find-user", "mikhail", "--connection", "slack-alexey"])
     assert args.group == "slack"
     assert args.command == "find-user"
+
+
+def _fake_slack(monkeypatch, handler):
+    monkeypatch.setattr(slack_ops.discovery_api, "_load",
+                        lambda cid, table: (_connection(cid), None))
+    monkeypatch.setattr(slack_ops.tokens, "get_access_token",
+                        FakeTokens().get_access_token)
+    monkeypatch.setattr(slack_ops.slack_discovery, "_slack_call", handler)
+
+
+def test_history_exposes_reply_count(monkeypatch):
+    _fake_slack(monkeypatch, lambda method, token, payload: {
+        "ok": True,
+        "messages": [{"ts": "1.0", "text": "q", "thread_ts": "1.0",
+                      "reply_count": 3, "latest_reply": "9.0"}],
+    })
+    msg = slack_ops.history("C1")["messages"][0]
+    assert msg["reply_count"] == 3 and msg["thread_ts"] == "1.0"
+
+
+def test_replies_pages_through_cursor(monkeypatch):
+    seen = []
+
+    def handler(method, token, payload):
+        assert method == "conversations.replies"
+        assert payload["ts"] == "1.0"
+        seen.append(payload.get("cursor"))
+        if not payload.get("cursor"):
+            return {"ok": True, "messages": [{"ts": "1.0", "text": "root"}],
+                    "response_metadata": {"next_cursor": "c2"}}
+        return {"ok": True, "messages": [{"ts": "1.1", "text": "answer"}]}
+
+    _fake_slack(monkeypatch, handler)
+    out = slack_ops.replies("C1", "1.0")
+    assert [m["text"] for m in out["messages"]] == ["root", "answer"]
+    assert seen == [None, "c2"]
+    with pytest.raises(slack_ops.SlackOpsError):
+        slack_ops.replies("C1", "")
+
+
+def test_channels_pages_past_one_page(monkeypatch):
+    def handler(method, token, payload):
+        if not payload.get("cursor"):
+            return {"ok": True, "channels": [{"id": "C1", "name": "a"}],
+                    "response_metadata": {"next_cursor": "n"}}
+        return {"ok": True, "channels": [{"id": "C2", "name": "b", "is_private": True}]}
+
+    _fake_slack(monkeypatch, handler)
+    out = slack_ops.channels()
+    assert [c["id"] for c in out["items"]] == ["C1", "C2"]
+    assert out["items"][1]["type"] == "private"
+
+
+def test_search_maps_matches(monkeypatch):
+    _fake_slack(monkeypatch, lambda method, token, payload: {
+        "ok": True,
+        "messages": {"matches": [{"ts": "1.0", "text": "t", "user": "U1",
+                                   "channel": {"id": "C1", "name": "x"},
+                                   "permalink": "p"}],
+                     "paging": {"page": 1, "pages": 1, "total": 1}}})
+    out = slack_ops.search("in:#x hello")
+    assert out["items"][0]["channel_id"] == "C1" and out["total"] == 1
+
+
+def test_cli_registers_new_slack_commands():
+    from dapier_cli.cli import build_parser
+    parser = build_parser()
+    args = parser.parse_args(["slack", "replies", "--channel", "C1", "--thread-ts", "1.0"])
+    assert args.command == "replies" and args.thread_ts == "1.0"
+    assert parser.parse_args(["slack", "channels"]).command == "channels"
+    assert parser.parse_args(["slack", "search", "x"]).command == "search"

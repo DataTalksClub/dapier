@@ -106,6 +106,19 @@ def dm_export_api(event):
     return _json_response(200, payload)
 
 
+def _simple(event, action, fn, build):
+    subject, error = require_operator(event, action)
+    if error:
+        return error
+    query = event.get("queryStringParameters") or {}
+    try:
+        payload = fn(**build(query, _connection_id(event)))
+    except (slack_ops.SlackOpsError, ValueError) as exc:
+        return _error(exc)
+    audit.emit(payload["connection"], action, subject, outcome="ok")
+    return _json_response(200, payload)
+
+
 def route_slack(event, method, path):
     """Return a response for Slack agent routes, or None if unmatched."""
     if path == "/api/agent/slack/users" and method == "GET":
@@ -116,4 +129,17 @@ def route_slack(event, method, path):
         return history_api(event)
     if path == "/api/agent/slack/dm-export" and method == "GET":
         return dm_export_api(event)
+    if path == "/api/agent/slack/replies" and method == "GET":
+        return _simple(event, "slack.replies", slack_ops.replies, lambda q, c: {
+            "channel": q.get("channel") or "", "thread_ts": q.get("thread_ts") or "",
+            "connection_id": c, "limit": int(q.get("limit") or 200),
+            "cursor": q.get("cursor")})
+    if path == "/api/agent/slack/channels" and method == "GET":
+        return _simple(event, "slack.channels", slack_ops.channels, lambda q, c: {
+            "connection_id": c, "limit": int(q.get("limit") or 200),
+            "cursor": q.get("cursor")})
+    if path == "/api/agent/slack/search" and method == "GET":
+        return _simple(event, "slack.search", slack_ops.search, lambda q, c: {
+            "query": q.get("q") or q.get("query") or "", "connection_id": c,
+            "count": int(q.get("count") or 20), "page": int(q.get("page") or 1)})
     return None
