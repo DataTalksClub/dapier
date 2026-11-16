@@ -1426,8 +1426,16 @@ Resources:
       DeletionProtectionEnabled: true
       AttributeDefinitions:
         - {AttributeName: inbox_id, AttributeType: S}
+        - {AttributeName: connector, AttributeType: S}
+        - {AttributeName: received_at, AttributeType: S}
       KeySchema:
         - {AttributeName: inbox_id, KeyType: HASH}
+      GlobalSecondaryIndexes:
+        - IndexName: by-connector-received
+          KeySchema:
+            - {AttributeName: connector, KeyType: HASH}
+            - {AttributeName: received_at, KeyType: RANGE}
+          Projection: {ProjectionType: ALL}
       TimeToLiveSpecification:
         AttributeName: expires_at
         Enabled: true

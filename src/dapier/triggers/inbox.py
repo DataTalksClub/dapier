@@ -35,6 +35,7 @@ from .dynamo import decode_numbers
 logger = logging.getLogger(__name__)
 
 TABLE_ENV = "TRIGGER_INBOX_TABLE"
+CONNECTOR_RECEIVED_INDEX = "by-connector-received"
 RETENTION_DAYS = 30
 # api_list reads the inbox in pages of SCAN_PAGE up to SCAN_WINDOW_ITEMS rows
 # before sorting newest-first (see api_list).
@@ -306,7 +307,6 @@ def record(event, *, table_ref=None):
     now = int(datetime.now(timezone.utc).timestamp())
     item = {
         "inbox_id": str(event["id"]),
-        "connector": event.get("connector"),
         "event": event.get("event"),
         "source": event.get("source"),
         "occurred_at": event.get("occurred_at"),
@@ -316,6 +316,8 @@ def record(event, *, table_ref=None):
         "matched": [],
         "expires_at": now + RETENTION_DAYS * 86400,
     }
+    if event.get("connector"):
+        item["connector"] = str(event["connector"])
     if event.get("connector") == "email":
         # Summarized from the full data before the storage cap clips it,
         # so an oversized message still lists with its sender and subject.
@@ -513,15 +515,75 @@ def _outcomes(value):
     return wanted or None
 
 
+def _query_connector(table, connector, limit, *, token_key=None, outcomes=None, hook=None):
+    """Query one connector's inbox slice newest-first via the GSI."""
+    from boto3.dynamodb.conditions import Attr, Key
+
+    key_expr = Key("connector").eq(connector)
+    if token_key is not None and token_key[0]:
+        key_expr = key_expr & Key("received_at").lte(token_key[0])
+
+    kwargs = {
+        "IndexName": CONNECTOR_RECEIVED_INDEX,
+        "KeyConditionExpression": key_expr,
+        "ScanIndexForward": False,
+        "Limit": SCAN_PAGE if (outcomes or hook) else min(SCAN_PAGE, limit + 5),
+    }
+    if outcomes:
+        wanted_statuses = [status for status, name in OUTCOMES.items() if name in outcomes]
+        if wanted_statuses:
+            kwargs["FilterExpression"] = Attr("status").is_in(wanted_statuses)
+
+    events = []
+    scanned = 0
+    while True:
+        page = table.query(**kwargs)
+        batch = page.get("Items", [])
+        scanned += len(batch)
+        for item in batch:
+            event = _view(item)
+            if hook and not (isinstance(event.get("data"), dict)
+                             and event["data"].get("hook") == hook):
+                continue
+            if outcomes and event.get("outcome") not in outcomes:
+                continue
+            if token_key is not None and _sort_key(event) >= token_key:
+                continue
+            events.append(event)
+        # Stop once we have limit + 1 items and have moved past any
+        # same-second received_at ties on the boundary item.
+        past_boundary = (len(events) > limit
+                         and (events[-1].get("received_at") or "")
+                         < (events[limit - 1].get("received_at") or ""))
+        if past_boundary or scanned >= SCAN_WINDOW_ITEMS or "LastEvaluatedKey" not in page:
+            break
+        kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+    return events
+
+
+def _scan_inbox(table):
+    """Fallback full-window scan when no connector filter or GSI is available."""
+    items = []
+    page = table.scan(Limit=SCAN_PAGE)
+    while True:
+        items.extend(page.get("Items", []))
+        if len(items) >= SCAN_WINDOW_ITEMS or "LastEvaluatedKey" not in page:
+            break
+        page = table.scan(ExclusiveStartKey=page["LastEvaluatedKey"],
+                          Limit=SCAN_PAGE)
+    return [_view(item) for item in items]
+
+
 def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=None,
              outcome=None, hook=None):
     """Recent inbox events, newest first; ``connector`` filters when given.
 
     ``paging.next`` carries the last returned row's sort key; the follow-up
     call passes it back as ``next_token`` and the window starts strictly
-    after that row, so the connector filter and paging compose. The scan
-    covers the whole retention window up to SCAN_WINDOW_ITEMS rows — events
-    past that cap age out of the list but stay reachable through api_get.
+    after that row, so the connector filter and paging compose. When
+    ``connector`` is given and the table supports ``query``, the
+    ``by-connector-received`` GSI reads only the requested slice newest-first;
+    unfiltered calls fall back to the bounded retention-window scan.
 
     ``outcome`` (comma-separated :data:`OUTCOMES` values) keeps the events
     with that outcome, composing with the connector filter and paging.
@@ -538,36 +600,38 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
     if unknown:
         return 400, {"error": f"Unknown outcome {', '.join(unknown)}; use "
                               f"{', '.join(sorted(set(OUTCOMES.values())))}"}
-    # Scan the whole retention window (paginated, item-capped) before
-    # sorting: a single-page scan reads an arbitrary slice of the hash-key
-    # space, so freshly written rows could be invisible until enough older
-    # rows aged out — the Oct-16 incident where handled mail "went missing".
-    # At current volume (retention-bounded, tens of rows/day) the cap never
-    # binds; past it, promote a received_at GSI rather than raising it.
     table = table_ref if table_ref is not None else _table()
-    items = []
-    page = table.scan(Limit=SCAN_PAGE)
-    while True:
-        items.extend(page.get("Items", []))
-        if len(items) >= SCAN_WINDOW_ITEMS or "LastEvaluatedKey" not in page:
-            break
-        page = table.scan(ExclusiveStartKey=page["LastEvaluatedKey"],
-                          Limit=SCAN_PAGE)
-    events = [_view(item) for item in items]
-    if connector:
-        # One connector, or a family of them (the hook delivery log reads
-        # webhook and telegram rows together).
-        wanted = (connector,) if isinstance(connector, str) else tuple(connector)
-        events = [event for event in events if event.get("connector") in wanted]
-    if hook:
-        # Hook intakes stamp the hook trigger's name on the event data.
-        events = [event for event in events
-                  if isinstance(event.get("data"), dict) and event["data"].get("hook") == hook]
-    if outcomes:
-        events = [event for event in events if event.get("outcome") in outcomes]
+    wanted = ((connector,) if isinstance(connector, str) else tuple(connector)) if connector else ()
+    events = None
+    if wanted and hasattr(table, "query"):
+        from botocore.exceptions import ClientError
+
+        try:
+            events = []
+            for conn in wanted:
+                events.extend(_query_connector(
+                    table, conn, limit, token_key=token_key,
+                    outcomes=outcomes, hook=hook,
+                ))
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "ValidationException":
+                raise
+            events = None
+
+    if events is None:
+        events = _scan_inbox(table)
+        if wanted:
+            events = [event for event in events if event.get("connector") in wanted]
+        if hook:
+            # Hook intakes stamp the hook trigger's name on the event data.
+            events = [event for event in events
+                      if isinstance(event.get("data"), dict) and event["data"].get("hook") == hook]
+        if outcomes:
+            events = [event for event in events if event.get("outcome") in outcomes]
+        if token_key is not None:
+            events = [event for event in events if _sort_key(event) < token_key]
+
     events.sort(key=_sort_key, reverse=True)
-    if token_key is not None:
-        events = [event for event in events if _sort_key(event) < token_key]
     page = events[:limit]
     more = len(events) > limit
     return 200, {
