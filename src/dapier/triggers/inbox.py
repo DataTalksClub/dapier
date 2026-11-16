@@ -515,6 +515,19 @@ def _outcomes(value):
     return wanted or None
 
 
+_LIST_PROJECTION = (
+    "inbox_id, connector, #event, #source, occurred_at, received_at, "
+    "processed_at, #status, matched, #error, email, #request"
+)
+_LIST_PROJECTION_NAMES = {
+    "#event": "event",
+    "#source": "source",
+    "#status": "status",
+    "#error": "error",
+    "#request": "request",
+}
+
+
 def _query_connector(table, connector, limit, *, token_key=None, outcomes=None, hook=None):
     """Query one connector's inbox slice newest-first via the GSI."""
     from boto3.dynamodb.conditions import Attr, Key
@@ -529,6 +542,9 @@ def _query_connector(table, connector, limit, *, token_key=None, outcomes=None, 
         "ScanIndexForward": False,
         "Limit": SCAN_PAGE if (outcomes or hook) else min(SCAN_PAGE, limit + 5),
     }
+    if connector == "email" and not hook:
+        kwargs["ProjectionExpression"] = _LIST_PROJECTION
+        kwargs["ExpressionAttributeNames"] = dict(_LIST_PROJECTION_NAMES)
     if outcomes:
         wanted_statuses = [status for status, name in OUTCOMES.items() if name in outcomes]
         if wanted_statuses:
@@ -561,16 +577,19 @@ def _query_connector(table, connector, limit, *, token_key=None, outcomes=None, 
     return events
 
 
-def _scan_inbox(table):
+def _scan_inbox(table, *, include_data=True):
     """Fallback full-window scan when no connector filter or GSI is available."""
+    scan_kwargs = {"Limit": SCAN_PAGE}
+    if not include_data:
+        scan_kwargs["ProjectionExpression"] = _LIST_PROJECTION
+        scan_kwargs["ExpressionAttributeNames"] = dict(_LIST_PROJECTION_NAMES)
     items = []
-    page = table.scan(Limit=SCAN_PAGE)
+    page = table.scan(**scan_kwargs)
     while True:
         items.extend(page.get("Items", []))
         if len(items) >= SCAN_WINDOW_ITEMS or "LastEvaluatedKey" not in page:
             break
-        page = table.scan(ExclusiveStartKey=page["LastEvaluatedKey"],
-                          Limit=SCAN_PAGE)
+        page = table.scan(ExclusiveStartKey=page["LastEvaluatedKey"], **scan_kwargs)
     return [_view(item) for item in items]
 
 
@@ -602,24 +621,15 @@ def api_list(connector=None, limit=DEFAULT_LIMIT, *, next_token=None, table_ref=
                               f"{', '.join(sorted(set(OUTCOMES.values())))}"}
     table = table_ref if table_ref is not None else _table()
     wanted = ((connector,) if isinstance(connector, str) else tuple(connector)) if connector else ()
-    events = None
     if wanted and hasattr(table, "query"):
-        from botocore.exceptions import ClientError
-
-        try:
-            events = []
-            for conn in wanted:
-                events.extend(_query_connector(
-                    table, conn, limit, token_key=token_key,
-                    outcomes=outcomes, hook=hook,
-                ))
-        except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") != "ValidationException":
-                raise
-            events = None
-
-    if events is None:
-        events = _scan_inbox(table)
+        events = []
+        for conn in wanted:
+            events.extend(_query_connector(
+                table, conn, limit, token_key=token_key,
+                outcomes=outcomes, hook=hook,
+            ))
+    else:
+        events = _scan_inbox(table, include_data=bool(hook))
         if wanted:
             events = [event for event in events if event.get("connector") in wanted]
         if hook:
