@@ -176,6 +176,14 @@ class EnvelopeTests(unittest.TestCase):
             dataops_action._leads_intake_body(
                 leads_action(), email_event(), steps=steps)
 
+    def test_ok_false_extraction_surfaces_the_real_error(self):
+        steps = {"extract-sponsors": {"status": "completed", "output": {
+            "ok": False, "error": "json_schema validation failed: missing sponsors",
+            "text": "{}"}}}
+        with self.assertRaisesRegex(ValueError, "validation failed: missing sponsors"):
+            dataops_action._leads_intake_body(
+                leads_action(), email_event(), steps=steps)
+
     def test_custom_extraction_step_is_honored(self):
         steps = extraction_steps(sponsors=[{"name": "Custom"}], step="my-extract")
         envelope = dataops_action._leads_intake_body(

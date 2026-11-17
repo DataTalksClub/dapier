@@ -103,3 +103,7 @@ def test_template_leaves_intake_url_to_the_connection():
     assert "DATAOPS_LEADS_URL" not in text
     assert "DATAOPS_INTAKE_URL" not in text
     assert "DataOpsIntakeUrl" not in deploy
+
+
+def test_extract_sponsors_reserves_output_room_for_full_reply():
+    assert extract_action()["max_tokens"] >= 4096
