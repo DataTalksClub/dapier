@@ -31,6 +31,8 @@ actions:
   # category is optional: gold labels omit it, and requiring it forces the
   # model to invent one.
   model: claude-sonnet-5-5
+  # Room for 20 sponsors with blurbs: a truncated reply is unparsable JSON.
+  max_tokens: 8192
   prompt: |
     Extract the newsletter identity and its paid sponsor placements from the
     email below. Read the entire email — intro, mid-roll, close, and footer

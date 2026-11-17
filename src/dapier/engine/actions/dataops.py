@@ -782,6 +782,12 @@ def _extraction_data(action, steps):
     for name in names:
         node = steps.get(name)
         output = node.get("output") if isinstance(node, dict) else None
+        if isinstance(output, dict) and output.get("ok") is False:
+            # ai_complete's verdict carries error/text but no data, so report
+            # the real failure instead of the generic "no structured sponsors".
+            raise ValueError(
+                f"extraction step '{name}' did not produce structured data "
+                f"({output.get('error') or 'ok: false'})")
         data = output.get("data") if isinstance(output, dict) else None
         if isinstance(data, dict) and isinstance(data.get("sponsors"), list):
             if output.get("ok") is False:
