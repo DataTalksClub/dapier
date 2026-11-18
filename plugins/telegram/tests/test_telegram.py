@@ -250,6 +250,40 @@ class SendMessageActionTests(unittest.TestCase):
         self.assertTrue(res["found"])
         self.assertFalse(res["chat"]["pinned_is_ours"])
 
+    def test_find_chat_reports_bot_membership(self):
+        def fake_call(token, method, payload=None, **kwargs):
+            if method == "getMe":
+                return {"id": 42, "username": "au_tomator_bot"}
+            if method == "getChatMember":
+                self.assertEqual(payload, {"chat_id": "@mlzoomcamp", "user_id": 42})
+                return {"status": "left", "user": {"id": 42}}
+            return {"id": -1001435532197, "title": "ML Zoomcamp announcements", "type": "channel"}
+
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.call", side_effect=fake_call):
+            res = run_telegram_find_chat({"connection_id": "tg-bot", "chat_id": "@mlzoomcamp"}, {"data": {}})
+        self.assertEqual(res["bot_member_status"], "left")
+        self.assertIsNone(res["bot_member_error"])
+
+    def test_find_chat_membership_refusal_is_reported_not_raised(self):
+        from src.dapier.connections.providers.telegram_api import TelegramApiError
+
+        def fake_call(token, method, payload=None, **kwargs):
+            if method == "getMe":
+                return {"id": 42, "username": "au_tomator_bot"}
+            if method == "getChatMember":
+                raise TelegramApiError("Telegram rejected getChatMember: Bad Request: member list is inaccessible")
+            return {"id": -100, "type": "channel"}
+
+        with patch("src.dapier.engine.actions.base._connected_connection", return_value=dict(self.CONNECTION)), \
+             patch("src.dapier.connections.credentials.get_credential", return_value={"token": "bot-token"}), \
+             patch("src.dapier.connections.providers.telegram_api.call", side_effect=fake_call):
+            res = run_telegram_find_chat({"connection_id": "tg-bot", "chat_id": "@x"}, {"data": {}})
+        self.assertTrue(res["found"])
+        self.assertIsNone(res["bot_member_status"])
+        self.assertIn("inaccessible", res["bot_member_error"])
+
     def test_unpin_message_calls_api(self):
         calls = []
 

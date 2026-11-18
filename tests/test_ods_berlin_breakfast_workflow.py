@@ -115,7 +115,7 @@ def test_workflow_execution_end_to_end():
         execute(event)
 
     called_methods = [c["method"] for c in calls]
-    assert called_methods == ["getChat", "getMe", "sendMessage", "pinChatMessage", "unpinChatMessage"]
+    assert called_methods == ["getChat", "getMe", "getChatMember", "sendMessage", "pinChatMessage", "unpinChatMessage"]
 
     # Check sendMessage payload
     send_call = next(c for c in calls if c["method"] == "sendMessage")
@@ -186,4 +186,4 @@ def test_foreign_pin_is_left_alone():
 
     called_methods = [c["method"] for c in calls]
     assert "unpinChatMessage" not in called_methods
-    assert called_methods == ["getChat", "getMe", "sendMessage", "pinChatMessage"]
+    assert called_methods == ["getChat", "getMe", "getChatMember", "sendMessage", "pinChatMessage"]
