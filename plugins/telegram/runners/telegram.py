@@ -74,7 +74,10 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
     The output also carries the bot's own id (via getMe) and whether the
     currently pinned message is ours (``pinned_is_ours``), so a workflow
     can unpin only its own previous announcement and leave other people's
-    pins alone — the ods-berlin-bot port.
+    pins alone — the ods-berlin-bot port. ``bot_member_status`` is the
+    bot's getChatMember status there (``administrator``, ``member``,
+    ``left``, ``kicked``); ``bot_member_error`` carries Telegram's refusal
+    when it will not say (a channel the bot is not in).
     """
     connection = base._connected_connection(action["connection_id"])
     secret = credentials.get_credential(connection["credential_id"])
@@ -103,9 +106,24 @@ def run_telegram_find_chat(action, event, *, transport=None, steps=None):
     except telegram_api.TelegramApiError:
         bot_id = None
     pinned_from = (pinned_info or {}).get("from_id")
+    # The bot's own standing in the chat (getChatMember). getChat answers for
+    # any public chat, member or not, so this is the only signal that the bot
+    # was removed from (or demoted in) a channel it should be reading —
+    # channel posts reach a bot only while it is an administrator there.
+    bot_member_status, bot_member_error = None, None
+    if bot_id is not None:
+        try:
+            member = telegram_api.call(
+                token, "getChatMember", {"chat_id": chat_id, "user_id": bot_id},
+                transport=transport) or {}
+            bot_member_status = member.get("status") if isinstance(member, dict) else None
+        except telegram_api.TelegramApiError as exc:
+            bot_member_error = str(exc)
     return {
         "found": True,
         "bot_id": bot_id,
+        "bot_member_status": bot_member_status,
+        "bot_member_error": bot_member_error,
         "chat": {
             "id": chat.get("id"),
             "title": chat.get("title"),
