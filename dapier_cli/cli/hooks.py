@@ -26,6 +26,13 @@ def _activity_commands(group_sub):
     replay = group_sub.add_parser(
         "replay", help="Re-send a recorded delivery through the engine (fresh event id)")
     replay.add_argument("delivery_id")
+    health = group_sub.add_parser(
+        "telegram-health", help="Telegram's view of each Telegram webhook "
+                                "(url, pending updates, last delivery error); exit 1 while failing")
+    health.add_argument("name", nargs="?", default=None, help="Only this Telegram webhook")
+    health.add_argument("--repair", action="store_true",
+                        help="Re-register the webhook first (the setWebhook a save performs; "
+                             "keeps pending updates so Telegram redelivers them)")
 
 
 def register(sub):
@@ -67,6 +74,8 @@ def run(args, api_url, debug, child=None):
         return commands.hooks_delivery(api_url, args.delivery_id, debug=debug)
     if args.command == "test":
         return commands.hooks_test(api_url, args.name, data_path=args.data, debug=debug)
+    if args.command == "telegram-health":
+        return commands.hooks_telegram_health(api_url, args.name, repair=args.repair, debug=debug)
     if args.command == "replay":
         return commands.inbox_replay(api_url, args.delivery_id, debug=debug)
     return 2

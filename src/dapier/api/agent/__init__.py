@@ -136,6 +136,8 @@ def _route(event, method, path):
         return hook_delivery_api(event, unquote(hook_delivery_match.group(1)))
     if path == "/api/agent/hook-triggers/test" and method == "POST":
         return hook_test_api(event)
+    if path == "/api/agent/hook-triggers/telegram-health" and method in ("GET", "POST"):
+        return telegram_health_api(event, method)
     if path == "/api/agent/schedule-triggers" and method in ("GET", "PUT", "DELETE"):
         return schedule_triggers_api(event, method)
     if path == "/api/agent/schedule-triggers/upcoming" and method == "GET":
