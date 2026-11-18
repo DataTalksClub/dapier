@@ -111,6 +111,12 @@ shows, so Dapier asks it on a schedule.
   error in the last 30 minutes while still holding updates, 20+ updates are
   pending, the registration dropped `message`/`channel_post`, or the probe
   cannot reach Telegram with the stored token.
+- **End-to-end channel check.** The webhook view cannot see posts Telegram
+  never sends, such as the bot's own. So the same schedule reads
+  `t.me/s/<channel>` for every public channel a trigger has received posts
+  from in the last 30 days. It flags `missed_posts` when a post older than
+  30 minutes (and younger than 3 days) has a higher id than anything Dapier
+  received. That is the failure behind the 2026-11 crosspost gap.
 - While failing it emails a detailed report to the operator inbox
   (`NotifyEmail`, dev@) at most hourly.
 - **`TelegramWebhookUnhealthyAlarm`** pages dev@ through the alarm topic
