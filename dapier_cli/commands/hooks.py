@@ -222,4 +222,20 @@ def hooks_telegram_health(api_url, name=None, repair=False, debug=False):
             print(f"  last error:      {row['last_error_at']} {row.get('last_error_message') or ''}")
         for problem in row.get("problems") or []:
             print(f"  PROBLEM {problem.get('code')}: {problem.get('detail')}")
-    return 1 if any(row.get("status") != "ok" for row in rows) else 0
+    channels = [row for row in data.get("channels") or []
+                if not name or row.get("hook_id") == name]
+    for row in channels:
+        if row.get("error"):
+            print(f"channel check: {str(row.get('status')).upper()} — {row['error']}")
+            continue
+        line = (f"channel @{row.get('channel')} via {row.get('hook_id')}: "
+                f"{str(row.get('status')).upper()} (received up to {row.get('received_max_message_id')}, "
+                f"public newest {row.get('public_max_message_id')})")
+        if row.get("preview_error"):
+            line += f" — preview unavailable: {row['preview_error']}"
+        print(line)
+        for problem in row.get("problems") or []:
+            print(f"  PROBLEM {problem.get('code')}: {problem.get('detail')}")
+    failing = any(row.get("status") != "ok" for row in rows)
+    failing = failing or any(row.get("status") == "failing" for row in channels)
+    return 1 if failing else 0

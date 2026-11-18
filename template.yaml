@@ -1814,6 +1814,10 @@ Resources:
             TableName: !Ref CredentialsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref CursorsTable
+        # The channel check reads which public channels each trigger has
+        # received posts from (by-connector-received GSI).
+        - DynamoDBReadPolicy:
+            TableName: !Ref TriggerInboxTable
       Events:
         Every5Minutes:
           Type: Schedule

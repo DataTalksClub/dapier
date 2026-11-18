@@ -328,4 +328,9 @@ def telegram_health_api(event, method):
         audit.emit(str(name or "telegram"), "hook-trigger.telegram-repair", subject, outcome="ok")
         return _no_store(_json_response(200, {"repaired": repaired,
                                                "triggers": telegram_health.check()}))
-    return _no_store(_json_response(200, {"triggers": telegram_health.check()}))
+    try:
+        channels = telegram_health.channel_check()
+    except Exception as exc:  # noqa: BLE001 — the webhook half still answers
+        channels = [{"status": "unknown", "error": f"{type(exc).__name__}: {exc}"[:200]}]
+    return _no_store(_json_response(200, {"triggers": telegram_health.check(),
+                                          "channels": channels}))

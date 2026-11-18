@@ -119,6 +119,7 @@ class FakeSes:
 def test_handler_publishes_metric_and_alerts_hourly(monkeypatch):
     failing = telegram_health._report(ITEM, {"url": ""}, [{"code": "url_mismatch", "detail": "gone"}])
     monkeypatch.setattr(telegram_health, "check", lambda: [failing])
+    monkeypatch.setattr(telegram_health, "channel_check", lambda: [])
     cloudwatch, ses = FakeCloudWatch(), FakeSes()
     real_put_metric = telegram_health._put_metric
     monkeypatch.setattr(telegram_health, "_put_metric",
@@ -162,6 +163,7 @@ def test_agent_route_get_and_repair(monkeypatch):
     monkeypatch.setattr("src.dapier.api.agent.audit.emit", lambda *a, **k: None)
     row = telegram_health._report(ITEM, HEALTHY, [])
     monkeypatch.setattr(telegram_health, "check", lambda: [row])
+    monkeypatch.setattr(telegram_health, "channel_check", lambda: [])
     monkeypatch.setattr(telegram_health, "repair", lambda name=None: ["automator-telegram"])
     path = "/api/agent/hook-triggers/telegram-health"
     response = agent_api.route({"headers": {}}, "GET", path)
@@ -193,7 +195,10 @@ def test_cli_telegram_health(monkeypatch, capsys):
         if method == "POST":
             return {"repaired": ["automator-telegram"],
                     "triggers": [telegram_health._report(ITEM, HEALTHY, [])]}
-        return {"triggers": [failing]}
+        return {"triggers": [failing], "channels": [
+            {"hook_id": "automator-telegram", "channel": "mlzoomcamp", "status": "failing",
+             "received_max_message_id": 268, "public_max_message_id": 269,
+             "problems": [{"code": "missed_posts", "detail": "t.me/mlzoomcamp/269 never reached"}]}]}
 
     monkeypatch.setattr("dapier_cli.commands.hooks.api.call", fake_call)
     assert main.main(["webhooks", "telegram-health"]) == 1
@@ -203,4 +208,66 @@ def test_cli_telegram_health(monkeypatch, capsys):
                       {"name": "automator-telegram"})]
     out = capsys.readouterr().out
     assert "FAILING" in out and "PROBLEM url_mismatch" in out
+    assert "channel @mlzoomcamp" in out and "PROBLEM missed_posts" in out
     assert "Re-registered: automator-telegram" in out
+
+
+# --- channel check: posts Telegram never sent (the bot's own posts) -----------
+
+def _post_event(hook, username, chat_id, message_id):
+    return {"connector": "telegram", "source": hook,
+            "data": {"hook": hook, "is_channel_post": True, "message_id": message_id,
+                     "chat": {"id": chat_id, "type": "channel", "username": username}}}
+
+
+def _preview(*posts):
+    blocks = "".join(
+        f'<div class="tgme_widget_message_wrap"><div data-post="mlzoomcamp/{post}">'
+        f'<time datetime="{when}" class="time">x</time></div></div>' for post, when in posts)
+    return f"<html>{blocks}</html>"
+
+
+def test_public_posts_parses_the_preview():
+    page = _preview((268, "2026-11-15T08:05:08+00:00"), (269, "2026-11-18T10:51:24+00:00"))
+    assert [post for post, _ in telegram_health.public_posts(page)] == [268, 269]
+
+
+def test_channel_check_flags_posts_that_never_arrived(monkeypatch):
+    _patch_items(monkeypatch, [ITEM])
+    events = [_post_event("automator-telegram", "mlzoomcamp", -1001435532197, 268),
+              {"connector": "telegram", "data": {"hook": "automator-telegram", "chat": {"id": 1}}}]
+    page = _preview((268, "2026-11-15T08:05:08+00:00"),   # received
+                    (269, "2026-11-18T10:51:24+00:00"),   # missed, 2h old
+                    (270, "2026-11-18T12:45:00+00:00"))   # inside the grace window
+    [row] = telegram_health.channel_check(events=events, fetch=lambda username: page, now=NOW)
+    assert row["status"] == "failing" and row["missed"] == [269]
+    assert row["problems"][0]["code"] == "missed_posts"
+    assert "dapier webhooks test automator-telegram" in row["problems"][0]["detail"]
+
+
+def test_channel_check_ok_when_caught_up_and_ignores_old_gaps(monkeypatch):
+    _patch_items(monkeypatch, [ITEM])
+    events = [_post_event("automator-telegram", "mlzoomcamp", -1, 192)]
+    old_gap = _preview((193, "2026-11-03T08:12:40+00:00"))  # older than the max age
+    [row] = telegram_health.channel_check(events=events, fetch=lambda u: old_gap, now=NOW)
+    assert row["status"] == "ok"
+    caught_up = _preview((192, "2026-11-18T10:00:00+00:00"))
+    [row] = telegram_health.channel_check(events=events, fetch=lambda u: caught_up, now=NOW)
+    assert row["status"] == "ok"
+
+
+def test_channel_check_preview_failure_is_unknown_not_failing(monkeypatch):
+    _patch_items(monkeypatch, [ITEM])
+    events = [_post_event("automator-telegram", "mlzoomcamp", -1, 1)]
+
+    def boom(username):
+        raise OSError("blocked")
+
+    [row] = telegram_health.channel_check(events=events, fetch=boom, now=NOW)
+    assert row["status"] == "unknown" and "blocked" in row["preview_error"]
+
+
+def test_channel_check_skips_disabled_triggers(monkeypatch):
+    _patch_items(monkeypatch, [])
+    events = [_post_event("automator-telegram", "mlzoomcamp", -1, 1)]
+    assert telegram_health.channel_check(events=events, fetch=lambda u: "", now=NOW) == []
