@@ -608,7 +608,10 @@ def test_telegram_find_chat_returns_the_chat_profile():
 
     output = run_telegram({"chat_id": "{chat_handle}"}, transport)
 
-    assert output == {"found": True, "bot_id": -10022, "chat": {
+    # The stub answers every method with the chat dict, so getChatMember's
+    # "status" reads as absent.
+    assert output == {"found": True, "bot_id": -10022,
+                      "bot_member_status": None, "bot_member_error": None, "chat": {
         "id": -10022, "title": "DataTalksClub Announcements",
         "username": "dtc_announce", "type": "channel",
         "pinned_message_id": None, "pinned_message": None,
