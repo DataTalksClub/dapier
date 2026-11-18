@@ -29,6 +29,11 @@ HOOK_CONNECTORS = {"webhook": "webhook", "telegram": "telegram"}
 # Run lookups are one GSI query per (delivery, matched workflow); a page
 # never pays for more than this many.
 MAX_RUN_LOOKUPS = 60
+# A Telegram trigger's default test: a private-chat message no course
+# channel condition matches, so it exercises intake without side effects.
+TELEGRAM_TEST_SAMPLE = {"message_id": 1, "chat": {"id": 0, "type": "private"},
+                        "text": "Hello from Dapier (Send test request)"}
+
 TEST_SAMPLE = {"event": "test", "message": "Hello from Dapier",
                "sent_by": "Send test request"}
 
@@ -247,11 +252,14 @@ def api_send_test(name, data=None):
         return 400, {"error": str(exc)}
     if not item:
         return 404, {"error": f"no hook named '{name}'"}
-    if item.get("kind", "webhook") != "webhook":
-        return 400, {"error": f"'{name}' is a {item.get('kind')} hook; the provider sends its "
-                              "requests, so only webhook hooks take a test request"}
+    kind = item.get("kind", "webhook")
+    if kind not in ("webhook", "telegram"):
+        return 400, {"error": f"'{name}' is a {kind} hook; the provider sends its "
+                              "requests, so only webhook and telegram hooks take a test request"}
     if not item.get("enabled", True):
         return 409, {"error": f"'{name}' is disabled; enable it before sending a test request"}
+    if kind == "telegram":
+        return _send_telegram(item, TELEGRAM_TEST_SAMPLE if data is None else data)
     payload = TEST_SAMPLE if data is None else data
     if not isinstance(payload, (dict, list)):
         return 400, {"error": "data must be a JSON object or array"}
@@ -285,6 +293,66 @@ def api_send_test(name, data=None):
             "headers": hook_triggers.delivery_record(headers, body)["headers"],
             "body": payload,
         },
+        "response": {"status": response.get("statusCode"), "body": answer},
+        "delivery_id": delivery_id,
+    }
+
+
+def telegram_update_for(data):
+    """The Telegram Update one test/relay payload delivers.
+
+    A full Update (it carries ``update_id``) passes through unchanged. A bare
+    Message — what ``sendMessage`` returns — is wrapped as the update
+    Telegram itself would send: ``channel_post`` for a channel chat,
+    ``message`` otherwise, under a stable ``update_id`` derived from the chat
+    and message ids, so relaying the same post twice dedupes to one run.
+
+    This is how a post the bot sent itself reaches its own trigger: Telegram
+    never delivers a bot's own messages back to it, so a channel
+    announcement posted *through* the trigger's bot is invisible to the
+    trigger unless the sender relays the returned Message here.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("a telegram test request takes a JSON object: an Update or a Message")
+    if "update_id" in data:
+        return data
+    chat = data.get("chat")
+    if data.get("message_id") is None or not isinstance(chat, dict) or chat.get("id") is None:
+        raise ValueError("a telegram test request needs an Update (update_id) or a Message "
+                         "(message_id and chat.id)")
+    key = "channel_post" if chat.get("type") == "channel" else "message"
+    return {"update_id": f"relay-{chat['id']}-{data['message_id']}", key: data}
+
+
+def _send_telegram(item, data):
+    from . import router
+
+    try:
+        update = telegram_update_for(data)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    body = json.dumps(update).encode()
+    if len(body) > router.MAX_HOOK_BODY_BYTES:
+        return 413, {"error": "data is larger than a hook accepts"}
+    headers = {
+        "content-type": "application/json",
+        "user-agent": "Dapier-Test/1.0",
+        hook_triggers.TEST_HEADER: "1",
+        router.TELEGRAM_SECRET_HEADER: item.get("token") or "",
+    }
+    request_event = {"headers": headers, "body": body.decode(), "isBase64Encoded": False}
+    response = router._telegram_hook(request_event, item["hook_id"], body)
+    raw = response.get("body")
+    try:
+        answer = json.loads(raw) if isinstance(raw, str) else raw
+    except ValueError:
+        answer = raw
+    delivery_id = answer.get("event_id") if isinstance(answer, dict) else None
+    redacted = {**headers, router.TELEGRAM_SECRET_HEADER: "[redacted]"}
+    return 200, {
+        "hook_id": item["hook_id"],
+        "url": item.get("url") or hook_triggers.hook_url("telegram", item["hook_id"]),
+        "request": {"headers": redacted, "body": update},
         "response": {"status": response.get("statusCode"), "body": answer},
         "delivery_id": delivery_id,
     }

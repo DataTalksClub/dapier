@@ -631,13 +631,13 @@ def _telegram_hook(event, name, body):
     # hook_triggers so live discovery publishes the exact same shape a real
     # delivery does.
     try:
-        _publish("telegram", hook_triggers.telegram_event_for(update),
-                 hook_triggers.update_data(update, item["hook_id"]),
-                 source=item["hook_id"], event_id=event_id)
+        event_id = _publish("telegram", hook_triggers.telegram_event_for(update),
+                            hook_triggers.update_data(update, item["hook_id"]),
+                            source=item["hook_id"], event_id=event_id)
     except Exception:
         _release_delivery(item, event_id)
         raise
-    return _response(200, {"accepted": True})
+    return _response(200, {"accepted": True, "event_id": event_id})
 
 
 def handler(event, _context):

@@ -117,7 +117,7 @@ function endpointRow(hook) {
   const menuId = `hook-menu-${name}`;
   const menu = `<button class="icon-button row-more" type="button" popovertarget="${menuId}" aria-label="More actions for ${name}" title="More actions"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
     <div id="${menuId}" class="row-menu" popover aria-label="Actions for ${name}">
-      ${kind === 'webhook' && hook.enabled ? `<button class="row-menu-item hook-test" type="button" data-hook="${name}">Send test request</button>` : ''}
+      ${(kind === 'webhook' || kind === 'telegram') && hook.enabled ? `<button class="row-menu-item hook-test" type="button" data-hook="${name}">Send test request</button>` : ''}
       ${(hook.workflows || []).map((flow) => `<a class="row-menu-item workflow-edit" href="/workflows/${encodeURIComponent(flow.id)}" data-workflow="${escapeHtml(flow.id)}" title="${escapeHtml(flow.id)}">Open ${escapeHtml(workflowName(flow.id))}</a>`).join('')}
       <button class="row-menu-item hook-edit" type="button" data-hook="${name}">Edit</button>
       <button class="row-menu-item row-menu-danger hook-delete" type="button" data-hook="${name}">Delete</button>
@@ -335,15 +335,15 @@ let lastTestDelivery = null;
 
 function testTarget(name) {
   const hook = findHook(name);
-  $('#hook-test-target').textContent = hook
-    ? `POST ${hook.url} · ${hook.signed ? 'signed with the hook secret' : 'with the hook bearer token'}`
-    : '';
+  let auth = hook && hook.signed ? 'signed with the hook secret' : 'with the hook bearer token';
+  if (hook && hook.kind === 'telegram') auth = 'with the Telegram secret token; data is an Update or a sent Message';
+  $('#hook-test-target').textContent = hook ? `POST ${hook.url} · ${auth}` : '';
 }
 
 function openTest(name) {
-  const webhooks = hooks.filter((hook) => (hook.kind || 'webhook') === 'webhook' && hook.enabled);
+  const webhooks = hooks.filter((hook) => ['webhook', 'telegram'].includes(hook.kind || 'webhook') && hook.enabled);
   if (!webhooks.length) {
-    notice('Send test request works on enabled webhook hooks; create one first.', true);
+    notice('Send test request works on enabled webhook and Telegram hooks; create one first.', true);
     return;
   }
   const form = $('#hook-test-form');
@@ -385,6 +385,9 @@ $('#hook-test-form').addEventListener('submit', async (event) => {
   let data;
   try {
     data = form.data.value.trim() ? JSON.parse(form.data.value) : undefined;
+    // The untouched sample: let the API pick the kind's own default
+    // (a Telegram hook takes an Update/Message, not the webhook sample).
+    if (JSON.stringify(data) === JSON.stringify(TEST_SAMPLE)) data = undefined;
   } catch (_) {
     $('#hook-test-error').textContent = 'Payload must be valid JSON.';
     return;
