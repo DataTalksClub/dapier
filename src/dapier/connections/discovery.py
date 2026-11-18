@@ -115,13 +115,19 @@ def _error_detail(status, raw):
     return ""
 
 
-def _request(method, url, token, payload, *, transport=None):
+def _request(method, url, token, payload, *, transport=None, form=False):
     """One provider call; returns parsed JSON or raises DiscoveryError(502)."""
     headers = {"authorization": f"Bearer {token}"}
     body = None
     if payload is not None:
-        headers["content-type"] = "application/json"
-        body = json.dumps(payload).encode()
+        if form:
+            headers["content-type"] = "application/x-www-form-urlencoded"
+            body = urllib.parse.urlencode(
+                {k: str(v).lower() if isinstance(v, bool) else v for k, v in payload.items()}
+            ).encode()
+        else:
+            headers["content-type"] = "application/json"
+            body = json.dumps(payload).encode()
     try:
         status, raw = (transport or _default_transport)(
             method, url, headers=headers, body=body, timeout=15,
@@ -531,8 +537,14 @@ def _dropbox_search(connection, token, params, limit, *, transport=None):
 # --- Slack ---
 
 
+# Slack reads these methods' arguments from form/query params only; a JSON
+# body is answered with invalid_arguments.
+_SLACK_FORM_METHODS = frozenset({"conversations.replies", "search.messages"})
+
+
 def _slack_call(method, token, payload, *, transport=None):
-    data = _request("POST", f"{SLACK_API_URL}/{method}", token, payload, transport=transport)
+    data = _request("POST", f"{SLACK_API_URL}/{method}", token, payload, transport=transport,
+                    form=method in _SLACK_FORM_METHODS)
     if not data.get("ok"):
         error = data.get("error") or "unknown_error"
         raise DiscoveryError(f"Slack rejected {method}: {oauth_providers.redact(str(error))}",

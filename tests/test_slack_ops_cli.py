@@ -192,3 +192,23 @@ def test_cli_registers_new_slack_commands():
     assert args.command == "replies" and args.thread_ts == "1.0"
     assert parser.parse_args(["slack", "channels"]).command == "channels"
     assert parser.parse_args(["slack", "search", "x"]).command == "search"
+
+
+@pytest.mark.parametrize("method,form", [
+    ("conversations.replies", True), ("search.messages", True),
+    ("conversations.history", False)])
+def test_slack_call_encoding(method, form):
+    from src.dapier.connections import discovery
+    seen = {}
+
+    def transport(http_method, url, headers=None, body=None, timeout=None):
+        seen["ct"] = headers["content-type"]
+        seen["body"] = body
+        return 200, b'{"ok": true}'
+
+    discovery._slack_call(method, "t", {"channel": "C1", "limit": 5}, transport=transport)
+    if form:
+        assert seen["ct"] == "application/x-www-form-urlencoded"
+        assert seen["body"] == b"channel=C1&limit=5"
+    else:
+        assert seen["ct"] == "application/json"
