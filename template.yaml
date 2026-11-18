@@ -1778,6 +1778,88 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
+  # Telegram triggers are push: when Telegram stops delivering (webhook
+  # repointed/deleted, or a rejected update parks the queue behind it) Dapier
+  # sees nothing at all and no run ever fails. This check asks Telegram
+  # (getWebhookInfo) every 5 minutes and pages on what it sees
+  # (triggers/telegram_health.py).
+  TelegramHealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src.dapier.triggers.telegram_health.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      Timeout: 60
+      MemorySize: 128
+      Environment:
+        Variables:
+          DAPIER_EMAIL_SENDER: !Ref EmailSender
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [ses:SendEmail]
+              Resource: '*'
+            - Effect: Allow
+              Action: cloudwatch:PutMetricData
+              Resource: '*'
+              Condition:
+                StringEquals:
+                  cloudwatch:namespace: Dapier/Triggers
+        - DynamoDBReadPolicy:
+            TableName: !Ref HookTriggersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ConnectionsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref CredentialsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CursorsTable
+      Events:
+        Every5Minutes:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Enabled: true
+
+  # Pages dev@ when any telegram trigger is failing for 10 minutes, and
+  # sends OK on recovery. Missing data (the check itself not running)
+  # counts as breaching: a dead monitor must not read as healthy.
+  TelegramWebhookUnhealthyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: >
+        Telegram is not delivering updates to a Dapier telegram trigger (or
+        the health check stopped running). Run `dapier webhooks
+        telegram-health` for Telegram's view and `--repair` to re-register.
+      Namespace: Dapier/Triggers
+      MetricName: TelegramWebhookUnhealthy
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  TelegramHealthErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Dapier Telegram webhook health check Lambda errors
+      AlarmActions: [!Ref AlarmTopic]
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref TelegramHealthFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
 Outputs:
   ApiUrl:
     Value: !Sub https://${DomainName}

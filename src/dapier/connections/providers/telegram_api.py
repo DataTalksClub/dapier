@@ -119,3 +119,12 @@ def send_message(token, chat_id, text, *, transport=None, timeout=10,
         payload["parse_mode"] = parse_mode
     return call(token, "sendMessage", payload, transport=transport, timeout=timeout)
 
+
+
+def get_webhook_info(token, *, transport=None):
+    """Telegram's own view of the bot's delivery: the registered ``url``,
+    ``pending_update_count`` (updates Telegram holds and keeps retrying),
+    ``last_error_date``/``last_error_message`` (why the last delivery
+    failed) and ``allowed_updates``. The token never appears in it."""
+    result = call(token, "getWebhookInfo", transport=transport)
+    return result if isinstance(result, dict) else {}

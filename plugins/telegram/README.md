@@ -97,6 +97,37 @@ returns the documented tap. Creating the buttons themselves still means
 sending a `reply_markup` inline keyboard through the API — the send actions
 have no `reply_markup` field yet.
 
+## Delivery health and alerting
+
+Telegram triggers are push: if Telegram stops delivering, Dapier sees
+nothing — no run fails, no inbox row appears, and the silence looks like a
+quiet channel. Telegram's `getWebhookInfo` is the only place such an outage
+shows, so Dapier asks it on a schedule.
+
+- **`TelegramHealthFunction`** (template.yaml, every 5 minutes) checks every
+  enabled telegram trigger and publishes `Dapier/Triggers
+  TelegramWebhookUnhealthy`. A trigger is failing when the bot's webhook is
+  not the trigger URL (repointed or deleted), Telegram recorded a delivery
+  error in the last 30 minutes while still holding updates, 20+ updates are
+  pending, the registration dropped `message`/`channel_post`, or the probe
+  cannot reach Telegram with the stored token.
+- While failing it emails a detailed report to the operator inbox
+  (`NotifyEmail`, dev@) at most hourly.
+- **`TelegramWebhookUnhealthyAlarm`** pages dev@ through the alarm topic
+  after 10 minutes of failure, sends OK on recovery, and also fires when the
+  check stops reporting (missing data is breaching).
+
+Operator commands (same API: `/api/agent/hook-triggers/telegram-health`):
+
+```sh
+uv run dapier webhooks telegram-health            # Telegram's view; exit 1 while failing
+uv run dapier webhooks telegram-health automator-telegram --repair
+```
+
+`--repair` re-runs the `setWebhook` a trigger save performs (re-saving the
+trigger in the console does the same). Pending updates are kept, so
+Telegram redelivers the backlog once Dapier answers 200.
+
 ## Discovery and the getUpdates conflict
 
 Telegram connections expose three live listings to the console/CLI pickers

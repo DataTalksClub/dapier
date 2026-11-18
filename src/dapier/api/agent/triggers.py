@@ -21,7 +21,7 @@ audit = _LateBinding("audit")
 verify_id_token = _LateBinding("verify_id_token")
 
 
-__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_delivery_api", "hook_test_api", "hook_triggers_api", "poll_activity_api", "poll_trigger_action_api", "poll_trigger_show_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "trigger_sample_api"]
+__all__ = ["discover_samples_api", "email_from_api", "email_triggers_api", "hook_delivery_api", "hook_test_api", "hook_triggers_api", "poll_activity_api", "poll_trigger_action_api", "poll_trigger_show_api", "poll_triggers_api", "schedule_action_api", "schedule_triggers_api", "schedule_upcoming_api", "telegram_health_api", "trigger_sample_api"]
 
 
 
@@ -296,3 +296,36 @@ def poll_trigger_action_api(event, name, action):
     audit.emit(name, f"poll-trigger.{action}", subject,
                outcome="ok" if status < 300 else "error")
     return _json_response(status, payload)
+
+
+def telegram_health_api(event, method):
+    """Operator-only Telegram webhook health (GET) and re-registration (POST).
+
+    GET is Telegram's own view of every enabled telegram trigger — the same
+    check the scheduled TelegramHealthFunction alarms on
+    (triggers.telegram_health). POST ``{"name": <hook>|null}`` re-runs the
+    setWebhook a trigger save performs (the console reaches the same outcome
+    by re-saving the trigger) and answers the fresh health rows."""
+    from ...triggers import telegram_health
+
+    subject, error = require_operator(event, "hook-trigger.telegram-health")
+    if error:
+        return error
+    if method == "POST":
+        try:
+            body = json.loads(event.get("body") or "{}")
+            if not isinstance(body, dict):
+                raise ValueError("request body must be an object")
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _json_response(400, {"error": str(exc) or "Invalid request"})
+        name = body.get("name") or None
+        try:
+            repaired = telegram_health.repair(name)
+        except (hook_triggers.TriggerError, telegram_health.telegram_api.TelegramApiError) as exc:
+            audit.emit(str(name or "telegram"), "hook-trigger.telegram-repair", subject, outcome="error")
+            status = 400 if isinstance(exc, hook_triggers.TriggerError) else 502
+            return _json_response(status, {"error": str(exc)})
+        audit.emit(str(name or "telegram"), "hook-trigger.telegram-repair", subject, outcome="ok")
+        return _no_store(_json_response(200, {"repaired": repaired,
+                                               "triggers": telegram_health.check()}))
+    return _no_store(_json_response(200, {"triggers": telegram_health.check()}))

@@ -7,7 +7,7 @@ from .. import api
 from .shared import read_json_file
 
 __all__ = ["hooks_deliveries", "hooks_delete", "hooks_delivery", "hooks_list", "hooks_save",
-           "hooks_show", "hooks_test", "print_delivery", "print_hook"]
+           "hooks_show", "hooks_telegram_health", "hooks_test", "print_delivery", "print_hook"]
 
 
 def print_hook(item):
@@ -196,3 +196,30 @@ def hooks_test(api_url, name, data_path=None, debug=False):
         print(f"  Follow it with `dapier webhooks delivery {data['delivery_id']}`.")
     status = response.get("status") or 0
     return 0 if 200 <= int(status) < 300 else 1
+
+
+def hooks_telegram_health(api_url, name=None, repair=False, debug=False):
+    """Telegram's own view of each enabled telegram trigger's webhook
+    (getWebhookInfo); --repair re-registers it first. Exit 1 while failing."""
+    if repair:
+        data = api.call(api_url, "POST", "/api/agent/hook-triggers/telegram-health",
+                        {"name": name}, debug=debug)
+        print(f"Re-registered: {', '.join(data.get('repaired') or []) or 'nothing'}")
+    else:
+        data = api.call(api_url, "GET", "/api/agent/hook-triggers/telegram-health", debug=debug)
+    rows = [row for row in data.get("triggers") or [] if not name or row.get("hook_id") == name]
+    if not rows:
+        print("No enabled telegram triggers" + (f" named '{name}'" if name else ""))
+        return 0
+    for row in rows:
+        print(f"{row.get('hook_id')} (connection {row.get('connection_id')}): "
+              f"{str(row.get('status')).upper()}")
+        print(f"  webhook url:     {row.get('webhook_url')}")
+        if row.get("webhook_url") != row.get("expected_url"):
+            print(f"  expected url:    {row.get('expected_url')}")
+        print(f"  pending updates: {row.get('pending_update_count')}")
+        if row.get("last_error_at"):
+            print(f"  last error:      {row['last_error_at']} {row.get('last_error_message') or ''}")
+        for problem in row.get("problems") or []:
+            print(f"  PROBLEM {problem.get('code')}: {problem.get('detail')}")
+    return 1 if any(row.get("status") != "ok" for row in rows) else 0
