@@ -18,11 +18,14 @@ def _activity_commands(group_sub):
         "delivery", help="One delivery: request headers, payload, run outcome")
     delivery.add_argument("delivery_id")
     test = group_sub.add_parser(
-        "test", help="Send a test request to a webhook through its real intake "
-                     "(matched workflows run)")
+        "test", help="Send a test request to a webhook or Telegram hook through its real "
+                     "intake (matched workflows run)")
     test.add_argument("name")
     test.add_argument("--data", default=None,
-                      help="JSON payload file to send (- for stdin); default: a small sample")
+                      help="JSON payload file to send (- for stdin); default: a small sample. "
+                           "Telegram hooks take an Update, or a Message as sendMessage returns "
+                           "it (relays a post the bot sent itself, which Telegram never "
+                           "delivers back to the bot)")
     replay = group_sub.add_parser(
         "replay", help="Re-send a recorded delivery through the engine (fresh event id)")
     replay.add_argument("delivery_id")

@@ -239,12 +239,68 @@ def test_send_test_signs_a_secret_locked_hook(env):
 
 
 def test_send_test_refusals(env):
-    env["hooks"] = HookTable([_row(), _row("bot", kind="telegram"), _row("off", enabled=False)])
+    env["hooks"] = HookTable([_row(), _row("bot", kind="telegram"), _row("yt", kind="youtube"),
+                              _row("off", enabled=False)])
     assert hook_activity.api_send_test("missing")[0] == 404
-    assert hook_activity.api_send_test("bot")[0] == 400
+    assert hook_activity.api_send_test("yt")[0] == 400
     assert hook_activity.api_send_test("off")[0] == 409
     assert hook_activity.api_send_test("orders", "text")[0] == 400
+    assert hook_activity.api_send_test("bot", {"text": "no ids"})[0] == 400
     assert env["sent"] == []
+
+
+SENT_CHANNEL_POST = {"message_id": 270, "date": 1795000000, "text": "Update on peer reviews",
+                     "chat": {"id": -1001435532197, "type": "channel", "username": "mlzoomcamp"},
+                     "sender_chat": {"id": -1001435532197, "type": "channel"}}
+
+
+def _seen_store(monkeypatch):
+    from src.dapier.triggers import seen
+
+    claimed = set()
+
+    def claim(scope, key, **_kwargs):
+        if (scope, key) in claimed:
+            return False
+        claimed.add((scope, key))
+        return True
+
+    monkeypatch.setattr(seen, "claim", claim)
+
+
+def test_send_test_relays_a_bot_sent_channel_post(env, monkeypatch):
+    """A post the bot sent itself never comes back from Telegram; relaying
+    the Message sendMessage returned delivers it as the channel_post update
+    Telegram would have sent, through the real intake, once."""
+    _seen_store(monkeypatch)
+    env["hooks"] = HookTable([_row("bot", kind="telegram", token="tg-secret")])
+    status, payload = hook_activity.api_send_test("bot", SENT_CHANNEL_POST)
+    assert status == 200 and payload["response"]["status"] == 200
+    [envelope] = env["sent"]
+    assert envelope["connector"] == "telegram"
+    assert envelope["event"] == hook_triggers.TELEGRAM_CHANNEL_POST_EVENT
+    assert envelope["data"]["chat_id"] == -1001435532197
+    assert envelope["data"]["message_id"] == 270
+    assert envelope["data"]["is_channel_post"] is True
+    assert payload["delivery_id"] == envelope["id"]
+    assert payload["request"]["headers"][ingress.TELEGRAM_SECRET_HEADER] == "[redacted]"
+    # Relaying the same post again is a duplicate, not a second Slack post.
+    status, payload = hook_activity.api_send_test("bot", SENT_CHANNEL_POST)
+    assert payload["response"]["body"]["duplicate"] is True
+    assert len(env["sent"]) == 1
+
+
+def test_send_test_telegram_default_and_full_update(env, monkeypatch):
+    _seen_store(monkeypatch)
+    env["hooks"] = HookTable([_row("bot", kind="telegram", token="tg-secret")])
+    status, payload = hook_activity.api_send_test("bot")
+    assert status == 200 and payload["response"]["status"] == 200
+    assert env["sent"][0]["event"] == hook_triggers.TELEGRAM_EVENT
+    assert env["sent"][0]["data"]["chat_id"] == 0
+    update = {"update_id": 99, "message": {"message_id": 5, "chat": {"id": 7, "type": "private"},
+                                           "text": "hi"}}
+    hook_activity.api_send_test("bot", update)
+    assert env["sent"][1]["data"]["update_id"] == 99
 
 
 # --- routes: console (admin) and CLI (agent) -----------------------------------

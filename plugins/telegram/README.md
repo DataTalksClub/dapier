@@ -169,6 +169,15 @@ in place (`{data.chat_id}`); any other trigger must name the chat.
 
 ## Gotchas
 
+- **A bot never receives its own posts.** Telegram does not deliver a
+  message back to the bot that sent it, so a channel announcement posted
+  *through* the trigger's bot (e.g. the course-announcement helper posting
+  via @au_tomator_bot) never fires the trigger — the 2026-11 Telegram→Slack
+  crosspost gap. A sender that posts through the bot must relay the Message
+  `sendMessage` returned: `dapier webhooks test <trigger> --data sent.json`
+  (or POST `/api/agent/hook-triggers/test` `{"name", "data"}`). The relay is
+  wrapped as the `channel_post` update Telegram would have sent and dedupes
+  on chat + message id, so relaying twice runs once.
 - One bot, one trigger: enable a second trigger only on another bot's
   connection, or disable the first to release the webhook.
 - While the trigger is enabled, `telegram.chats` / `telegram.updates`
