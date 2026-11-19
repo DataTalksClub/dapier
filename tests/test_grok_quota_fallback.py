@@ -154,7 +154,7 @@ def test_fallback_definition(workflow_id, role, recipient):
 
     rotate = next(a for a in wf["actions"] if a.get("id") == "hub-token-rotate")
     assert rotate["type"] == "condition"
-    assert rotate["when"] == {"steps.decide-grok-route.output.result.refresh_needed": {"exists": True}}
+    assert rotate["when"] == {"steps.decide-grok-route.output.result.refresh_needed": {"equals": True}}
     rotate_then = rotate.get("then") or []
     assert [a.get("id") for a in rotate_then] == ["refresh-hub-token", "store-hub-tokens"]
     refresh = rotate_then[0]
@@ -513,10 +513,13 @@ def test_chain_rotates_expired_bearer_and_self_heals(workflow_id):
     assert store["hub_refresh_token"] == "fresh-refresh"
     assert step_outputs["hub-token-rotate.then.store-hub-tokens.then.store-hub-api-token"]["status"] == "completed"
 
-    # Run 2: same store, fresh bearer -> the divert path now works.
+    # Run 2: same store, fresh bearer -> the divert path now works and does not refresh again.
     stop, step_outputs, calls, store = _run_chain(workflow_id, store, usage_transport)
     assert stop is None
     assert step_outputs["decide-grok-route"]["output"]["result"]["route"] == "hub_session"
+    assert step_outputs["decide-grok-route"]["output"]["result"]["refresh_needed"] is False
+    assert step_outputs["hub-token-rotate"]["output"]["branch"] == "else"
+    assert [c for c in calls if c["url"].endswith("/api/token/refresh")] == []
     usage_calls = [c for c in calls if c["url"].endswith("/api/quota/grokbot")]
     assert usage_calls[0]["headers"]["authorization"] == "Bearer fresh-access"
 

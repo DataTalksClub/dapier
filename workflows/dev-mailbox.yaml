@@ -244,7 +244,7 @@ actions:
     type: condition
     when:
       steps.decide-grok-route.output.result.refresh_needed:
-        exists: true
+        equals: true
     then:
       - id: refresh-hub-token
         type: http_request
