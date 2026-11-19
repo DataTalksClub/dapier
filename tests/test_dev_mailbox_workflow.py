@@ -3,9 +3,12 @@
 Acceptance criteria (dev / tofu / orin):
 - mail to <bot>@dtcdev.click triggers <bot>-mailbox workflow, enabled
 - <bot>-mailbox does NOT run an agent step, sends no email, and has no
-  auto-reply (loop-safe: only storage_get / code / http_request)
+  auto-reply (loop-safe: only storage_get / code / http_request / condition)
 - <bot>-mailbox POSTs email details (from, to, subject, snippet, text, date,
-  message_id, attachments metadata) to its Grok bot webhook as JSON
+  message_id, attachments metadata) to its Grok bot webhook as JSON, unless
+  Hub's GrokBot usage export reports below_threshold on fresh evidence, in
+  which case the role's sticky Hub session is notified instead (see
+  test_grok_quota_fallback.py)
 - Webhook URL and Bearer token are fetched dynamically from this workflow's
   storage (keys webhook_url / webhook_token, never hardcoded in YAML);
   missing keys fail fast with a clear error (no POST to an empty URL)
@@ -33,6 +36,20 @@ MAILBOXES = (
 def _load(workflow_id):
     wf_path = Path(__file__).parent.parent / f"workflows/{workflow_id}.yaml"
     return wf_path, yaml.safe_load(wf_path.read_text())
+
+
+def _iter_steps(wf):
+    """Top-level steps plus every step nested in condition/paths branches."""
+    def walk(steps):
+        for step in steps or []:
+            yield step
+            for branch in ("then", "else", "default"):
+                yield from walk(step.get(branch))
+            for path in step.get("paths") or []:
+                yield from walk(path.get("actions"))
+            for case in step.get("cases") or []:
+                yield from walk(case.get("actions"))
+    yield from walk(wf.get("actions"))
 
 
 @pytest.mark.parametrize("workflow_id,route,address", MAILBOXES)
@@ -63,21 +80,30 @@ def test_bot_mailbox_definition(workflow_id, route, address):
                    for t in action_types), f"{workflow_id} must not send email"
     assert "storage_get" in action_types
     assert "code" in action_types
-    assert "http_request" in action_types
+
+    steps = list(_iter_steps(wf))
+    http_actions = [a for a in steps if a.get("type") == "http_request"]
+    assert http_actions, f"{workflow_id} must deliver over http_request"
 
     storage_keys = sorted(a.get("key") for a in actions if a.get("type") == "storage_get")
-    expected_storage_keys = ["webhook_token", "webhook_url"]
+    expected_storage_keys = [
+        "webhook_token", "webhook_url",
+        # GrokBot <1% quota fallback (Hub export + sticky-session notify).
+        "hub_api_token", "hub_messages_url", "hub_recipient", "hub_usage_url",
+    ]
     if workflow_id == "dev-mailbox":
         expected_storage_keys += ["oncall_webhook_token", "oncall_webhook_url"]
     assert storage_keys == sorted(expected_storage_keys)
     assert next(a for a in actions if a.get("key") == "webhook_url")["secret"] is True
+    assert next(a for a in actions if a.get("key") == "hub_api_token")["secret"] is True
+    assert "secret" not in next(a for a in actions if a.get("key") == "hub_recipient")
     if workflow_id == "dev-mailbox":
         assert next(a for a in actions if a.get("key") == "oncall_webhook_url")["secret"] is True
         assert next(a for a in actions if a.get("key") == "oncall_webhook_token")["secret"] is True
 
-    http_action = next(a for a in actions if a.get("type") == "http_request")
-    assert http_action["method"] == "POST"
-    assert http_action["auth_type"] == "bearer"
+    webhook_action = next(a for a in http_actions if a.get("id") == "post-webhook")
+    assert webhook_action["method"] == "POST"
+    assert webhook_action["auth_type"] == "bearer"
 
     # Ensure no secrets or tokens are committed in the YAML
     assert "crsr_" not in raw_yaml
@@ -114,16 +140,18 @@ def test_dev_mailbox_definition():
     # Actions must include storage_get for url/token, code format, and http_request
     assert "storage_get" in action_types
     assert "code" in action_types
-    assert "http_request" in action_types
-    assert [a["id"] for a in actions if a.get("type") == "http_request"] == [
-        "post-webhook", "post-oncall-ingest",
+    steps = list(_iter_steps(wf))
+    assert [a["id"] for a in steps if a.get("type") == "http_request"] == [
+        "post-oncall-ingest", "check-grokbot-usage", "notify-hub-session", "post-webhook",
     ]
-    assert all(a.get("on_error") == "continue" for a in actions if a.get("type") == "http_request")
-    oncall_action = next(a for a in actions if a.get("id") == "post-oncall-ingest")
+    assert all(a.get("on_error") == "continue"
+               for a in steps if a.get("type") == "http_request"
+               and a.get("id") in ("post-webhook", "post-oncall-ingest"))
+    oncall_action = next(a for a in steps if a.get("id") == "post-oncall-ingest")
     assert oncall_action["url"] == "{steps.get-oncall-url.output.value}"
     assert oncall_action["headers"]["X-Delivery-Id"] == "{steps.oncall-delivery-id.output.result}"
     assert oncall_action["auth_type"] == "bearer"
-    verify_action = next(a for a in actions if a.get("id") == "verify-both-deliveries")
+    verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
     assert verify_action["type"] == "code"
 
     # Ensure no secrets or tokens are committed in the YAML
@@ -303,7 +331,7 @@ def test_dev_mailbox_code_action_with_s3_body_pointer():
 @pytest.mark.parametrize("workflow_id", ["dev-mailbox", "tofu-mailbox", "orin-mailbox"])
 def test_bot_mailbox_http_request_delivery(workflow_id):
     _, wf = _load(workflow_id)
-    http_action = next(a for a in wf["actions"] if a.get("type") == "http_request")
+    http_action = next(a for a in _iter_steps(wf) if a.get("id") == "post-webhook")
 
     event = {"connector": "email", "data": {}}
     payload = {
@@ -347,7 +375,7 @@ def test_bot_mailbox_http_request_delivery(workflow_id):
 def test_dev_mailbox_http_request_delivery():
     wf_path = Path(__file__).parent.parent / "workflows/dev-mailbox.yaml"
     wf = yaml.safe_load(wf_path.read_text())
-    http_action = next(a for a in wf["actions"] if a.get("type") == "http_request")
+    http_action = next(a for a in _iter_steps(wf) if a.get("id") == "post-webhook")
 
     event = {"connector": "email", "data": {}}
     payload = {
@@ -420,14 +448,43 @@ def test_dev_mailbox_oncall_http_request_delivery():
     assert "delivery_id" not in sent_data
 
 
-def test_dev_mailbox_delivery_verifier_requires_both_endpoints():
+def test_dev_mailbox_delivery_verifier_requires_ingest_and_routed_leg():
+    """The verifier fails the run unless oncall ingest AND the routed leg
+    (webhook or sticky-session notify) both completed."""
     _, wf = _load("dev-mailbox")
-    verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-both-deliveries")
+    verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
     completed = {"status": "completed", "output": {}}
     failed = {"status": "failed", "output": {}}
-    steps = {"post-webhook": completed, "post-oncall-ingest": failed}
+    # Webhook route taken, webhook leg failed.
+    steps = {
+        "route": completed | {"output": {"branch": "else"}},
+        "route.else.post-webhook": failed,
+        "post-oncall-ingest": completed,
+    }
+    with pytest.raises(RuntimeError, match="post-oncall-ingest|post-webhook") as exc_info:
+        run_code(verify_action, {"connector": "email", "data": {}}, steps=dict(steps))
+    assert "post-webhook" in str(exc_info.value)
+    # Sticky-session route taken, notify leg completed, ingest failed.
+    steps = {
+        "route": completed | {"output": {"branch": "then"}},
+        "route.then.notify-hub-session": completed,
+        "post-oncall-ingest": failed,
+    }
     with pytest.raises(RuntimeError, match="post-oncall-ingest"):
         run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
+    # No route branch recorded at all.
+    steps = {"post-oncall-ingest": completed}
+    with pytest.raises(RuntimeError, match="route"):
+        run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
+    # Everything completed on the webhook route.
+    steps = {
+        "route": completed | {"output": {"branch": "else"}},
+        "route.else.post-webhook": completed,
+        "post-oncall-ingest": completed,
+    }
+    result = run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)["result"]
+    assert result["routed_to"] == "else"
+    assert result["oncall_ingest"] == "completed"
 
 
 @pytest.mark.parametrize("token_value", [
@@ -438,7 +495,7 @@ def test_dev_mailbox_delivery_verifier_requires_both_endpoints():
 ])
 def test_http_request_bearer_accepts_optional_bearer_prefix(token_value):
     _, wf = _load("dev-mailbox")
-    http_action = next(a for a in wf["actions"] if a.get("type") == "http_request")
+    http_action = next(a for a in _iter_steps(wf) if a.get("id") == "post-webhook")
     event = {"connector": "email", "data": {}}
     steps = {
         "get-url": {"status": "completed", "output": {"value": "https://example.invalid/hook"}},
@@ -568,7 +625,7 @@ def test_http_request_empty_url_fails_fast():
 
     wf_path = Path(__file__).parent.parent / "workflows/dev-mailbox.yaml"
     wf = yaml.safe_load(wf_path.read_text())
-    http_action = next(a for a in wf["actions"] if a.get("type") == "http_request")
+    http_action = next(a for a in _iter_steps(wf) if a.get("id") == "post-webhook")
 
     event = {"connector": "email", "data": {}}
     steps = {
