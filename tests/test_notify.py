@@ -104,6 +104,34 @@ def test_operator_recipient_extracts_bare_address_from_display_name_when_falling
     assert notify.operator_recipient() == "alerts@dtcdev.click"
 
 
+def test_operator_recipients_appends_the_extra_inboxes(monkeypatch):
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "dev@example.test")
+    monkeypatch.setenv("DAPIER_NOTIFY_EXTRA_EMAILS", "alexey@example.test,dev@example.test;  extra@example.test ,")
+
+    assert notify.operator_recipients() == ["dev@example.test", "alexey@example.test",
+                                            "extra@example.test"]
+
+
+def test_operator_recipients_without_extras_is_the_primary_alone(monkeypatch):
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "dev@example.test")
+    monkeypatch.delenv("DAPIER_NOTIFY_EXTRA_EMAILS", raising=False)
+
+    assert notify.operator_recipients() == ["dev@example.test"]
+
+
+def test_explicit_notify_list_keeps_the_operator_inboxes(monkeypatch):
+    import src.dapier.engine.matching as matching
+
+    monkeypatch.setattr(matching, "all_workflows",
+                        lambda: [{"id": "wf-1", "notify": ["team@example.test"]}],
+    )
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "dev@example.test")
+    monkeypatch.setenv("DAPIER_NOTIFY_EXTRA_EMAILS", "alexey@example.test")
+
+    assert notify.notify_addresses("wf-1") == ["team@example.test", "dev@example.test",
+                                               "alexey@example.test"]
+
+
 def test_ses_client_uses_the_email_send_region(monkeypatch):
     seen = {}
 

@@ -171,14 +171,15 @@ def test_handler_renders_the_summary_into_the_ses_payload(monkeypatch, ses):
 def test_handler_sends_to_the_notify_inbox_from_the_sender(monkeypatch, ses):
     _stub_summary(monkeypatch, _failed_runs())
     monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_NOTIFY_EXTRA_EMAILS", "alexey@example.test")
     monkeypatch.setenv("DAPIER_EMAIL_SENDER", "no-reply@dtcdev.click")
 
     result = error_digest.handler({})
 
-    assert result["to"] == "ops@example.test"
+    assert result["to"] == ["ops@example.test", "alexey@example.test"]
     kwargs = ses.return_value.send_email.call_args.kwargs
     assert kwargs["Source"] == "no-reply@dtcdev.click"
-    assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]
+    assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test", "alexey@example.test"]
 
 
 def test_handler_sends_from_alert_sender_when_configured(monkeypatch, ses):
@@ -189,7 +190,7 @@ def test_handler_sends_from_alert_sender_when_configured(monkeypatch, ses):
 
     result = error_digest.handler({})
 
-    assert result["to"] == "ops@example.test"
+    assert result["to"] == ["ops@example.test"]
     kwargs = ses.return_value.send_email.call_args.kwargs
     assert kwargs["Source"] == "DTC Alerts <alerts@dtcdev.click>"
     assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]
@@ -242,7 +243,7 @@ def test_admin_digest_send_now_returns_what_was_sent(monkeypatch, ses):
     assert response["statusCode"] == 200
     body = json.loads(response["body"])
     assert body["sent"] is True
-    assert body["to"] == "ops@dtcdev.click"
+    assert body["to"] == ["ops@dtcdev.click"]
     assert "3 failed runs" in body["subject"]
     assert "wf-1" in body["body"]
     ses.return_value.send_email.assert_called_once()
@@ -316,7 +317,7 @@ def test_agent_digest_send_now_returns_what_was_sent(monkeypatch, ses):
     assert response["statusCode"] == 200
     body = json.loads(response["body"])
     assert body["sent"] is True
-    assert body["to"] == "ops@dtcdev.click"
+    assert body["to"] == ["ops@dtcdev.click"]
     assert "3 failed runs" in body["subject"]
     ses.return_value.send_email.assert_called_once()
 

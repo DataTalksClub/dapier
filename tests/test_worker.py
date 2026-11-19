@@ -270,6 +270,10 @@ def test_notify_failure_emails_the_workflow_notify_list(monkeypatch):
     _patch_table(monkeypatch, calls)
     monkeypatch.setattr(matching, "all_workflows",
                         lambda: [{"id": "wf-1", "notify": ["ops@example.test", "  ", "lead@example.test"]}])
+    # The operator inboxes ride along on every failure notice (dev@ and the
+    # human operator's inbox); ops@ is deduplicated against the workflow list.
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "ops@example.test")
+    monkeypatch.setenv("DAPIER_NOTIFY_EXTRA_EMAILS", "alexey@example.test")
     ses = FakeSes()
     exc = ValueError("Slack rejected message")
     exc.dapier_workflow = "wf-1"
@@ -279,7 +283,8 @@ def test_notify_failure_emails_the_workflow_notify_list(monkeypatch):
 
     assert result["run_id"] == "wf-1:evt-1"
     sent = ses.calls[0]
-    assert sent["Destination"]["ToAddresses"] == ["ops@example.test", "lead@example.test"]
+    assert sent["Destination"]["ToAddresses"] == ["ops@example.test", "lead@example.test",
+                                                  "alexey@example.test"]
     assert sent["Source"]
     assert "Run failed" in sent["Message"]["Subject"]["Data"]
     body = sent["Message"]["Body"]["Text"]["Data"]

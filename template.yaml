@@ -109,6 +109,16 @@ Parameters:
       Developer directly (dev-mailbox forwards them to the Developer bot
       webhook). Distinct from EmailSender, which is the SES
       From identity and is not a mailbox anyone reads.
+  NotifyExtraEmails:
+    Type: String
+    Default: 'alexey@datatalks.club'
+    Description: >
+      Extra operator inboxes (comma-separated) that receive every operator
+      email alongside NotifyEmail: failed-run notices, CloudWatch alarm
+      emails, the error and connection digests, and Telegram health
+      reports. The bot mailbox alone is not enough — a human operator must
+      see failures too (the 2026-11 Telegram->Slack outage sat invisible
+      because nothing paged a person).
   EmailSendRegion:
     Type: String
     Default: us-east-1
@@ -188,6 +198,11 @@ Globals:
         DAPIER_EMAIL_REGION: !Ref EmailSendRegion
         DAPIER_ALERT_SENDER: !Ref AlertEmailSender
         DAPIER_NOTIFY_EMAIL: !Ref NotifyEmail
+        # engine.notify.operator_recipients(): every operator email (failure
+        # notices, alarm emails, digests, Telegram health reports) also goes
+        # to these inboxes, so a human operator sees failures even though the
+        # primary inbox is the Developer bot mailbox.
+        DAPIER_NOTIFY_EXTRA_EMAILS: !Ref NotifyExtraEmails
         HOOK_TRIGGERS_TABLE: !Ref HookTriggersTable
         TRIGGER_INBOX_TABLE: !Ref TriggerInboxTable
         SCHEDULE_TRIGGERS_TABLE: !Ref ScheduleTriggersTable

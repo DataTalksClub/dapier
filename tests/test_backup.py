@@ -580,14 +580,26 @@ def test_backup_excludes_external_team_secrets_table(env, monkeypatch):
 
 
 def test_backup_failure_email_routes_only_to_dev_inbox():
-    """Infra alerts go only to dev@dtcdev.click (intake 19fefe6f): the
-    template default and the explicit deploy override must both be dev@,
+    """Infra (backup) alerts go only to dev@dtcdev.click (intake 19fefe6f):
+    the template default and the explicit deploy override must both be dev@,
     since CloudFormation keeps the previous value when an override is
-    omitted and the old default was a personal inbox."""
+    omitted and the old default was a personal inbox.
+
+    Run-failure and operator mail is different (intake 779495a8): the
+    operator inboxes NotifyEmail + NotifyExtraEmails deliberately include a
+    human's address, so the personal-address ban is scoped to the backup
+    path instead of the whole template — backup.py must read only
+    BACKUP_ALERT_EMAIL and never the notify lists."""
     template = _load_yaml("template.yaml")
     assert template["Parameters"]["BackupAlertEmail"]["Default"] == "dev@dtcdev.click"
     deploy = Path("scripts/deploy.sh").read_text()
     assert 'BackupAlertEmail: "${BACKUP_ALERT_EMAIL:-dev@dtcdev.click}"' in deploy
-    for personal in ("alexey.s.grigoriev@gmail.com", "alexey@datatalks.club", "orin@dtcdev.click"):
+    backup_src = Path("src/dapier/backup.py").read_text()
+    assert "DAPIER_NOTIFY_EMAIL" not in backup_src
+    assert "DAPIER_NOTIFY_EXTRA_EMAILS" not in backup_src
+    for personal in ("alexey.s.grigoriev@gmail.com", "orin@dtcdev.click"):
         assert personal not in Path("template.yaml").read_text()
         assert personal not in deploy
+    # The backup recipient parameter itself must never default to a personal inbox.
+    assert "alexey@datatalks.club" not in template["Parameters"]["BackupAlertEmail"]["Default"]
+    assert "alexey@datatalks.club" not in Path("src/dapier/backup.py").read_text()

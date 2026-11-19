@@ -181,7 +181,7 @@ def test_handler_emails_the_expiring_connections(monkeypatch, ses):
     result = connection_digest.handler({})
 
     assert result["sent"] is True
-    assert result["to"] == "ops@example.test"
+    assert result["to"] == ["ops@example.test"]
     assert result["connections"] == ["google-sheets", "dropbox"]
     kwargs = ses.return_value.send_email.call_args.kwargs
     assert kwargs["Source"] == "no-reply@dtcdev.click"
@@ -201,7 +201,7 @@ def test_handler_sends_from_alert_sender_when_configured(monkeypatch, ses):
     result = connection_digest.handler({})
 
     assert result["sent"] is True
-    assert result["to"] == "ops@example.test"
+    assert result["to"] == ["ops@example.test"]
     kwargs = ses.return_value.send_email.call_args.kwargs
     assert kwargs["Source"] == "DTC Alerts <alerts@dtcdev.click>"
     assert kwargs["Destination"]["ToAddresses"] == ["ops@example.test"]

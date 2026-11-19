@@ -56,16 +56,17 @@ class HandlerTests(unittest.TestCase):
             "DAPIER_ALERT_SENDER": "DTC Alerts <alerts@dtcdev.click>",
             "DAPIER_EMAIL_SENDER": "no-reply@dtcdev.click",
             "DAPIER_NOTIFY_EMAIL": "ops@dtcdev.click",
+            "DAPIER_NOTIFY_EXTRA_EMAILS": "alexey@example.test, ops@dtcdev.click",
         }, clear=False):
             with patch.object(alarm_notify, "_summarize",
                               return_value=("body", "[dapier] alarm: X")) as summarize:
                 with patch("boto3.client") as client:
                     client.return_value.send_email.return_value = {"MessageId": "m1"}
                     result = alarm_notify.handler(sns_event(json.dumps({"AlarmName": "X"})))
-        self.assertEqual(result, {"notified": "ops@dtcdev.click"})
+        self.assertEqual(result, {"notified": ["ops@dtcdev.click", "alexey@example.test"]})
         kwargs = client.return_value.send_email.call_args.kwargs
         self.assertEqual(kwargs["Source"], "DTC Alerts <alerts@dtcdev.click>")
-        self.assertEqual(kwargs["Destination"]["ToAddresses"], ["ops@dtcdev.click"])
+        self.assertEqual(kwargs["Destination"]["ToAddresses"], ["ops@dtcdev.click", "alexey@example.test"])
         client.assert_called_with("ses", region_name=unittest.mock.ANY)
 
     def test_emails_the_operator_address(self):
@@ -74,16 +75,17 @@ class HandlerTests(unittest.TestCase):
         with patch.dict("os.environ", {
             "DAPIER_EMAIL_SENDER": "no-reply@dtcdev.click",
             "DAPIER_NOTIFY_EMAIL": "ops@dtcdev.click",
+            "DAPIER_NOTIFY_EXTRA_EMAILS": "alexey@example.test, ops@dtcdev.click",
         }, clear=False):
             with patch.object(alarm_notify, "_summarize",
                               return_value=("body", "[dapier] alarm: X")) as summarize:
                 with patch("boto3.client") as client:
                     client.return_value.send_email.return_value = {"MessageId": "m1"}
                     result = alarm_notify.handler(sns_event(json.dumps({"AlarmName": "X"})))
-        self.assertEqual(result, {"notified": "ops@dtcdev.click"})
+        self.assertEqual(result, {"notified": ["ops@dtcdev.click", "alexey@example.test"]})
         kwargs = client.return_value.send_email.call_args.kwargs
         self.assertEqual(kwargs["Source"], "no-reply@dtcdev.click")
-        self.assertEqual(kwargs["Destination"]["ToAddresses"], ["ops@dtcdev.click"])
+        self.assertEqual(kwargs["Destination"]["ToAddresses"], ["ops@dtcdev.click", "alexey@example.test"])
         client.assert_called_with("ses", region_name=unittest.mock.ANY)
 
 
