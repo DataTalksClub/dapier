@@ -117,11 +117,21 @@ shows, so Dapier asks it on a schedule.
   from in the last 30 days. It flags `missed_posts` when a post older than
   30 minutes (and younger than 3 days) has a higher id than anything Dapier
   received. That is the failure behind the 2026-11 crosspost gap.
-- While failing it emails a detailed report to the operator inbox
-  (`NotifyEmail`, dev@) at most hourly.
-- **`TelegramWebhookUnhealthyAlarm`** pages dev@ through the alarm topic
-  after 10 minutes of failure, sends OK on recovery, and also fires when the
-  check stops reporting (missing data is breaching).
+- **Auto-relay.** A missed post on a fully healthy webhook (no delivery
+  problems, nothing pending) is a post the trigger's bot sent itself —
+  Telegram will never deliver it, so the schedule relays its text back
+  through the trigger's own intake under the stable
+  `relay-<chat>-<message>` update id, and the crosspost workflows run
+  within one check cycle. When the webhook is failing, Telegram is holding
+  the posts and will deliver them itself once the hook answers 200 again,
+  so the check only alerts. Media-only posts have no text in the public
+  preview and stay alert-only — relay them by hand (see the gotcha below).
+- While failing it emails a detailed report to the operator inboxes
+  (`NotifyEmail` + `NotifyExtraEmails`: the Developer mailbox and the
+  human operator) at most hourly.
+- **`TelegramWebhookUnhealthyAlarm`** pages the operator inboxes through
+  the alarm topic after 10 minutes of failure, sends OK on recovery, and
+  also fires when the check stops reporting (missing data is breaching).
 
 Operator commands (same API: `/api/agent/hook-triggers/telegram-health`):
 
@@ -179,8 +189,11 @@ in place (`{data.chat_id}`); any other trigger must name the chat.
   message back to the bot that sent it, so a channel announcement posted
   *through* the trigger's bot (e.g. the course-announcement helper posting
   via @au_tomator_bot) never fires the trigger — the 2026-11 Telegram→Slack
-  crosspost gap. A sender that posts through the bot must relay the Message
-  `sendMessage` returned: `dapier webhooks test <trigger> --data sent.json`
+  crosspost gap. Text announcements on public channels are relayed
+  automatically by the Telegram health check (above, within one 5-minute
+  cycle). For everything else — media posts, private channels, or relaying
+  immediately — the sender relays the Message `sendMessage` returned:
+  `dapier webhooks test <trigger> --data sent.json`
   (or POST `/api/agent/hook-triggers/test` `{"name", "data"}`). The relay is
   wrapped as the `channel_post` update Telegram would have sent and dedupes
   on chat + message id, so relaying twice runs once.
