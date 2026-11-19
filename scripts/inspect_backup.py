@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import boto3
+import botocore.config
 from botocore.exceptions import ClientError
 
 
@@ -148,8 +149,12 @@ def main():
         print('Scheduled success requires a manifest and successful runtime report for the latest backup day; alarm OK alone is insufficient.')
     if args.invoke:
         with inspect('invoke'):
-            result = boto3.client('lambda').invoke(
-                FunctionName=fn, InvocationType='RequestResponse')
+            # A synchronous invoke holds the HTTP response open for the
+            # whole run — botocore's default 60 s read timeout aborts the
+            # client long before a 900 s backup finishes.
+            invoke_client = boto3.client('lambda', config=botocore.config.Config(
+                read_timeout=1000, retries={'max_attempts': 0}))
+            result = invoke_client.invoke(FunctionName=fn, InvocationType='RequestResponse')
             payload = result.get('Payload').read()
             print('BACKUP_INVOKE', json.dumps({
                 'status': result.get('StatusCode'),

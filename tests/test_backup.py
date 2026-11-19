@@ -235,10 +235,17 @@ def test_backup_inspection_grants_match_inspection_script():
     assert any("--invoke" in run for run in dispatch_runs)
 
     script = Path("scripts/inspect_backup.py").read_text()
-    clients = dict(re.findall(
+    # Every client creation maps its service; methods come from the vars
+    # named at creation. A plain assignment ends right after the quotes; a
+    # configured one (the invoke client's read timeout) carries kwargs, so
+    # only match its first line — `config`-style locals that merely hold a
+    # call result are deliberately not client vars.
+    plain = dict(re.findall(
         r"^\s*(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
+    configured = dict(re.findall(
+        r"^\s*(\w+) = boto3\.client\('([^']+)',", script, re.MULTILINE))
     calls = set(re.findall(r"boto3\.client\('([^']+)'\)\.(\w+)\(", script))
-    for var, service in clients.items():
+    for var, service in {**plain, **configured}.items():
         calls.update((service, method) for method in re.findall(rf"\b{var}\.(\w+)\(", script))
 
     infra = _load_yaml("infra/backup-inspection-access.yaml")
