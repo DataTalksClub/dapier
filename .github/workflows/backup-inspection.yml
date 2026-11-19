@@ -18,6 +18,13 @@ permissions:
   contents: read
   id-token: write
 
+# Two concurrent backups rewrite the same day's snapshot keys while an
+# inspection verifies byte sizes — the 2026-11-19 dispatches raced exactly
+# that way and failed the check. Serialize runs instead.
+concurrency:
+  group: backup-inspection
+  cancel-in-progress: false
+
 env:
   AWS_REGION: eu-west-1
 

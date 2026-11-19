@@ -69,7 +69,7 @@ def main():
     with inspect('config'):
         config = boto3.client('lambda').get_function_configuration(FunctionName=fn)
         print('BACKUP_CONFIG', json.dumps({k: config[k] for k in ('FunctionName', 'MemorySize', 'Timeout', 'LastModified', 'CodeSha256')}))
-        assert config['MemorySize'] >= 512
+        assert config['MemorySize'] >= 1024
     cw = boto3.client('cloudwatch')
     with inspect('alarm'):
         states = cw.describe_alarms(AlarmNames=[alarm])['MetricAlarms']

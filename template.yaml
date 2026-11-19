@@ -1642,7 +1642,9 @@ Resources:
       # retries) and died before manifest and failure email. 900 s and 4 GB
       # of /tmp cover throttled scans and years of inbox growth; snapshots
       # themselves stream out as S3 multipart parts and never touch /tmp.
-      MemorySize: 512
+      # 1 GB of memory: the first full runs of the fixed code peaked at
+      # ~497 MB of 512 — and the extra CPU cuts the ~660 s scan+gzip run.
+      MemorySize: 1024
       Timeout: 900
       EphemeralStorage:
         Size: 4096

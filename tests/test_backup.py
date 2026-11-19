@@ -52,7 +52,9 @@ def test_backup_has_explicit_memory_headroom():
 
     TemplateLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
     template = yaml.load(Path("template.yaml").read_text(), Loader=TemplateLoader)
-    assert template["Resources"]["BackupFunction"]["Properties"]["MemorySize"] >= 512
+    # 1 GB: the first full runs of the streaming fix peaked at ~497 MB of
+    # the previous 512 (2026-11-19), too close to the OOM kill.
+    assert template["Resources"]["BackupFunction"]["Properties"]["MemorySize"] >= 1024
 
 
 def test_backup_has_timeout_and_tmp_headroom_for_slow_scans():
