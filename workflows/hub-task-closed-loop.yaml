@@ -1,0 +1,297 @@
+id: hub-task-closed-loop
+enabled: true
+description: Hub task lifecycle webhook -> notify Dev (Developer bot webhook, or Dev sticky Hub session when GrokBot remaining usage < 1%)
+triggers:
+  - connector: webhook
+    event: request.received
+    filters:
+      hook:
+        equals: hub-task-status
+actions:
+  - id: get-url
+    type: storage_get
+    key: webhook_url
+    secret: true
+  - id: get-token
+    type: storage_get
+    key: webhook_token
+  - id: get-hub-usage-url
+    type: storage_get
+    key: hub_usage_url
+  - id: get-hub-messages-url
+    type: storage_get
+    key: hub_messages_url
+  - id: get-hub-api-token
+    type: storage_get
+    key: hub_api_token
+    secret: true
+  - id: get-hub-recipient
+    type: storage_get
+    key: hub_recipient
+  - id: get-hub-refresh-url
+    type: storage_get
+    key: hub_refresh_url
+  - id: get-hub-refresh-token
+    type: storage_get
+    key: hub_refresh_token
+    secret: true
+  - id: format-task-event
+    type: code
+    code: |
+      import hashlib
+      import json
+
+      if isinstance(steps, dict):
+          _missing_keys = []
+          for _step_id, _key in (("get-url", "webhook_url"), ("get-token", "webhook_token")):
+              if _step_id in steps:
+                  _output = ((steps.get(_step_id) or {}).get("output") or {})
+                  if not str(_output.get("value") or "").strip():
+                      _missing_keys.append(_key)
+          if _missing_keys:
+              raise ValueError(
+                  "hub-task-closed-loop is not configured: storage key(s) "
+                  + ", ".join(_missing_keys)
+                  + " are empty. Set them with: dapier storage set"
+                    " hub-task-closed-loop <name> <value>"
+              )
+          _url_output = ((steps.get("get-url") or {}).get("output") or {})
+          _webhook_url = str(_url_output.get("value") or "").strip()
+          if _webhook_url and not _webhook_url.lower().startswith(("http://", "https://")):
+              raise ValueError(
+                  "hub-task-closed-loop is misconfigured: storage key webhook_url must be "
+                  "an http:// or https:// URL. Correct it with: dapier storage "
+                  "set hub-task-closed-loop webhook_url <http(s)-URL>"
+              )
+
+      body = input.get("body") if isinstance(input.get("body"), dict) else {}
+      intake_obj = body.get("intake") if isinstance(body.get("intake"), dict) else {}
+      session_obj = body.get("session") if isinstance(body.get("session"), dict) else {}
+
+      event_kind = str(
+          body.get("event") or body.get("kind") or body.get("type") or "task.updated"
+      ).strip()
+      outcome = str(
+          body.get("outcome") or body.get("status") or body.get("state") or ""
+      ).strip()
+      intake_id = str(
+          body.get("intake_id")
+          or body.get("intake_task_id")
+          or body.get("task_id")
+          or intake_obj.get("id")
+          or ""
+      ).strip()
+      session_id = str(
+          body.get("session_id") or session_obj.get("id") or ""
+      ).strip()
+      title = str(
+          body.get("title") or intake_obj.get("title") or ""
+      ).strip()
+      summary = str(
+          body.get("summary")
+          or body.get("detail")
+          or body.get("message")
+          or body.get("error")
+          or ""
+      ).strip()
+      pr_url = str(body.get("pr_url") or "").strip()
+      raw_delivery_id = str(
+          body.get("delivery_id") or body.get("event_id") or body.get("id") or ""
+      ).strip()
+
+      norm = (outcome or event_kind).lower()
+      if norm in (
+          "finished",
+          "done",
+          "completed",
+          "met",
+          "succeeded",
+          "success",
+          "task_finished",
+          "session_finished",
+          "intake.finished",
+          "intake.completed",
+          "session.finished",
+      ):
+          status_text = "finished"
+      elif norm in (
+          "unfinished",
+          "failed",
+          "error",
+          "blocked",
+          "stopped",
+          "task_blocked",
+          "task_failed",
+          "task_unfinished",
+          "intake.failed",
+          "intake.blocked",
+          "session.failed",
+      ):
+          status_text = f"not finished ({outcome or event_kind})"
+      elif norm in (
+          "started",
+          "running",
+          "task_started",
+          "session_started",
+          "intake.started",
+          "native_session_started",
+      ):
+          status_text = "started"
+      else:
+          status_text = outcome or event_kind or "updated"
+
+      label = title or intake_id or session_id or "Hub task"
+      parts = [f"Hub task {status_text}: {label}"]
+      if intake_id and intake_id != label:
+          parts.append(f"intake={intake_id}")
+      if session_id:
+          parts.append(f"session={session_id}")
+      if pr_url:
+          parts.append(f"pr={pr_url}")
+      if summary:
+          parts.append(" ".join(summary.split())[:500])
+      message_text = " | ".join(parts)
+
+      identity = raw_delivery_id or json.dumps(
+          {
+              "event": event_kind,
+              "outcome": outcome,
+              "intake_id": intake_id,
+              "session_id": session_id,
+              "summary": summary[:200],
+          },
+          sort_keys=True,
+          separators=(",", ":"),
+          ensure_ascii=False,
+      )
+      delivery_key = "dapier-hub-task-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+      recipient = str(((steps.get("get-hub-recipient") or {}).get("output") or {}).get("value") or "").strip()
+
+      output = {
+          "event": event_kind,
+          "outcome": outcome,
+          "status_text": status_text,
+          "intake_id": intake_id,
+          "session_id": session_id,
+          "title": title,
+          "summary": summary,
+          "pr_url": pr_url,
+          "message": message_text,
+          "text": message_text,
+          "delivery_key": delivery_key,
+          "hub_message_payload": {
+              "recipient": recipient,
+              "body": message_text,
+              "key": delivery_key,
+          },
+      }
+  - id: grok-fallback-armed
+    type: condition
+    when:
+      steps.get-hub-usage-url.output.value:
+        prefix: "http"
+      steps.get-hub-messages-url.output.value:
+        prefix: "http"
+      steps.get-hub-api-token.output.value:
+        exists: true
+      steps.get-hub-recipient.output.value:
+        exists: true
+      steps.get-hub-refresh-url.output.value:
+        prefix: "http"
+      steps.get-hub-refresh-token.output.value:
+        exists: true
+    then:
+      - id: check-grokbot-usage
+        type: http_request
+        method: GET
+        url: "{steps.get-hub-usage-url.output.value}"
+        auth_type: bearer
+        auth_token: "{steps.get-hub-api-token.output.value}"
+        on_fail: continue
+    else: []
+  - id: decide-grok-route
+    type: code
+    code: |
+      def _out(step_id):
+          return ((steps.get(step_id) or {}).get("output") or {})
+
+      usage_url = str(_out("get-hub-usage-url").get("value") or "").strip()
+      messages_url = str(_out("get-hub-messages-url").get("value") or "").strip()
+      recipient = str(_out("get-hub-recipient").get("value") or "").strip()
+      check = steps.get("grok-fallback-armed.then.check-grokbot-usage") or {}
+
+      divert = False
+      if not (usage_url and messages_url and recipient):
+          reason = "hub_fallback_not_configured"
+      elif check.get("status") != "completed":
+          reason = "grokbot_usage_unavailable"
+      else:
+          data = check.get("output") or {}
+          data = data.get("body") if isinstance(data.get("body"), dict) else {}
+          fresh = data.get("fresh") is True
+          if data.get("below_threshold") is True and fresh:
+              divert = True
+              reason = "grokbot_below_threshold"
+          elif not fresh:
+              reason = "grokbot_usage_not_fresh"
+          else:
+              reason = "grokbot_above_threshold"
+      expired = check.get("status") == "skipped" and "HTTP 401" in str(check.get("error") or "")
+      output = {
+          "route": "hub_session" if divert else "webhook",
+          "reason": reason,
+          "recipient": recipient if divert else "",
+          "refresh_needed": expired,
+      }
+  - id: hub-token-rotate
+    type: condition
+    when:
+      steps.decide-grok-route.output.result.refresh_needed:
+        equals: true
+    then:
+      - id: refresh-hub-token
+        type: http_request
+        method: POST
+        url: "{steps.get-hub-refresh-url.output.value}"
+        content_type: application/json
+        body: '{"grant_type": "refresh_token", "refresh_token": "{steps.get-hub-refresh-token.output.value}"}'
+        on_fail: continue
+      - id: store-hub-tokens
+        type: condition
+        when:
+          steps.hub-token-rotate.then.refresh-hub-token.output.body.access_token:
+            exists: true
+        then:
+          - id: store-hub-api-token
+            type: storage_set
+            key: hub_api_token
+            value: "{steps.hub-token-rotate.then.refresh-hub-token.output.body.access_token}"
+          - id: store-hub-refresh-token
+            type: storage_set
+            key: hub_refresh_token
+            value: "{steps.hub-token-rotate.then.refresh-hub-token.output.body.refresh_token}"
+        else: []
+    else: []
+  - id: route
+    type: condition
+    when:
+      steps.decide-grok-route.output.result.route:
+        equals: hub_session
+    then:
+      - id: notify-hub-session
+        type: http_request
+        method: POST
+        url: "{steps.get-hub-messages-url.output.value}"
+        auth_type: bearer
+        auth_token: "{steps.get-hub-api-token.output.value}"
+        content_type: application/json
+        body: "{steps.format-task-event.output.result.hub_message_payload}"
+    else:
+      - id: post-webhook
+        type: http_request
+        method: POST
+        url: "{steps.get-url.output.value}"
+        auth_type: bearer
+        auth_token: "{steps.get-token.output.value}"
+        content_type: application/json
+        body: "{steps.format-task-event.output.result}"
