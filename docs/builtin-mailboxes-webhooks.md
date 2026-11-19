@@ -206,7 +206,7 @@ Hub-side contract (agent-hub intake 408b585e, deployed on the same Hub):
 
 Workflow behavior (all three mailboxes, `route` condition):
 
-- `grok-fallback-armed` runs the usage check only when all four hub storage
+- `grok-fallback-armed` runs the usage check only when all six hub storage
   keys below are provisioned; otherwise no Hub call is made.
 - `decide-grok-route` diverts only when the check completed with
   `below_threshold: true` **and** `fresh: true`. Fail-safe by design: a Hub
@@ -217,6 +217,16 @@ Workflow behavior (all three mailboxes, `route` condition):
   webhook leg runs exactly as before. `dev-mailbox` additionally always runs
   its direct oncall ingest regardless of the route.
 
+Token rotation: Hub bearers are human device credentials whose access tokens
+expire hourly. Each mailbox stores `hub_refresh_token` alongside
+`hub_api_token`; when the usage check answers HTTP 401, the same run trades
+the refresh token for a fresh pair (`POST /api/token/refresh`, grant_type
+`refresh_token`) and overwrites both keys with `storage_set`. The expired
+run itself still delivers via the webhook (fail-safe); the next email uses
+the fresh bearer, so the fallback self-heals within one email of an expiry.
+Hub grants refresh-token replay grace, which covers the three mailboxes
+rotating copies of the same family concurrently.
+
 Storage keys per mailbox workflow (all optional; the fallback arms only when
 all are set — provision them to enable the fallback):
 
@@ -224,8 +234,19 @@ all are set — provision them to enable the fallback):
 dapier storage set <wf> hub_usage_url "https://hub.dtcdev.click/api/quota/grokbot"
 dapier storage set <wf> hub_messages_url "https://hub.dtcdev.click/api/messages"
 dapier storage set <wf> hub_api_token "<Hub-bearer-token>"
+dapier storage set <wf> hub_refresh_token "<Hub-refresh-token>"
+dapier storage set <wf> hub_refresh_url "https://hub.dtcdev.click/api/token/refresh"
 dapier storage set <wf> hub_recipient "agent:orin"   # agent:tofu / agent:dev
 ```
+
+The bearer is the human device login (`client_kind: human`,
+`~/.config/agent-hub/cli.json` after `hub auth login --label dapier`): Hub
+refuses `kind=service` actors on everything except `/api/model-policy`, and
+the human grant carries the `operator:admin` scope both routes need. Access
+tokens rotate hourly; the workflow rotates them itself from the stored
+refresh token (see above), so manual re-provisioning is only needed when
+Hub reports `invalid_grant` (family revoked — log in again and re-store
+both tokens).
 
 The delivery idempotency key (`dapier-<role>-<sha256 of message_id>`) is
 stable across queue redeliveries of the same email, so a replay dedupes at

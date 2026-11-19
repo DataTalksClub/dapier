@@ -33,6 +33,13 @@ actions:
   - id: get-hub-recipient
     type: storage_get
     key: hub_recipient
+  - id: get-hub-refresh-url
+    type: storage_get
+    key: hub_refresh_url
+  - id: get-hub-refresh-token
+    type: storage_get
+    key: hub_refresh_token
+    secret: true
   - id: format-email
     type: code
     code: |
@@ -152,6 +159,10 @@ actions:
         exists: true
       steps.get-hub-recipient.output.value:
         exists: true
+      steps.get-hub-refresh-url.output.value:
+        prefix: "http"
+      steps.get-hub-refresh-token.output.value:
+        exists: true
     then:
       - id: check-grokbot-usage
         type: http_request
@@ -197,11 +208,47 @@ actions:
               reason = "grokbot_usage_not_fresh"
           else:
               reason = "grokbot_above_threshold"
+      # An HTTP 401 from the usage check means the stored Hub bearer
+      # expired (they rotate hourly). Report it so the rotate branch can
+      # trade the stored refresh token for a fresh pair; this run still
+      # delivers via the webhook (fail-safe) and the next email uses the
+      # fresh token.
+      expired = check.get("status") == "skipped" and "HTTP 401" in str(check.get("error") or "")
       output = {
           "route": "hub_session" if divert else "webhook",
           "reason": reason,
           "recipient": recipient if divert else "",
+          "refresh_needed": expired,
       }
+  - id: hub-token-rotate
+    type: condition
+    when:
+      steps.decide-grok-route.output.result.refresh_needed:
+        exists: true
+    then:
+      - id: refresh-hub-token
+        type: http_request
+        method: POST
+        url: "{steps.get-hub-refresh-url.output.value}"
+        content_type: application/json
+        body: '{"grant_type": "refresh_token", "refresh_token": "{steps.get-hub-refresh-token.output.value}"}'
+        on_fail: continue
+      - id: store-hub-tokens
+        type: condition
+        when:
+          steps.hub-token-rotate.then.refresh-hub-token.output.body.access_token:
+            exists: true
+        then:
+          - id: store-hub-api-token
+            type: storage_set
+            key: hub_api_token
+            value: "{steps.hub-token-rotate.then.refresh-hub-token.output.body.access_token}"
+          - id: store-hub-refresh-token
+            type: storage_set
+            key: hub_refresh_token
+            value: "{steps.hub-token-rotate.then.refresh-hub-token.output.body.refresh_token}"
+        else: []
+    else: []
   - id: route
     type: condition
     when:
