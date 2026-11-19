@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+The Gmail connection default gains `gmail.modify` (the console Gmail chip,
+the services catalog's `default_scopes`, and the core `GMAIL_SCOPES`
+declaration): new Gmail connections consent to mark handled mail read and
+apply labels. Grants are still the connection's own scopes — existing
+connections gain modify with `dapier connections edit <id> --scopes …`
+plus a re-consent (`dapier connections connect <id>`).
+
 The `gmail_send` workflow action refuses to send agent-to-agent or `[handoff]` mail from an Alexey mailbox (resolved from the Gmail profile), pointing senders at Hub notes, SendToAgent or the dev@dtcdev.click -> orin@dtcdev.click dev relay (intake a7a0e545).
 
 New operator CLI nouns `dapier gmail` and `dapier gdrive` over the new

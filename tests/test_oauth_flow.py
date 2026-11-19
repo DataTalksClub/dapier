@@ -367,14 +367,15 @@ def test_cookieless_callback_without_subject_is_rejected(monkeypatch):
 # --- Google connection scopes are honored, never widened -------------------------
 #
 # Re-consent and initial consent request and verify against the connection's own
-# normalized scopes, never adding extra Gmail scopes such as gmail.modify from
+# normalized scopes, never adding extra Gmail scopes such as gmail.settings from
 # GMAIL_SCOPES (see oauth_providers.connection_grant_scopes).
 
 GMAIL_READ_ONLY = "https://www.googleapis.com/auth/gmail.readonly"
 GMAIL_SEND = "https://www.googleapis.com/auth/gmail.send"
 GMAIL_MODIFY = "https://www.googleapis.com/auth/gmail.modify"
+GMAIL_SETTINGS = "https://www.googleapis.com/auth/gmail.settings"
 WEBMASTERS = "https://www.googleapis.com/auth/webmasters"
-DECLARED = sorted([GMAIL_READ_ONLY, GMAIL_SEND])
+DECLARED = sorted([GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY])
 
 
 def seed_google_connection(connections, scopes=None):
@@ -404,7 +405,7 @@ def test_gmail_consent_does_not_add_env_extras_or_unrequested_scopes(monkeypatch
     connections = configure(
         monkeypatch, token_payload=gmail_token_payload(GMAIL_READ_ONLY))[0]
     seed_google_connection(connections)
-    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
 
     response = oauth_flow.oauth_start(start_event(), "google")
 
@@ -428,7 +429,7 @@ def test_non_gmail_consent_requests_exactly_the_stored_scopes(monkeypatch):
     connections = configure(
         monkeypatch, token_payload=gmail_token_payload(YOUTUBE_SCOPE))[0]
     seed_connection(connections)
-    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
 
     response = oauth_flow.oauth_start(start_event(), "youtube-personal")
 
@@ -443,7 +444,7 @@ def test_google_reconsent_without_gmail_modify_accepts_grant_covering_requested_
     seed_google_connection(connections, scopes=requested)
     connections.items["google"]["status"] = "connected"
     connections.items["google"]["granted_scopes"] = sorted(requested + [GMAIL_MODIFY])
-    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
 
     response = oauth_flow.oauth_start(start_event(), "google")
 
@@ -466,7 +467,7 @@ def test_gmail_callback_stores_superset_grant(monkeypatch):
         token_payload=gmail_token_payload(
             " ".join(sorted([GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY]))))
     seed_google_connection(connections)
-    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
     response = oauth_flow.oauth_start(start_event(), "google")
 
     result = oauth_flow.oauth_callback(callback_event(response))
@@ -484,13 +485,18 @@ def test_gmail_callback_stores_superset_grant(monkeypatch):
 
 def test_effective_gmail_scopes_without_env_is_the_declaration(monkeypatch):
     monkeypatch.delenv("GMAIL_SCOPES", raising=False)
-    assert oauth_providers.effective_gmail_scopes() == (GMAIL_READ_ONLY, GMAIL_SEND)
+    assert oauth_providers.effective_gmail_scopes() == (
+        GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY)
+
+
+def test_gmail_declaration_includes_modify_for_mark_and_label():
+    assert GMAIL_MODIFY in oauth_providers.GMAIL_SCOPES
 
 
 def test_effective_gmail_scopes_env_extends_the_declaration(monkeypatch):
-    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_MODIFY)
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
     assert oauth_providers.effective_gmail_scopes() == (
-        GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY)
+        GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY, GMAIL_SETTINGS)
 
 
 def test_effective_gmail_scopes_parses_commas_whitespace_and_short_names(monkeypatch):
@@ -499,8 +505,7 @@ def test_effective_gmail_scopes_parses_commas_whitespace_and_short_names(monkeyp
         "gmail.modify, https://www.googleapis.com/auth/gmail.settings\n"
         "\tgmail.labels gmail.delegates,gmail.filters")
     assert oauth_providers.effective_gmail_scopes() == (
-        GMAIL_READ_ONLY, GMAIL_SEND,
-        "https://www.googleapis.com/auth/gmail.modify",
+        GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY,
         "https://www.googleapis.com/auth/gmail.settings",
         "https://www.googleapis.com/auth/gmail.labels",
         "https://www.googleapis.com/auth/gmail.delegates",
@@ -509,9 +514,10 @@ def test_effective_gmail_scopes_parses_commas_whitespace_and_short_names(monkeyp
 
 def test_effective_gmail_scopes_dedupes_and_keeps_the_declaration_first(monkeypatch):
     monkeypatch.setenv("GMAIL_SCOPES",
-                       "gmail.send, " + GMAIL_SEND + ", gmail.modify, gmail.modify")
+                       "gmail.send, " + GMAIL_SEND + ", gmail.modify, gmail.modify, "
+                       + GMAIL_SETTINGS)
     assert oauth_providers.effective_gmail_scopes() == (
-        GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY)
+        GMAIL_READ_ONLY, GMAIL_SEND, GMAIL_MODIFY, GMAIL_SETTINGS)
 
 
 def test_grant_scopes_preserve_requested_gmail_scopes_without_widening(monkeypatch):
@@ -523,12 +529,12 @@ def test_grant_scopes_preserve_requested_gmail_scopes_without_widening(monkeypat
 
 
 def test_grant_scopes_ignore_env_extras_for_gmail_connections(monkeypatch):
-    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify, gmail.settings")
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
     assert oauth_providers.connection_grant_scopes("google", [GMAIL_SEND]) == [GMAIL_SEND]
 
 
 def test_grant_scopes_leave_non_gmail_connections_alone(monkeypatch):
-    monkeypatch.setenv("GMAIL_SCOPES", "gmail.modify")
+    monkeypatch.setenv("GMAIL_SCOPES", GMAIL_SETTINGS)
     calendar_scope = "https://www.googleapis.com/auth/calendar.readonly"
     youtube_scope = "https://www.googleapis.com/auth/youtube.readonly"
     assert oauth_providers.connection_grant_scopes("google", [calendar_scope]) == \

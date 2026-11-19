@@ -158,6 +158,12 @@ def test_console_catalog_matches_python():
             assert scope in JS
 
 
+def test_gmail_defaults_include_modify_for_mark_and_label():
+    gmail = next(spec for spec in CATALOG if spec["id"] == "gmail")
+    assert "https://www.googleapis.com/auth/gmail.modify" in gmail["default_scopes"]
+    assert "https://www.googleapis.com/auth/gmail.modify" in JS
+
+
 def test_console_groups_rows_by_service():
     assert "connection-register" in HTML
     assert "Connect another service" in HTML
