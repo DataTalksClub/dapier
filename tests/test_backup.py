@@ -224,7 +224,11 @@ def test_backup_inspection_grants_match_inspection_script():
 
     deploy_workflow = _load_yaml(".github/workflows/deploy.yml")
     step = deploy_workflow["jobs"]["deploy"]["steps"][_inspection_step_index(deploy_workflow)]
-    assert "scripts/inspect_backup.py" in step["run"]
+    # The exact command, one line: when the step moved from an inline heredoc
+    # to this script, a leftover "PY" terminator line survived the edit and
+    # the script died on the stray argument — silently, behind
+    # continue-on-error (2026-11-19). Pin the whole run string.
+    assert step["run"].strip() == "uv run --with boto3 python scripts/inspect_backup.py"
     dispatch = _load_yaml(".github/workflows/backup-inspection.yml")
     dispatch_runs = [s.get("run", "") for s in dispatch["jobs"]["inspect"]["steps"]]
     assert any("scripts/inspect_backup.py" in run for run in dispatch_runs)

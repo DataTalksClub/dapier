@@ -208,6 +208,5 @@ jobs:
         # the next 03:00Z run).
         continue-on-error: true
         run: uv run --with boto3 python scripts/inspect_backup.py
-          PY
       - name: Inspect YouTube renewal infrastructure (read-only)
         run: bash scripts/inspect-youtube-renewal.sh
