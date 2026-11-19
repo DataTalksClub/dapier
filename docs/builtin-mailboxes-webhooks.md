@@ -313,6 +313,17 @@ Tokens: `dapier webhooks show`; never put them in git or shared reports.
 Run history masks storage values whose key contains `token`, `secret`,
 `password`, `authorization`, or `api_key` (case-insensitive). For other
 `storage_get` keys, set `secret: true` on the step to hide its recorded value.
+
+## Hub task closed-loop webhook (`hub-task-closed-loop`)
+
+`workflows/hub-task-closed-loop.yaml` listens on webhook hook
+`hub-task-status` (`https://dapier.dtcdev.click/hooks/webhook/hub-task-status`)
+for Hub task lifecycle events (started, finished/completed, failed/blocked) and
+forwards a formatted status message to Dev — using Dev's sticky Hub session
+(`agent:dev` via `POST /api/messages`) when GrokBot remaining usage is `< 1%`
+on fresh evidence, or Dev's bot webhook (`webhook_url`) otherwise. It uses the
+same per-workflow storage keys (`webhook_url`, `webhook_token`, `hub_*`) as
+`dev-mailbox`.
 Later steps still receive the real value through `{steps.<id>.output.value}`.
 Recorded HTTP credentials (including `auth_token` and authorization headers)
 are masked before storage and truncation. Console, CLI, export, and content
