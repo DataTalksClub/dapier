@@ -23,6 +23,11 @@ Resources:
           - Effect: Allow
             Action:
               - lambda:GetFunctionConfiguration
+              # --invoke on scripts/inspect_backup.py runs one real backup
+              # through the dispatchable inspection workflow, so a fix is
+              # verified without waiting for the next 03:00Z run. Scoped
+              # to the backup function only.
+              - lambda:InvokeFunction
             Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*
           - Effect: Allow
             Action:

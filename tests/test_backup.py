@@ -55,6 +55,17 @@ def test_backup_has_explicit_memory_headroom():
     assert template["Resources"]["BackupFunction"]["Properties"]["MemorySize"] >= 512
 
 
+def test_backup_has_timeout_and_tmp_headroom_for_slow_scans():
+    """The 2026-11-17/18 alarm fired because full scans of the 3.7 GB inbox
+    — throttled by its fresh GSI backfill — outgrew the 300 s timeout and
+    the invocation was killed before manifest and failure email. The
+    function must carry explicit headroom against both."""
+    template = _load_yaml("template.yaml")
+    fn = template["Resources"]["BackupFunction"]["Properties"]
+    assert fn["Timeout"] >= 900
+    assert fn["EphemeralStorage"]["Size"] >= 4096
+
+
 def test_backup_alarm_notifies_on_recovery():
     """A fired backup alarm only emails on the way up; without OKActions the
     operator never learns that a scheduled backup went green again."""
@@ -63,6 +74,101 @@ def test_backup_alarm_notifies_on_recovery():
     topic = [{"Ref": "AlarmTopic"}]
     assert alarm["AlarmActions"] == topic
     assert alarm["OKActions"] == topic
+
+
+class MultipartS3:
+    """Reassembles multipart uploads byte-for-byte, like S3 does."""
+
+    def __init__(self):
+        self.objects = {}
+        self.uploads = []
+        self.aborted = []
+        self.put_keys = []
+
+    def _by_id(self, upload_id):
+        return next(u for u in self.uploads if u["id"] == upload_id)
+
+    def put_object(self, Bucket, Key, Body, **kwargs):
+        self.put_keys.append(Key)
+        self.objects[Key] = Body.read() if hasattr(Body, "read") else Body
+
+    def create_multipart_upload(self, Bucket, Key, **kwargs):
+        upload = {"id": f"upload-{len(self.uploads)}", "key": Key, "parts": {}}
+        self.uploads.append(upload)
+        return {"UploadId": upload["id"]}
+
+    def upload_part(self, Bucket, Key, UploadId, PartNumber, Body, **kwargs):
+        body = Body.read() if hasattr(Body, "read") else Body
+        self._by_id(UploadId)["parts"][PartNumber] = body
+        return {"ETag": f"etag-{PartNumber}"}
+
+    def complete_multipart_upload(self, Bucket, Key, UploadId, MultipartUpload):
+        upload = self._by_id(UploadId)
+        self.objects[Key] = b"".join(
+            upload["parts"][part["PartNumber"]] for part in MultipartUpload["Parts"])
+
+    def abort_multipart_upload(self, Bucket, Key, UploadId, **kwargs):
+        self.aborted.append(UploadId)
+
+
+def _blob(n):
+    """Random text: gzip can't crush it, so sizes stay near n/1.33."""
+    import base64
+    import os
+
+    return base64.b64encode(os.urandom(n)).decode("ascii")
+
+
+def test_backup_streams_big_tables_as_multipart_parts(monkeypatch):
+    """A multi-GB snapshot must not have to fit in Lambda's /tmp: once the
+    gzip stream outgrows one part size, finished chunks upload as S3
+    multipart parts and the object reassembles byte-for-byte."""
+    monkeypatch.setattr(backup, "MULTIPART_PART_SIZE", 64 * 1024)
+    items = [{"id": {"S": f"item-{i}"}, "blob": {"S": _blob(4096)}}
+             for i in range(64)]  # distinct random blobs: ~350 KB compressed
+    s3 = MultipartS3()
+    stats = backup.backup_table(FakeDynamo({"big": items}), s3, "big", "bucket", "day")
+
+    assert len(s3.uploads) == 1
+    parts = s3.uploads[0]["parts"]
+    assert len(parts) >= 2
+    # All but the final part ride the part-size minimum.
+    assert all(len(body) == backup.MULTIPART_PART_SIZE
+               for number, body in parts.items() if number < len(parts))
+    assert s3.objects[stats["key"]] == b"".join(
+        parts[number] for number in sorted(parts))
+    assert stats["bytes"] == len(s3.objects[stats["key"]])
+    snapshot = gzip.decompress(s3.objects[stats["key"]])
+    assert [json.loads(line) for line in snapshot.decode().splitlines()] == items
+    assert s3.aborted == []
+
+
+def test_backup_small_tables_skip_multipart(monkeypatch):
+    monkeypatch.setattr(backup, "MULTIPART_PART_SIZE", 64 * 1024)
+    s3 = MultipartS3()
+    stats = backup.backup_table(
+        FakeDynamo({"tiny": [{"id": {"S": "one"}}]}), s3, "tiny", "bucket", "day")
+    assert s3.uploads == []
+    assert stats["key"] in s3.put_keys
+
+
+def test_backup_aborts_the_upload_when_a_scan_dies_mid_table(monkeypatch):
+    monkeypatch.setattr(backup, "MULTIPART_PART_SIZE", 64 * 1024)
+
+    class DiesOnSecondPage:
+        def get_paginator(self, operation):
+            return self
+
+        def paginate(self, **kwargs):
+            yield {"Items": [{"id": {"S": f"i-{i}"}, "blob": {"S": _blob(4096)}}
+                             for i in range(32)]}  # > one part size
+            raise RuntimeError("scan died")
+
+    s3 = MultipartS3()
+    with pytest.raises(RuntimeError, match="scan died"):
+        backup.backup_table(DiesOnSecondPage(), s3, "big", "bucket", "day")
+    assert len(s3.aborted) == 1  # no orphaned upload accruing storage cost
+    assert s3.objects == {}
 
 
 def _load_yaml(path):
@@ -87,6 +193,7 @@ def _load_yaml(path):
 INSPECTION_GRANTS = {
     ("cloudformation", "describe_stack_resource"): "cloudformation:DescribeStackResource",
     ("lambda", "get_function_configuration"): "lambda:GetFunctionConfiguration",
+    ("lambda", "invoke"): "lambda:InvokeFunction",
     ("cloudwatch", "describe_alarms"): "cloudwatch:DescribeAlarms",
     ("cloudwatch", "get_metric_statistics"): "cloudwatch:GetMetricStatistics",
     ("logs", "filter_log_events"): "logs:FilterLogEvents",
@@ -97,28 +204,35 @@ INSPECTION_GRANTS = {
 }
 
 
-def _inspection_step(deploy_workflow):
+def _inspection_step_index(deploy_workflow):
     steps = deploy_workflow["jobs"]["deploy"]["steps"]
     named = {step.get("name"): i for i, step in enumerate(steps) if step.get("name")}
     i = named["Inspect DynamoDB backup health (read-only)"]
     j = named["Deploy backup inspection access policy stack"]
     assert j < i, "the access policy stack must deploy before the inspection step"
-    return steps[i]["run"]
+    return i
 
 
-def test_backup_inspection_grants_match_deploy_step():
-    """The deploy-time backup health step can only verify while its IAM
-    grants cover every boto3 call it makes — until 2026-11-12 they did not,
-    so a failing backup's only evidence line was BACKUP_UNVERIFIED. This
-    fails when the step script and infra/backup-inspection-access.yaml
-    drift apart."""
+def test_backup_inspection_grants_match_inspection_script():
+    """The backup health checks can only verify while their IAM grants cover
+    every boto3 call scripts/inspect_backup.py makes — until 2026-11-12 they
+    did not, so a failing backup's only evidence line was BACKUP_UNVERIFIED.
+    This fails when the script and infra/backup-inspection-access.yaml drift
+    apart. The deploy workflow and the dispatchable backup-inspection
+    workflow both run the same script, so one check covers both."""
     import re
 
-    workflow = _load_yaml(".github/workflows/deploy.yml")
-    script = _inspection_step(workflow)
+    deploy_workflow = _load_yaml(".github/workflows/deploy.yml")
+    step = deploy_workflow["jobs"]["deploy"]["steps"][_inspection_step_index(deploy_workflow)]
+    assert "scripts/inspect_backup.py" in step["run"]
+    dispatch = _load_yaml(".github/workflows/backup-inspection.yml")
+    dispatch_runs = [s.get("run", "") for s in dispatch["jobs"]["inspect"]["steps"]]
+    assert any("scripts/inspect_backup.py" in run for run in dispatch_runs)
+    assert any("--invoke" in run for run in dispatch_runs)
 
+    script = Path("scripts/inspect_backup.py").read_text()
     clients = dict(re.findall(
-        r"^(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
+        r"^\s*(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
     calls = set(re.findall(r"boto3\.client\('([^']+)'\)\.(\w+)\(", script))
     for var, service in clients.items():
         calls.update((service, method) for method in re.findall(rf"\b{var}\.(\w+)\(", script))
@@ -141,7 +255,7 @@ def test_backup_inspection_grants_match_deploy_step():
     unneeded = granted - used
     assert not unneeded, f"grants the inspection step never uses: {sorted(unneeded)}"
     # Snapshot reads stay scoped to the backup bucket's backups/ prefix; the
-    # function-config and log grants name the backup function only.
+    # function-config, invoke and log grants name the backup function only.
     def arns(actions):
         found = []
         for statement in policy["PolicyDocument"]["Statement"]:
@@ -153,8 +267,10 @@ def test_backup_inspection_grants_match_deploy_step():
 
     assert arns(["s3:GetObject"]) == [
         "arn:${AWS::Partition}:s3:::dapier-backups-${AWS::AccountId}/backups/*"]
-    assert arns(["lambda:GetFunctionConfiguration"]) == [
-        "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*"]
+    function_arn = ("arn:${AWS::Partition}:lambda:${AWS::Region}:"
+                    "${AWS::AccountId}:function:dapier-BackupFunction-*")
+    assert arns(["lambda:GetFunctionConfiguration"]) == [function_arn]
+    assert arns(["lambda:InvokeFunction"]) == [function_arn]
     # The physical function/log-group names carry a random CloudFormation
     # suffix (dapier-BackupFunction-XXXXXXXX), so every name pattern must
     # wildcard inside the name. A pattern ending "...BackupFunction:*" only

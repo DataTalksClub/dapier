@@ -13,8 +13,12 @@ lifecycle rule expires every object after 30 days, giving a rolling month of
 daily snapshots.
 
 Snapshots stream one scan page at a time into a temporary gzip file; peak
-Python memory does not grow with table size. The compressed snapshot must
-fit in Lambda's /tmp storage (512 MB by default).
+Python memory does not grow with table size. Finished gzip chunks stream
+straight out as S3 multipart parts (put_object while the snapshot is
+small), so a snapshot never has to fit in Lambda's /tmp, and a scan of a
+multi-GB table only has to fit the function timeout — raised alongside
+the transient slowness seen while a table's GSI backfill throttles
+concurrent scans (2026-11-17/18: three 300 s timeout kills per day).
 
 A failed run also emails the operator through the AWS mail
 service SES with the function's IAM role: report failures, stay silent on
@@ -49,6 +53,90 @@ def _s3():
     return boto3.client("s3")
 
 
+# S3 multipart parts have a 5 MiB minimum (final part exempt); buffering a
+# part at a time keeps peak memory at roughly one part plus one scan page.
+MULTIPART_PART_SIZE = 8 * 1024 * 1024
+
+
+class _Snapshot:
+    """Lands a gzip stream in S3 as backups/<day>/<name>.json.gz.
+
+    gzip output accumulates in a temporary file; once MULTIPART_PART_SIZE
+    bytes have piled up they upload as the next multipart part, so the
+    snapshot never has to fit in /tmp or memory. Small snapshots (the
+    common case: every table except the inbox) skip multipart entirely and
+    go out through the same single put_object as before.
+    """
+
+    def __init__(self, s3, bucket, key):
+        self.s3, self.bucket, self.key = s3, bucket, key
+        self.body = TemporaryFile()
+        self._upload_id = None
+        self._parts = []
+        self._sent = 0  # bytes already uploaded as parts
+
+    def flush(self):
+        """Upload full part-size chunks; re-arm the write position at the end."""
+        pending = self.body.tell() - self._sent
+        while pending >= MULTIPART_PART_SIZE:
+            if self._upload_id is None:
+                self._upload_id = self.s3.create_multipart_upload(
+                    Bucket=self.bucket, Key=self.key,
+                    ContentType="application/x-ndjson",
+                    ContentEncoding="gzip")["UploadId"]
+            self.body.seek(self._sent)
+            number = len(self._parts) + 1
+            self._parts.append({
+                "PartNumber": number,
+                "ETag": self.s3.upload_part(
+                    Bucket=self.bucket, Key=self.key, UploadId=self._upload_id,
+                    PartNumber=number, Body=self.body.read(MULTIPART_PART_SIZE),
+                )["ETag"],
+            })
+            self._sent += MULTIPART_PART_SIZE
+            pending -= MULTIPART_PART_SIZE
+        # gzip keeps appending at the file position; put it back at the end.
+        self.body.seek(0, 2)
+
+    def finish(self):
+        """Close out the snapshot; returns its byte size."""
+        try:
+            if self._upload_id is None:
+                self.body.seek(0)
+                self.s3.put_object(
+                    Bucket=self.bucket, Key=self.key, Body=self.body,
+                    ContentType="application/x-ndjson", ContentEncoding="gzip",
+                )
+            else:
+                self.body.seek(self._sent)
+                self._parts.append({
+                    "PartNumber": len(self._parts) + 1,
+                    "ETag": self.s3.upload_part(
+                        Bucket=self.bucket, Key=self.key, UploadId=self._upload_id,
+                        PartNumber=len(self._parts) + 1, Body=self.body.read(),
+                    )["ETag"],
+                })
+                self.s3.complete_multipart_upload(
+                    Bucket=self.bucket, Key=self.key, UploadId=self._upload_id,
+                    MultipartUpload={"Parts": self._parts})
+        except BaseException:
+            self.abort()
+            raise
+        return self.body.tell()
+
+    def abort(self):
+        if self._upload_id is not None:
+            self.s3.abort_multipart_upload(
+                Bucket=self.bucket, Key=self.key, UploadId=self._upload_id)
+            self._upload_id = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.body.close()
+
+
 class _Encoder(json.JSONEncoder):
     """DynamoDB item values that are not native JSON: numbers, sets, binary."""
 
@@ -65,23 +153,29 @@ class _Encoder(json.JSONEncoder):
 def backup_table(dynamodb, s3, name, bucket, day):
     """Scan one table into backups/<day>/<name>.json.gz and return its stats."""
     key = f"backups/{day}/{name}.json.gz"
-    # Keep only a scan page and one encoded item in memory. Building a list,
-    # joined JSON string and UTF-8 copy of the whole table exhausted 256 MB.
-    # Disk-backed gzip also avoids retaining the compressed table in RAM.
+    # Keep only a scan page, one encoded item and one part buffer in memory.
+    # Building a list, joined JSON string and UTF-8 copy of the whole table
+    # exhausted 256 MB. Disk-backed gzip avoids retaining the compressed
+    # table in RAM; _Snapshot streams it out so it also never fills /tmp.
     count = 0
-    with TemporaryFile() as body:
-        with gzip.GzipFile(fileobj=body, mode="wb") as compressed:
-            for page in dynamodb.get_paginator("scan").paginate(TableName=name):
-                for item in page.get("Items", []):
-                    line = json.dumps(item, cls=_Encoder, separators=(",", ":")) + "\n"
-                    compressed.write(line.encode("utf-8"))
-                    count += 1
-        size = body.tell()
-        body.seek(0)
-        s3.put_object(
-            Bucket=bucket, Key=key, Body=body,
-            ContentType="application/x-ndjson", ContentEncoding="gzip",
-        )
+    with _Snapshot(s3, bucket, key) as snapshot:
+        try:
+            with gzip.GzipFile(fileobj=snapshot.body, mode="wb") as compressed:
+                for page in dynamodb.get_paginator("scan").paginate(TableName=name):
+                    for item in page.get("Items", []):
+                        line = json.dumps(item, cls=_Encoder,
+                                          separators=(",", ":")) + "\n"
+                        compressed.write(line.encode("utf-8"))
+                        count += 1
+                    # zlib holds compressed output in its own buffers until
+                    # it fills; sync-flush per page so the temp file shows
+                    # the bytes and _Snapshot can judge a part boundary.
+                    compressed.flush()
+                    snapshot.flush()
+            size = snapshot.finish()
+        except BaseException:  # leave no orphaned multipart upload behind
+            snapshot.abort()
+            raise
     return {"key": key, "items": count, "bytes": size}
 
 
