@@ -153,6 +153,36 @@ def test_mark_completed_records_output_and_duration(monkeypatch):
     assert kwargs["UpdateExpression"].startswith("SET ")
 
 
+def test_mark_completed_preserves_large_structured_output_for_recovery(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    large_output = {
+        "ok": True,
+        "data": {
+            "newsletter": "Weekly",
+            "sponsors": [{"name": f"Sponsor {i}", "blurb": "b" * 400} for i in range(20)],
+        },
+    }
+
+    worker._mark_completed("newsletter-sponsors", "extract-sponsors", EVENT, output=large_output)
+
+    stored = calls[0][1]["ExpressionAttributeValues"][":output"]
+    assert stored == large_output
+    assert "truncated" not in stored
+
+
+def test_mark_completed_previews_output_past_step_output_limit(monkeypatch):
+    calls = []
+    _patch_table(monkeypatch, calls)
+    huge = {"ok": True, "data": {"blob": "x" * (worker.STEP_OUTPUT_LIMIT + 1)}}
+
+    worker._mark_completed("newsletter-sponsors", "extract-sponsors", EVENT, output=huge)
+
+    stored = calls[0][1]["ExpressionAttributeValues"][":output"]
+    assert stored["truncated"] is True
+    assert len(stored["preview"]) == worker.STEP_OUTPUT_LIMIT
+
+
 def test_release_action_records_error_and_reopens_lease(monkeypatch):
     calls = []
     _patch_table(monkeypatch, calls)

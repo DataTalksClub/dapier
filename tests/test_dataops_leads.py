@@ -184,6 +184,13 @@ class EnvelopeTests(unittest.TestCase):
             dataops_action._leads_intake_body(
                 leads_action(), email_event(), steps=steps)
 
+    def test_truncated_extraction_output_fails_loudly_with_truncation_reason(self):
+        steps = {"extract-sponsors": {"status": "completed", "output": {
+            "truncated": True, "preview": '{"ok": true, "data": ...'}}}
+        with self.assertRaisesRegex(ValueError, "extract-sponsors.*truncated"):
+            dataops_action._leads_intake_body(
+                leads_action(), email_event(), steps=steps)
+
     def test_custom_extraction_step_is_honored(self):
         steps = extraction_steps(sponsors=[{"name": "Custom"}], step="my-extract")
         envelope = dataops_action._leads_intake_body(

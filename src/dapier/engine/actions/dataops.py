@@ -788,6 +788,10 @@ def _extraction_data(action, steps):
             raise ValueError(
                 f"extraction step '{name}' did not produce structured data "
                 f"({output.get('error') or 'ok: false'})")
+        if isinstance(output, dict) and output.get("truncated") is True:
+            raise ValueError(
+                f"extraction step '{name}' output was truncated before recovery "
+                "and no longer carries structured sponsors")
         data = output.get("data") if isinstance(output, dict) else None
         if isinstance(data, dict) and isinstance(data.get("sponsors"), list):
             if output.get("ok") is False:
