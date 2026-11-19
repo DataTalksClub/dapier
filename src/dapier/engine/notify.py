@@ -1,12 +1,14 @@
 """Failure notifications: one email per failed run, on by default.
 
-A workflow's top-level ``notify:`` list of email addresses (managed definition or
-a published designer workflow) picks its recipients. With no ``notify:``
-key the operator inbox is notified instead — error visibility is the
-default — and an explicit ``notify: []`` opts out. Failures with no
+Every failure notice goes to the workflow's top-level ``notify:`` list
+(managed definition or published designer workflow) *plus* the operator
+inboxes — ``notify.operator_recipients()``: ``DAPIER_NOTIFY_EMAIL``
+(template.yaml ``NotifyEmail``) and ``DAPIER_NOTIFY_EXTRA_EMAILS``
+(template.yaml ``NotifyExtraEmails``, the human operator's inbox). An
+explicit ``notify: []`` opts a workflow out entirely. Failures with no
 workflow behind them (a poll trigger that could not fetch) notify the
-operator too: the worker hands ``notify_failure`` a minimal envelope
-naming the trigger.
+operator inboxes too: the worker hands ``notify_failure`` a minimal
+envelope naming the trigger.
 
 The engine tags action exceptions with the failing workflow's id, and the
 worker calls ``notify_failure`` from its error path. Delivery is
@@ -54,12 +56,13 @@ def operator_sender():
 
 
 def operator_recipient():
-    """The inbox that reads failure mail.
+    """The primary inbox that reads failure mail.
 
     Prefers ``DAPIER_NOTIFY_EMAIL`` (template.yaml ``NotifyEmail``), then
     ``BACKUP_ALERT_EMAIL`` (the same operator inbox backup failures use),
     then the verified sender. Sending To the From address is silent: the
     trigger domain's no-reply identity is not a mailbox anyone reads.
+    See :func:`operator_recipients` for the full list operator mail goes to.
     """
     for name in ("DAPIER_NOTIFY_EMAIL", "BACKUP_ALERT_EMAIL"):
         address = str(os.environ.get(name) or "").strip()
@@ -71,16 +74,37 @@ def operator_recipient():
     return parseaddr(sender)[1] or sender
 
 
+def operator_recipients():
+    """Every inbox operator mail is delivered to, primary first.
+
+    The primary address from :func:`operator_recipient` plus the extra
+    operator inboxes in ``DAPIER_NOTIFY_EXTRA_EMAILS`` (template.yaml
+    ``NotifyExtraEmails``, comma-separated). Deduplicated, order stable.
+    A human operator must stay on this list: routing failure mail only
+    to a bot mailbox left the 2026-11 crosspost outage invisible to the
+    person who needed to know.
+    """
+    addresses = [operator_recipient()]
+    for token in str(os.environ.get("DAPIER_NOTIFY_EXTRA_EMAILS") or "").replace(";", ",").split(","):
+        address = token.strip()
+        if address and address not in addresses:
+            addresses.append(address)
+    return addresses
+
+
 def _console_runs_url():
     base = str(os.environ.get("HOOKS_BASE_URL") or "").rstrip("/")
     return f"{base}/runs" if base else ""
 
 
 def notify_addresses(workflow_id):
-    """The workflow's notify email addresses.
+    """The email addresses a failure notice for this workflow goes to.
 
-    An explicit ``notify: []`` opts out; a workflow with no ``notify:`` key
-    (or a malformed value) defaults to the operator address.
+    The workflow's ``notify`` list is always included. An explicit
+    ``notify: []`` opts out entirely. When the workflow has no ``notify:``
+    key (or a malformed value) the operator inboxes are the recipients;
+    with an explicit list they join it, so failure mail keeps reaching
+    the operator inboxes regardless of what a workflow adds.
     """
     from .matching import all_workflows
 
@@ -88,11 +112,17 @@ def notify_addresses(workflow_id):
     if not workflow:
         return []
     notify = workflow.get("notify")
+    if notify is None or not isinstance(notify, (str, list)):
+        return operator_recipients()
     if isinstance(notify, str):
         notify = [notify]
-    if not isinstance(notify, list):
-        notify = [operator_recipient()]
-    return [str(address).strip() for address in notify if str(address).strip()]
+    addresses = [str(address).strip() for address in notify if str(address).strip()]
+    if not addresses:
+        return []  # an explicit ``notify: []`` opts out entirely
+    for address in operator_recipients():
+        if address not in addresses:
+            addresses.append(address)
+    return addresses
 
 
 def _ingress_subject(event):
@@ -190,13 +220,13 @@ def _notice_body(kind_line, subject, run_id, event, error, extra=None):
 def notify_failure(exc, event, *, ses=None):
     """Email a failed run to its notify list, once per run.
 
-    Recipients: the failing workflow's ``notify`` list, defaulting to the
-    operator inbox when the workflow has no ``notify:`` (an explicit
-    ``notify: []`` opts out); a failure with no workflow behind it — the
-    worker passes a minimal poll envelope — goes to the operator. Returns
-    a small dict describing the send, or None when the event is not a
-    dict, no recipient list resolves, or this attempt lost the
-    once-per-run claim (a redelivery of the same failure).
+    Recipients: the failing workflow's ``notify`` list plus the operator
+    inboxes (an explicit ``notify: []`` opts the workflow out); a failure
+    with no workflow behind it — the worker passes a minimal poll
+    envelope — goes to the operator inboxes. Returns a small dict
+    describing the send, or None when the event is not a dict, no
+    recipient list resolves, or this attempt lost the once-per-run claim
+    (a redelivery of the same failure).
     """
     if not isinstance(event, dict):
         return None
@@ -208,7 +238,7 @@ def notify_failure(exc, event, *, ses=None):
         subject = _ingress_subject(event)
         if not subject:
             return None
-        addresses = [operator_recipient()]
+        addresses = operator_recipients()
     if not addresses:
         return None
     run_id = f"{subject}:{event.get('id', '')}"

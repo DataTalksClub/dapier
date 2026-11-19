@@ -31,15 +31,22 @@ post older than ``CHANNEL_GRACE_SECONDS`` (and younger than
 ``CHANNEL_MAX_AGE_SECONDS``, so one old gap does not page forever) has a
 higher message id than anything Dapier received from that channel.
 
+Missed posts do not just page: while a trigger's webhook is fully healthy
+(no delivery problems and nothing pending, so Telegram is not holding the
+post for later delivery) the schedule relays every missed text post back
+through the trigger's own intake under a stable ``relay-<chat>-<message>``
+update id — the same wrap the Send test request performs — so the crosspost
+workflows run within one check cycle. Media-only posts have no text to
+relay and stay alert-only (relay them manually, see below).
 ``handler()`` is the TelegramHealthFunction schedule (template.yaml, every
 5 minutes). It publishes ``Dapier/Triggers TelegramWebhookUnhealthy`` (a
-CloudWatch alarm pages dev@ through the AlarmTopic and sends OK on
-recovery; a missing datapoint — the check itself dead — also alarms) and
-emails a detailed report to the operator inbox at most once an hour while
-anything is failing. ``repair()`` re-registers the webhook (the same
-setWebhook a trigger save performs) — the fix for ``url_mismatch`` and for
-a secret the bot no longer echoes; the operator runs it explicitly through
-``dapier webhooks telegram-health --repair``.
+CloudWatch alarm pages the operator inboxes through AlarmNotifyFunction
+and sends OK on recovery; a missing datapoint — the check itself dead —
+also alarms) and emails a detailed report to the operator inboxes at most
+once an hour while anything is failing. ``repair()`` re-registers the
+webhook (the same setWebhook a trigger save performs) — the fix for
+``url_mismatch`` and for a secret the bot no longer echoes; the operator
+runs it explicitly through ``dapier webhooks telegram-health --repair``.
 """
 
 import logging
@@ -199,7 +206,12 @@ def _telegram_events(table_ref=None):
 
 
 def public_posts(page_html):
-    """``[(message_id, epoch)]`` of the posts on one t.me/s preview page."""
+    """``[(message_id, epoch, text)]`` of the posts on one t.me/s preview page.
+
+    The text is the rendered body with inline markup stripped and links
+    replaced by their href — the plain text the relay posts back through
+    the trigger. A post with no text div (media only) relays as ``""``.
+    """
     import re
 
     posts = []
@@ -212,7 +224,17 @@ def public_posts(page_html):
             epoch = datetime.fromisoformat(when.group(1)).timestamp()
         except ValueError:
             continue
-        posts.append((int(post.group(1)), epoch))
+        body = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', block, re.S)
+        text = ""
+        if body:
+            inner = body.group(1)
+            inner = re.sub(r'<br\s*/?>', '\n', inner)
+            inner = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>.*?</a>', lambda m: m.group(1), inner, flags=re.S)
+            inner = re.sub(r'<[^>]+>', '', inner)
+            import html as _html
+
+            text = re.sub(r'\n{3,}', '\n\n', _html.unescape(inner)).strip()
+        posts.append((int(post.group(1)), epoch, text))
     return posts
 
 
@@ -250,22 +272,105 @@ def channel_check(*, events=None, fetch=None, now=None, table_ref=None):
             row["status"] = "unknown"
             rows.append(row)
             continue
-        row["public_max_message_id"] = max((post for post, _ in posts), default=None)
-        missed = [post for post, when in posts
+        row["public_max_message_id"] = max((post for post, _, _ in posts), default=None)
+        missed = [(post, when, text) for post, when, text in posts
                   if post > seen["max_message_id"]
                   and CHANNEL_GRACE_SECONDS <= now.timestamp() - when <= CHANNEL_MAX_AGE_SECONDS]
         if missed:
-            row["missed"] = missed
+            row["missed"] = [post for post, _, _ in missed]
+            row["missed_posts"] = [{"message_id": post, "date": int(when), "text": text}
+                                   for post, when, text in missed]
             row["problems"].append({
                 "code": "missed_posts",
-                "detail": (f"t.me/{username}/{', '.join(str(post) for post in missed)} never reached "
-                           f"Dapier (newest received: {seen['max_message_id']}). A post sent through "
-                           f"the trigger's own bot is never delivered back to it: relay it with "
-                           f"`dapier webhooks test {hook} --data <message.json>`"),
+                "detail": (f"t.me/{username}/{', '.join(str(post) for post in row['missed'])} never reached "
+                           f"Dapier (newest received: {seen['max_message_id']}). Posts the trigger's bot "
+                           f"sent itself are never delivered back to it; the schedule relays text posts "
+                           f"automatically while the webhook is healthy (`dapier webhooks test {hook} "
+                           f"--data <message.json>` relays one by hand)"),
             })
         row["status"] = "failing" if row["problems"] else "ok"
         rows.append(row)
     return rows
+
+
+def auto_relay(channel_rows, webhook_rows, *, transport=None, connections_table=None):
+    """Relay missed public channel posts through their trigger's intake.
+
+    Only for hooks whose webhook is fully healthy — no delivery problems
+    and nothing pending — because that is exactly the signature of a post
+    the trigger's bot sent itself: Telegram will never deliver it, so the
+    relay cannot duplicate a delivery that is still in flight. When the
+    webhook is failing, Telegram holds the posts and will deliver them
+    itself once the hook answers 200 again; relaying here would double-post.
+
+    Each post is POSTed to the hook URL with its secret as the wrap the
+    Send test request performs: ``{"update_id": "relay-<chat>-<message>",
+    "channel_post": {...}}`` — the hook's own dedupe (update_id) keeps
+    repeated checks from running the crosspost twice. Returns
+    ``{hook_id: {"relayed": [ids], "errors": [(id, reason)]}}`` for the
+    hooks something happened on. A post with no text (media only) cannot
+    be relayed from the preview and is left to the operator.
+    """
+    import json as _json
+
+    if transport is None:
+        from src.dapier.engine.actions import base
+
+        transport = base._default_transport
+    deliverable = {row["hook_id"] for row in webhook_rows
+                   if row["status"] == "ok" and not row.get("pending_update_count")}
+    pending = []
+    for row in channel_rows:
+        hook = row.get("hook_id")
+        posts = [post for post in (row.get("missed_posts") or [])
+                 if str(post.get("text") or "").strip()]
+        if hook in deliverable and posts:
+            pending.append((row, posts))
+    result = {}
+    if not pending:
+        return result
+    items = {item.get("hook_id"): item for item in telegram_items()}
+    for row, posts in pending:
+        hook = row["hook_id"]
+        item = items.get(hook)
+        if not item or not item.get("url"):
+            continue
+        try:
+            token = _token(item, connections_table)
+        except Exception as exc:  # noqa: BLE001 — reported per hook, never fatal
+            result[hook] = {"relayed": [], "errors": [(post["message_id"], str(exc)[:120])
+                                                      for post in posts]}
+            continue
+        chat_id = row.get("chat_id")
+        relayed, errors = [], [
+            (post["message_id"], "no text in the public preview (media post)")
+            for post in (row.get("missed_posts") or [])
+            if not str(post.get("text") or "").strip()]
+        for post in posts:
+            update = {
+                "update_id": f"relay-{chat_id}-{post['message_id']}",
+                "channel_post": {
+                    "message_id": post["message_id"],
+                    "date": post["date"],
+                    "chat": {"id": chat_id, "type": "channel", "username": row.get("channel")},
+                    "text": post["text"],
+                },
+            }
+            url = item.get("url")
+            try:
+                status, raw = transport(
+                    "POST", url,
+                    headers={"content-type": "application/json",
+                             "x-telegram-bot-api-secret-token": token},
+                    body=_json.dumps(update).encode(), timeout=15)
+                if status >= 300:
+                    raise RuntimeError(f"hook answered HTTP {status}")
+                relayed.append(post["message_id"])
+            except Exception as exc:  # noqa: BLE001 — reported per post, never fatal
+                errors.append((post["message_id"], f"{type(exc).__name__}: {exc}"[:120]))
+        if relayed or errors:
+            result[hook] = {"relayed": relayed, "errors": errors}
+    return result
 
 
 def repair(name=None, *, table_ref=None, connections_table=None, transport=None):
@@ -297,6 +402,10 @@ def summary(rows):
             lines.append(f"channel @{row['channel']} via {row['hook_id']}: {row['status'].upper()}")
             for problem in row["problems"]:
                 lines.append(f"  PROBLEM {problem['code']}: {problem['detail']}")
+            if row.get("relayed"):
+                lines.append(f"  relayed back through the trigger: {', '.join(str(p) for p in row['relayed'])}")
+            for miss in row.get("relay_errors") or []:
+                lines.append(f"  RELAY FAILED {miss['message_id']}: {miss['error']}")
             continue
         lines.append(f"{row['hook_id']} (connection {row['connection_id']}): {row['status'].upper()}")
         lines.append(f"  expected url: {row['expected_url']}")
@@ -322,7 +431,7 @@ def _put_metric(failing, cloudwatch=None):
 def _alert(rows, *, now=None, ses=None):
     """Email the failing rows to the operator, at most once per hour."""
     from . import seen
-    from ..engine.notify import operator_recipient, operator_sender, ses_client
+    from ..engine.notify import operator_recipients, operator_sender, ses_client
 
     now = now or _now()
     bucket = now.strftime("%Y-%m-%dT%H")
@@ -336,18 +445,21 @@ def _alert(rows, *, now=None, ses=None):
     body = (
         "CRITICAL: Telegram posts are not reaching Dapier.\n\n"
         "Telegram messages for the triggers below are NOT reaching Dapier, so the "
-        "workflows they start (e.g. telegram-crosspost to Slack) are silently not running.\n\n"
+        "workflows they start (e.g. telegram-crosspost to Slack) are silently not running.\n"
+        "Text posts missed on a healthy webhook are relayed automatically by this "
+        "check; media-only posts and failing webhooks still need the steps below.\n\n"
         f"{summary(failing)}\n\n"
         "Fix:\n"
         "  dapier webhooks telegram-health            # Telegram's current view\n"
         "  dapier webhooks telegram-health --repair   # re-register the webhook (keeps the backlog)\n"
+        "  dapier webhooks test <hook> --data <message.json>  # relay one post by hand\n"
         "If last delivery error is an HTTP 5xx from Dapier, Dapier is rejecting an update: "
         "check the API Lambda logs for /hooks/telegram/<name>.\n"
         "Repeats hourly while failing; the CloudWatch alarm TelegramWebhookUnhealthy sends OK on recovery.\n"
     )
     (ses or ses_client()).send_email(
         Source=operator_sender(),
-        Destination={"ToAddresses": [operator_recipient()]},
+        Destination={"ToAddresses": operator_recipients()},
         Message={
             "Subject": {"Data": f"CRITICAL: Telegram webhook failing ({names})", "Charset": "utf-8"},
             "Body": {"Text": {"Data": body, "Charset": "utf-8"}},
@@ -357,16 +469,28 @@ def _alert(rows, *, now=None, ses=None):
 
 
 def handler(event=None, context=None):
-    """Scheduled check: metric every run, operator email while failing.
+    """Scheduled check: metric every run, relay + operator email while failing.
 
     A probe failure counts as failing — a check that cannot see Telegram
-    must not report healthy."""
+    must not report healthy. Missed channel posts on a healthy webhook are
+    relayed back through the trigger (see auto_relay) before the report."""
     rows = check()
     try:
         channels = channel_check()
     except Exception:  # noqa: BLE001 — the webhook half still reports
         logger.exception("telegram channel check failed")
         channels = []
+    try:
+        relayed = auto_relay(channels, rows)
+    except Exception:  # noqa: BLE001 — the report still goes out
+        logger.exception("telegram missed-post relay failed")
+        relayed = {}
+    for row in channels:
+        outcome = relayed.get(row.get("hook_id"))
+        if outcome and row.get("missed"):
+            row["relayed"] = outcome.get("relayed", [])
+            row["relay_errors"] = [{"message_id": mid, "error": err}
+                                   for mid, err in outcome.get("errors", [])]
     failing = sum(1 for row in rows if row["status"] != "ok")
     failing += sum(1 for row in channels if row["status"] == "failing")
     rows = rows + channels
@@ -375,4 +499,5 @@ def handler(event=None, context=None):
     if failing:
         logger.error("telegram webhook unhealthy:\n%s", summary(rows))
         alerted = _alert(rows)
-    return {"checked": len(rows), "failing": failing, "alerted": alerted, "triggers": rows}
+    return {"checked": len(rows), "failing": failing, "alerted": alerted,
+            "relayed": relayed, "triggers": rows}

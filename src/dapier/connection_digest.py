@@ -172,19 +172,19 @@ def send(window_hours=None, *, ses=None, now=None):
     ids) or ``{"skipped": True, ...}`` when nothing expires in the window —
     no SES call, no noise email.
     """
-    from .engine.notify import operator_recipient, operator_sender, ses_client
+    from .engine.notify import operator_recipients, operator_sender, ses_client
 
     hours = window_hours if window_hours is not None else _window_hours()
     rows = expiring(hours, now=now)
     if not rows:
         return {"skipped": True, "window_hours": hours, "expiring": 0}
     subject, body = render(rows, hours)
-    recipient = operator_recipient()
+    recipients = operator_recipients()
     if ses is None:
         ses = ses_client()
     response = ses.send_email(
         Source=operator_sender(),
-        Destination={"ToAddresses": [recipient]},
+        Destination={"ToAddresses": recipients},
         Message={
             "Subject": {"Data": subject, "Charset": "utf-8"},
             "Body": {"Text": {"Data": body, "Charset": "utf-8"}},
@@ -192,7 +192,7 @@ def send(window_hours=None, *, ses=None, now=None):
     )
     return {
         "sent": True,
-        "to": recipient,
+        "to": recipients,
         "subject": subject,
         "body": body,
         "message_id": response.get("MessageId"),

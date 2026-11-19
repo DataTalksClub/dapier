@@ -6,7 +6,7 @@ function. Every other failure path in dapier emails the operator through
 ``engine.notify``; alarms were the last silent failure surface — they
 fired into the void because they had no actions at all.
 
-The recipient is the same operator inbox ``notify.operator_recipient``
+The recipients are the same operator inboxes ``notify.operator_recipients``
 resolves, sent From the verified ``EmailSender`` identity, so a fired
 alarm lands wherever run failures already land. The SNS message is a JSON
 CloudWatch notification; anything unparseable is quoted verbatim so the
@@ -17,20 +17,20 @@ import json
 
 
 def handler(event, context=None):
-    from .engine.notify import operator_recipient, operator_sender, ses_client
+    from .engine.notify import operator_recipients, operator_sender, ses_client
 
     sender = operator_sender()
-    recipient = operator_recipient()
-    body, subject = _summarize(event, recipient)
+    recipients = operator_recipients()
+    body, subject = _summarize(event, recipients[0])
     ses_client().send_email(
         Source=sender,
-        Destination={"ToAddresses": [recipient]},
+        Destination={"ToAddresses": recipients},
         Message={
             "Subject": {"Data": subject, "Charset": "utf-8"},
             "Body": {"Text": {"Data": body, "Charset": "utf-8"}},
         },
     )
-    return {"notified": recipient}
+    return {"notified": recipients}
 
 
 def _summarize(event, sender):

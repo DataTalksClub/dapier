@@ -116,6 +116,102 @@ class FakeSes:
         self.sent.append(kwargs)
 
 
+def _channel_row(missed_posts, hook="automator-telegram", chat_id=-1001435532197):
+    return {"hook_id": hook, "channel": "mlzoomcamp", "chat_id": chat_id,
+            "received_max_message_id": 268, "public_max_message_id": 270,
+            "missed": [post["message_id"] for post in missed_posts],
+            "missed_posts": missed_posts, "status": "failing",
+            "problems": [{"code": "missed_posts", "detail": "x"}]}
+
+
+def test_auto_relay_relays_text_posts_on_a_healthy_webhook(monkeypatch):
+    _patch_items(monkeypatch, [ITEM])
+    posts = [{"message_id": 269, "date": 1794000000, "text": "Hello classmates"},
+             {"message_id": 270, "date": 1794000100, "text": ""}]  # media post
+    posts[1]["text"] = "  "
+    sent = []
+
+    def transport(method, url, *, headers=None, body=None, timeout=15):
+        sent.append((method, url, headers, body))
+        return 200, b'{"accepted": true, "event_id": "e1"}'
+
+    result = telegram_health.auto_relay([_channel_row(posts)],
+                                        [{"hook_id": "automator-telegram", "status": "ok",
+                                          "pending_update_count": 0}],
+                                        transport=transport)
+    [hook] = result
+    assert result[hook]["relayed"] == [269]
+    assert result[hook]["errors"] == [(270, "no text in the public preview (media post)")]
+    [call] = sent
+    method, url, headers, body = call
+    assert (method, url) == ("POST", URL)
+    assert headers["x-telegram-bot-api-secret-token"] == "1:tok"
+    update = json.loads(body)
+    assert update["update_id"] == "relay--1001435532197-269"
+    assert update["channel_post"]["message_id"] == 269
+    assert update["channel_post"]["chat"] == {"id": -1001435532197, "type": "channel",
+                                              "username": "mlzoomcamp"}
+    assert update["channel_post"]["text"] == "Hello classmates"
+
+
+def test_auto_relay_skips_failing_or_pending_webhooks(monkeypatch):
+    posts = [{"message_id": 269, "date": 1794000000, "text": "Hello"}]
+    sent = []
+
+    def transport(method, url, *, headers=None, body=None, timeout=15):
+        sent.append(url)
+        return 200, b"{}"
+
+    failing = [{"hook_id": "automator-telegram", "status": "failing",
+                "pending_update_count": 0}]
+    pending = [{"hook_id": "automator-telegram", "status": "ok",
+                "pending_update_count": 3}]
+    assert telegram_health.auto_relay([_channel_row(posts)], failing,
+                                      transport=transport) == {}
+    assert telegram_health.auto_relay([_channel_row(posts)], pending,
+                                      transport=transport) == {}
+    assert sent == []  # Telegram holds those posts and will deliver them itself
+
+
+def test_auto_relay_reports_a_failed_post_without_raising(monkeypatch):
+    _patch_items(monkeypatch, [ITEM])
+    posts = [{"message_id": 269, "date": 1794000000, "text": "Hello"}]
+
+    def transport(method, url, *, headers=None, body=None, timeout=15):
+        return 502, b"bad gateway"
+
+    result = telegram_health.auto_relay([_channel_row(posts)],
+                                        [{"hook_id": "automator-telegram", "status": "ok",
+                                          "pending_update_count": 0}],
+                                        transport=transport)
+    assert result["automator-telegram"]["relayed"] == []
+    assert "HTTP 502" in result["automator-telegram"]["errors"][0][1]
+
+
+def test_handler_relays_missed_posts(monkeypatch):
+    healthy = telegram_health._report(ITEM, dict(HEALTHY), [])
+    posts = [{"message_id": 269, "date": 1794000000, "text": "Hello"}]
+    monkeypatch.setattr(telegram_health, "check", lambda: [healthy])
+    monkeypatch.setattr(telegram_health, "channel_check",
+                        lambda: [_channel_row(posts)])
+    _patch_items(monkeypatch, [ITEM])
+    relayed_calls = []
+    monkeypatch.setattr(telegram_health, "auto_relay",
+                        lambda channels, rows: relayed_calls.append((channels, rows)) or
+                        {"automator-telegram": {"relayed": [269], "errors": []}})
+    monkeypatch.setattr("src.dapier.triggers.seen.claim", lambda *a, **k: True)
+    monkeypatch.setattr("src.dapier.engine.notify.ses_client", lambda: FakeSes())
+    monkeypatch.setenv("DAPIER_NOTIFY_EMAIL", "dev@example.test")
+    cloudwatch = FakeCloudWatch()
+    real_put_metric = telegram_health._put_metric
+    monkeypatch.setattr(telegram_health, "_put_metric",
+                        lambda count: real_put_metric(count, cloudwatch))
+    result = telegram_health.handler()
+    assert result["relayed"] == {"automator-telegram": {"relayed": [269], "errors": []}}
+    [row] = [r for r in result["triggers"] if "channel" in r]
+    assert row["relayed"] == [269]
+
+
 def test_handler_publishes_metric_and_alerts_hourly(monkeypatch):
     failing = telegram_health._report(ITEM, {"url": ""}, [{"code": "url_mismatch", "detail": "gone"}])
     monkeypatch.setattr(telegram_health, "check", lambda: [failing])
@@ -221,15 +317,30 @@ def _post_event(hook, username, chat_id, message_id):
 
 
 def _preview(*posts):
-    blocks = "".join(
-        f'<div class="tgme_widget_message_wrap"><div data-post="mlzoomcamp/{post}">'
-        f'<time datetime="{when}" class="time">x</time></div></div>' for post, when in posts)
+    """``(message_id, datetime[, text])`` tuples -> one t.me/s preview page."""
+    blocks = ""
+    for post in posts:
+        post_id, when = post[0], post[1]
+        text = post[2] if len(post) > 2 else None
+        body = (f'<div class="tgme_widget_message_text js-message_text" dir="auto">'
+                f'{text}</div>' if text is not None else "")
+        blocks += (
+            f'<div class="tgme_widget_message_wrap"><div data-post="mlzoomcamp/{post_id}">'
+            f'<time datetime="{when}" class="time">x</time>{body}</div></div>')
     return f"<html>{blocks}</html>"
 
 
 def test_public_posts_parses_the_preview():
-    page = _preview((268, "2026-11-15T08:05:08+00:00"), (269, "2026-11-18T10:51:24+00:00"))
-    assert [post for post, _ in telegram_health.public_posts(page)] == [268, 269]
+    page = _preview((268, "2026-11-15T08:05:08+00:00"),
+                    (269, "2026-11-18T10:51:24+00:00",
+                     'Deadline is near.<br/><br/>Submit at '
+                     '<a href="https://courses.example.test/eval" target="_blank">the form</a>'),
+                    (270, "2026-11-18T12:27:40+00:00", ""))
+    posts = telegram_health.public_posts(page)
+    assert [post[0] for post in posts] == [268, 269, 270]
+    assert posts[0][2] == ""
+    assert posts[1][2] == "Deadline is near.\n\nSubmit at https://courses.example.test/eval"
+    assert posts[2][2] == ""
 
 
 def test_channel_check_flags_posts_that_never_arrived(monkeypatch):

@@ -3,8 +3,8 @@
 ErrorDigestFunction (template.yaml) invokes handler() on a daily EventBridge
 schedule. It renders the same summary the console and CLI read — api/errors.py
 ``api_summary``, one domain function, no second grouping — into a short
-plain-text email and sends it to the same operator address
-``engine.notify.operator_recipient`` resolves, sent From the verified
+plain-text email and sends it to the operator inboxes
+``engine.notify.operator_recipients`` resolves, sent From the verified
 ``EmailSender`` identity through the SES send region. A window with zero
 failed runs sends nothing: the digest exists to surface new failures, not
 to confirm quiet days.
@@ -67,7 +67,7 @@ def send(days=None, *, ses=None):
     call, no noise email.
     """
     from .api.errors import api_summary
-    from .engine.notify import operator_recipient, operator_sender, ses_client
+    from .engine.notify import operator_recipients, operator_sender, ses_client
 
     _, summary = api_summary(days if days is not None else _window_days())
     total = int(summary.get("total_failed_runs") or 0)
@@ -78,12 +78,12 @@ def send(days=None, *, ses=None):
             "total_failed_runs": 0,
         }
     subject, body = render(summary)
-    recipient = operator_recipient()
+    recipients = operator_recipients()
     if ses is None:
         ses = ses_client()
     response = ses.send_email(
         Source=operator_sender(),
-        Destination={"ToAddresses": [recipient]},
+        Destination={"ToAddresses": recipients},
         Message={
             "Subject": {"Data": subject, "Charset": "utf-8"},
             "Body": {"Text": {"Data": body, "Charset": "utf-8"}},
@@ -91,7 +91,7 @@ def send(days=None, *, ses=None):
     )
     return {
         "sent": True,
-        "to": recipient,
+        "to": recipients,
         "subject": subject,
         "body": body,
         "message_id": response.get("MessageId"),
