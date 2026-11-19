@@ -90,6 +90,8 @@ def test_bot_mailbox_definition(workflow_id, route, address):
         "webhook_token", "webhook_url",
         # GrokBot <1% quota fallback (Hub export + sticky-session notify).
         "hub_api_token", "hub_messages_url", "hub_recipient", "hub_usage_url",
+        # Hub bearer rotation (access tokens expire hourly).
+        "hub_refresh_token", "hub_refresh_url",
     ]
     if workflow_id == "dev-mailbox":
         expected_storage_keys += ["oncall_webhook_token", "oncall_webhook_url"]
@@ -142,7 +144,8 @@ def test_dev_mailbox_definition():
     assert "code" in action_types
     steps = list(_iter_steps(wf))
     assert [a["id"] for a in steps if a.get("type") == "http_request"] == [
-        "post-oncall-ingest", "check-grokbot-usage", "notify-hub-session", "post-webhook",
+        "post-oncall-ingest", "check-grokbot-usage", "refresh-hub-token",
+        "notify-hub-session", "post-webhook",
     ]
     assert all(a.get("on_error") == "continue"
                for a in steps if a.get("type") == "http_request"

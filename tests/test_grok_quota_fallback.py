@@ -2,7 +2,7 @@
 
 Contract (Hub intake 408b585e, Dapier intake f28baca0):
 - Each mailbox workflow (orin / tofu / dev) checks Hub's GrokBot usage export
-  (GET /api/quota/grokbot) only when the four hub_* storage keys are armed.
+  (GET /api/quota/grokbot) only when the hub_* storage keys are armed.
 - The route diverts to the role's sticky Hub session (POST /api/messages,
   recipient agent:<role>, body "Hey, check your emails.") only when the
   export says below_threshold on fresh evidence — the same rule Hub applies,
@@ -12,6 +12,11 @@ Contract (Hub intake 408b585e, Dapier intake f28baca0):
   divert mailbox mail into the void.
 - The messages key is dapier-<role>-<sha256(message id)> — stable across
   queue redeliveries of the same email, so Hub-side dedupe absorbs retries.
+- Hub bearers rotate hourly: when the usage check answers HTTP 401, the run
+  trades the stored refresh token for a fresh pair (POST /api/token/refresh,
+  Hub grants replay grace) via storage_set in the mailbox's own store, and
+  self-heals from the next email on. The current email still fails safe to
+  the webhook.
 - dev-mailbox's direct oncall ingest always runs, independent of the route.
 """
 import hashlib
@@ -50,7 +55,31 @@ HUB_KEYS_CONFIGURED = {
     "get-hub-messages-url": {"status": "completed", "output": {"value": "https://hub.dtcdev.click/api/messages"}},
     "get-hub-api-token": {"status": "completed", "output": {"value": "hub-token"}},
     "get-hub-recipient": {"status": "completed", "output": {"value": "agent:orin"}},
+    "get-hub-refresh-url": {"status": "completed", "output": {"value": "https://hub.dtcdev.click/api/token/refresh"}},
+    "get-hub-refresh-token": {"status": "completed", "output": {"value": "hub-refresh-token"}},
 }
+FULL_STORAGE = {
+    "webhook_url": "https://bot.example.invalid/hook",
+    "webhook_token": "bot-token",
+    "hub_usage_url": "https://hub.dtcdev.click/api/quota/grokbot",
+    "hub_messages_url": "https://hub.dtcdev.click/api/messages",
+    "hub_api_token": "hub-token",
+    "hub_recipient": "agent:orin",
+    "hub_refresh_url": "https://hub.dtcdev.click/api/token/refresh",
+    "hub_refresh_token": "hub-refresh-token",
+}
+ARMED_RULES = {
+    "steps.get-hub-usage-url.output.value": {"prefix": "http"},
+    "steps.get-hub-messages-url.output.value": {"prefix": "http"},
+    "steps.get-hub-api-token.output.value": {"exists": True},
+    "steps.get-hub-recipient.output.value": {"exists": True},
+    "steps.get-hub-refresh-url.output.value": {"prefix": "http"},
+    "steps.get-hub-refresh-token.output.value": {"exists": True},
+}
+ARMED_GETTERS = (
+    "get-hub-usage-url", "get-hub-messages-url", "get-hub-api-token",
+    "get-hub-recipient", "get-hub-refresh-url", "get-hub-refresh-token",
+)
 
 
 def _load(workflow_id):
@@ -76,12 +105,15 @@ def _decide(workflow_id, *, check=None, hub_keys=True):
     decide = _one(wf, "decide-grok-route")
     steps = {k: dict(v) for k, v in HUB_KEYS_CONFIGURED.items()}
     if not hub_keys:
-        for key in ("get-hub-usage-url", "get-hub-messages-url", "get-hub-api-token", "get-hub-recipient"):
+        for key in ARMED_GETTERS:
             steps[key] = {"status": "completed", "output": {"key": key, "value": "", "found": False}}
     if check is not None:
-        status, body = check
+        status, body, error = check
         output = {"body": body} if body is not None else {}
-        steps["grok-fallback-armed.then.check-grokbot-usage"] = {"status": status, "output": output}
+        entry = {"status": status, "output": output}
+        if error:
+            entry["error"] = error
+        steps["grok-fallback-armed.then.check-grokbot-usage"] = entry
     return run_code(decide, {"connector": "email", "data": {}}, steps=steps)["result"]
 
 
@@ -94,13 +126,7 @@ def test_fallback_definition(workflow_id, role, recipient):
 
     armed = next(a for a in wf["actions"] if a.get("id") == "grok-fallback-armed")
     assert armed["type"] == "condition"
-    rules = armed.get("when") or {}
-    assert rules == {
-        "steps.get-hub-usage-url.output.value": {"prefix": "http"},
-        "steps.get-hub-messages-url.output.value": {"prefix": "http"},
-        "steps.get-hub-api-token.output.value": {"exists": True},
-        "steps.get-hub-recipient.output.value": {"exists": True},
-    }
+    assert armed.get("when") == ARMED_RULES
     check = armed.get("then") or []
     assert [a.get("id") for a in check] == ["check-grokbot-usage"]
     assert check[0]["method"] == "GET"
@@ -126,12 +152,40 @@ def test_fallback_definition(workflow_id, role, recipient):
     assert [a.get("id") for a in webhook] == ["post-webhook"]
     assert webhook[0]["body"] == "{steps.format-email.output.result}"
 
+    rotate = next(a for a in wf["actions"] if a.get("id") == "hub-token-rotate")
+    assert rotate["type"] == "condition"
+    assert rotate["when"] == {"steps.decide-grok-route.output.result.refresh_needed": {"exists": True}}
+    rotate_then = rotate.get("then") or []
+    assert [a.get("id") for a in rotate_then] == ["refresh-hub-token", "store-hub-tokens"]
+    refresh = rotate_then[0]
+    assert refresh["method"] == "POST"
+    assert refresh["url"] == "{steps.get-hub-refresh-url.output.value}"
+    assert refresh["content_type"] == "application/json"
+    assert '"grant_type": "refresh_token"' in refresh["body"]
+    assert '"refresh_token": "{steps.get-hub-refresh-token.output.value}"' in refresh["body"]
+    assert refresh["on_fail"] == "continue"
+    store = rotate_then[1]
+    assert store["type"] == "condition"
+    assert store["when"] == {"steps.hub-token-rotate.then.refresh-hub-token.output.body.access_token": {"exists": True}}
+    store_then = store.get("then") or []
+    assert [(a.get("id"), a.get("type"), a.get("key")) for a in store_then] == [
+        ("store-hub-api-token", "storage_set", "hub_api_token"),
+        ("store-hub-refresh-token", "storage_set", "hub_refresh_token"),
+    ]
+    assert store_then[0]["value"] == "{steps.hub-token-rotate.then.refresh-hub-token.output.body.access_token}"
+    assert store_then[1]["value"] == "{steps.hub-token-rotate.then.refresh-hub-token.output.body.refresh_token}"
+
     decide = _one(wf, "decide-grok-route")
     assert decide["type"] == "code"
     assert "below_threshold" in decide["code"]
     assert "fresh" in decide["code"]
-    # No secrets in the YAML.
-    assert "hub-token" not in yaml.safe_dump(wf)
+    assert "refresh_needed" in decide["code"]
+    # No secrets in the YAML: every hub token reference is a storage
+    # template, never a literal credential value.
+    import re
+    dump = yaml.safe_dump(wf)
+    assert not re.search(r"(value|auth_token): [\"']?(?!\\{)[A-Za-z0-9_-]{8,}", dump)
+    assert "Bearer " not in dump
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
@@ -139,9 +193,10 @@ def test_fallback_armed_only_when_fully_configured(workflow_id, role, recipient)
     wf = _load(workflow_id)
     armed = next(a for a in wf["actions"] if a.get("id") == "grok-fallback-armed")
     rules = predicate_rules(armed)
+    assert rules == ARMED_RULES
     data = {"steps": HUB_KEYS_CONFIGURED}
     assert evaluate_rules(rules, data) is True
-    for missing in ("get-hub-usage-url", "get-hub-messages-url", "get-hub-api-token", "get-hub-recipient"):
+    for missing in ARMED_GETTERS:
         partial = {k: v for k, v in HUB_KEYS_CONFIGURED.items() if k != missing}
         assert evaluate_rules(rules, {"steps": partial}) is False
         empty = {**HUB_KEYS_CONFIGURED, missing: {"status": "completed", "output": {"value": "", "found": False}}}
@@ -153,45 +208,61 @@ def test_fallback_armed_only_when_fully_configured(workflow_id, role, recipient)
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
 def test_decide_diverts_on_fresh_below_threshold(workflow_id, role, recipient):
-    result = _decide(workflow_id, check=("completed", USAGE_BODY_BELOW))
-    assert result["route"] == "hub_session"
-    assert result["reason"] == "grokbot_below_threshold"
-    assert result["recipient"] == "agent:orin"
+    result = _decide(workflow_id, check=("completed", USAGE_BODY_BELOW, ""))
+    assert result == {"route": "hub_session", "reason": "grokbot_below_threshold",
+                      "recipient": "agent:orin", "refresh_needed": False}
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
 def test_decide_keeps_webhook_when_above_threshold(workflow_id, role, recipient):
-    result = _decide(workflow_id, check=("completed", USAGE_BODY_ABOVE))
-    assert result == {"route": "webhook", "reason": "grokbot_above_threshold", "recipient": ""}
+    result = _decide(workflow_id, check=("completed", USAGE_BODY_ABOVE, ""))
+    assert result == {"route": "webhook", "reason": "grokbot_above_threshold",
+                      "recipient": "", "refresh_needed": False}
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
 def test_decide_keeps_webhook_on_stale_evidence(workflow_id, role, recipient):
-    result = _decide(workflow_id, check=("completed", USAGE_BODY_STALE))
-    assert result == {"route": "webhook", "reason": "grokbot_usage_not_fresh", "recipient": ""}
+    result = _decide(workflow_id, check=("completed", USAGE_BODY_STALE, ""))
+    assert result == {"route": "webhook", "reason": "grokbot_usage_not_fresh",
+                      "recipient": "", "refresh_needed": False}
     # below_threshold with stale evidence is still refused (defense in depth:
     # Hub promises below_threshold only on fresh evidence; Dapier re-checks).
     stale_below = {**USAGE_BODY_STALE, "below_threshold": True}
-    result = _decide(workflow_id, check=("completed", stale_below))
+    result = _decide(workflow_id, check=("completed", stale_below, ""))
     assert result["route"] == "webhook"
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
 def test_decide_keeps_webhook_when_usage_check_skipped(workflow_id, role, recipient):
-    result = _decide(workflow_id, check=("skipped", None))
-    assert result == {"route": "webhook", "reason": "grokbot_usage_unavailable", "recipient": ""}
+    result = _decide(workflow_id, check=("skipped", None, "hub down"))
+    assert result == {"route": "webhook", "reason": "grokbot_usage_unavailable",
+                      "recipient": "", "refresh_needed": False}
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
 def test_decide_keeps_webhook_without_check_step(workflow_id, role, recipient):
     result = _decide(workflow_id)
-    assert result == {"route": "webhook", "reason": "grokbot_usage_unavailable", "recipient": ""}
+    assert result == {"route": "webhook", "reason": "grokbot_usage_unavailable",
+                      "recipient": "", "refresh_needed": False}
+
+
+@pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
+def test_decide_flags_expired_bearer_on_http_401(workflow_id, role, recipient):
+    result = _decide(workflow_id, check=("skipped", None, "http_request returned HTTP 401"))
+    assert result["refresh_needed"] is True
+    # The expired-bearer run still fails safe to the webhook.
+    assert result["route"] == "webhook"
+    assert result["reason"] == "grokbot_usage_unavailable"
+    # A 403 is not an expiry: no refresh.
+    result = _decide(workflow_id, check=("skipped", None, "http_request returned HTTP 403"))
+    assert result["refresh_needed"] is False
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
 def test_decide_keeps_webhook_when_fallback_not_configured(workflow_id, role, recipient):
-    result = _decide(workflow_id, check=("completed", USAGE_BODY_BELOW), hub_keys=False)
-    assert result == {"route": "webhook", "reason": "hub_fallback_not_configured", "recipient": ""}
+    result = _decide(workflow_id, check=("completed", USAGE_BODY_BELOW, ""), hub_keys=False)
+    assert result == {"route": "webhook", "reason": "hub_fallback_not_configured",
+                      "recipient": "", "refresh_needed": False}
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
@@ -202,10 +273,11 @@ def test_decide_keeps_webhook_without_recipient(workflow_id, role, recipient):
              "get-hub-recipient": {"status": "completed", "output": {"value": "", "found": False}},
              "grok-fallback-armed.then.check-grokbot-usage": {"status": "completed", "output": {"body": USAGE_BODY_BELOW}}}
     result = run_code(decide, {"connector": "email", "data": {}}, steps=steps)["result"]
-    assert result == {"route": "webhook", "reason": "hub_fallback_not_configured", "recipient": ""}
+    assert result["route"] == "webhook"
+    assert result["reason"] == "hub_fallback_not_configured"
 
 
-# --- delivery: usage GET and sticky-session POST -----------------------------
+# --- delivery: usage GET, sticky-session POST, token refresh -----------------
 
 
 @pytest.mark.parametrize("workflow_id,role,recipient", MAILBOXES)
@@ -273,22 +345,27 @@ def test_delivery_id_stable_across_retries():
 # --- full-chain behavior through the real engine -----------------------------
 
 
-def _run_chain(workflow_id, storage, usage_response):
+def _run_chain(workflow_id, storage, usage_transport):
     wf = _load(workflow_id)
     calls = []
+    store = dict(storage)
 
     def transport(method, url, headers=None, body=None, timeout=None):
         calls.append({"method": method, "url": url, "headers": headers, "body": body})
-        if url.endswith("/api/quota/grokbot"):
-            return 200, json.dumps(usage_response).encode("utf-8"), {"content-type": "application/json"}
-        return 200, b'{"accepted": true}', {"content-type": "application/json"}
+        return usage_transport(method, url, headers, body)
 
     def run_action(step, event, workflow_id, steps=None):
         kind = step.get("type")
         if kind == "storage_get":
             key = step.get("key")
-            found = key in storage
-            return {"key": key, "value": storage.get(key, ""), "found": found}
+            found = key in store
+            return {"key": key, "value": store.get(key, ""), "found": found}
+        if kind == "storage_set":
+            # Mirror run_storage_set's template rendering without DynamoDB.
+            from src.dapier.engine.actions.templating import render
+            key = step.get("key")
+            store[key] = render(step.get("value"), event, steps)
+            return {"key": key, "stored": True}
         if kind == "code":
             return run_code(step, event, steps=steps)
         if kind == "http_request":
@@ -310,23 +387,21 @@ def _run_chain(workflow_id, storage, usage_response):
     }
     step_outputs = {}
     stop = run_chain(workflow_id, wf["actions"], event, run_action, step_outputs=step_outputs)
-    return stop, step_outputs, calls
+    return stop, step_outputs, calls, store
 
 
-FULL_STORAGE = {
-    "webhook_url": "https://bot.example.invalid/hook",
-    "webhook_token": "bot-token",
-    "hub_usage_url": "https://hub.dtcdev.click/api/quota/grokbot",
-    "hub_messages_url": "https://hub.dtcdev.click/api/messages",
-    "hub_api_token": "hub-token",
-    "hub_recipient": "agent:orin",
-}
+def _usage_ok(body):
+    def transport(method, url, headers=None, body_=None):
+        if url.endswith("/api/quota/grokbot"):
+            return 200, json.dumps(body).encode("utf-8"), {"content-type": "application/json"}
+        return 200, b'{"accepted": true}', {"content-type": "application/json"}
+    return transport
 
 
 @pytest.mark.parametrize("workflow_id", ["orin-mailbox", "tofu-mailbox"])
 def test_chain_diverts_to_sticky_session_when_below_threshold(workflow_id):
     storage = {**FULL_STORAGE, "hub_recipient": f"agent:{workflow_id.split('-')[0]}"}
-    stop, step_outputs, calls = _run_chain(workflow_id, storage, USAGE_BODY_BELOW)
+    stop, step_outputs, calls, store = _run_chain(workflow_id, storage, _usage_ok(USAGE_BODY_BELOW))
     assert stop is None
     assert step_outputs["route"]["output"]["branch"] == "then"
     assert step_outputs["decide-grok-route"]["output"]["result"]["route"] == "hub_session"
@@ -346,7 +421,7 @@ def test_chain_diverts_to_sticky_session_when_below_threshold(workflow_id):
 
 @pytest.mark.parametrize("workflow_id", ["orin-mailbox", "tofu-mailbox"])
 def test_chain_posts_webhook_when_usage_fine(workflow_id):
-    stop, step_outputs, calls = _run_chain(workflow_id, FULL_STORAGE, USAGE_BODY_ABOVE)
+    stop, step_outputs, calls, store = _run_chain(workflow_id, FULL_STORAGE, _usage_ok(USAGE_BODY_ABOVE))
     assert stop is None
     assert step_outputs["route"]["output"]["branch"] == "else"
     assert step_outputs["decide-grok-route"]["output"]["result"]["route"] == "webhook"
@@ -374,6 +449,10 @@ def test_chain_falls_back_to_webhook_when_hub_unreachable(workflow_id):
         if kind == "storage_get":
             key = step.get("key")
             return {"key": key, "value": FULL_STORAGE.get(key, ""), "found": key in FULL_STORAGE}
+        if kind == "storage_set":
+            from src.dapier.engine.actions.templating import render
+            key = step.get("key")
+            return {"key": key, "stored": True, "rendered": render(step.get("value"), event, steps)}
         if kind == "code":
             return run_code(step, event, steps=steps)
         if kind == "http_request":
@@ -392,7 +471,7 @@ def test_chain_falls_back_to_webhook_when_hub_unreachable(workflow_id):
 @pytest.mark.parametrize("workflow_id", ["orin-mailbox", "tofu-mailbox"])
 def test_chain_skips_hub_entirely_when_not_armed(workflow_id):
     storage = {k: v for k, v in FULL_STORAGE.items() if not k.startswith("hub_")}
-    stop, step_outputs, calls = _run_chain(workflow_id, storage, USAGE_BODY_BELOW)
+    stop, step_outputs, calls, store = _run_chain(workflow_id, storage, _usage_ok(USAGE_BODY_BELOW))
     assert stop is None
     assert step_outputs["grok-fallback-armed"]["output"]["branch"] == "else"
     assert all(c["url"] != "https://hub.dtcdev.click/api/quota/grokbot" for c in calls)
@@ -400,11 +479,72 @@ def test_chain_skips_hub_entirely_when_not_armed(workflow_id):
     assert [c["url"] for c in calls].count("https://bot.example.invalid/hook") == 1
 
 
+REFRESH_RESPONSE = {"access_token": "fresh-access", "refresh_token": "fresh-refresh"}
+
+
+@pytest.mark.parametrize("workflow_id", ["orin-mailbox", "tofu-mailbox"])
+def test_chain_rotates_expired_bearer_and_self_heals(workflow_id):
+    """HTTP 401 on the usage check rotates the stored tokens in the same
+    run; the current email fails safe to the webhook and the next run uses
+    the fresh bearer."""
+    storage = {**FULL_STORAGE, "hub_recipient": f"agent:{workflow_id.split('-')[0]}"}
+    state = {"expires": True}
+
+    def usage_transport(method, url, headers=None, body=None):
+        if url.endswith("/api/quota/grokbot"):
+            if state["expires"]:
+                return 401, b'{"error": "token_expired"}', {"content-type": "application/json"}
+            return 200, json.dumps(USAGE_BODY_BELOW).encode("utf-8"), {"content-type": "application/json"}
+        if url.endswith("/api/token/refresh"):
+            state["expires"] = False
+            return 200, json.dumps(REFRESH_RESPONSE).encode("utf-8"), {"content-type": "application/json"}
+        return 200, b'{"accepted": true}', {"content-type": "application/json"}
+
+    # Run 1: expired bearer -> refresh stored, webhook delivery (fail-safe).
+    stop, step_outputs, calls, store = _run_chain(workflow_id, storage, usage_transport)
+    assert stop is None
+    assert step_outputs["decide-grok-route"]["output"]["result"]["refresh_needed"] is True
+    assert step_outputs["route"]["output"]["branch"] == "else"
+    refresh_calls = [c for c in calls if c["url"].endswith("/api/token/refresh")]
+    assert len(refresh_calls) == 1
+    sent = json.loads(refresh_calls[0]["body"].decode("utf-8"))
+    assert sent == {"grant_type": "refresh_token", "refresh_token": "hub-refresh-token"}
+    assert store["hub_api_token"] == "fresh-access"
+    assert store["hub_refresh_token"] == "fresh-refresh"
+    assert step_outputs["hub-token-rotate.then.store-hub-tokens.then.store-hub-api-token"]["status"] == "completed"
+
+    # Run 2: same store, fresh bearer -> the divert path now works.
+    stop, step_outputs, calls, store = _run_chain(workflow_id, store, usage_transport)
+    assert stop is None
+    assert step_outputs["decide-grok-route"]["output"]["result"]["route"] == "hub_session"
+    usage_calls = [c for c in calls if c["url"].endswith("/api/quota/grokbot")]
+    assert usage_calls[0]["headers"]["authorization"] == "Bearer fresh-access"
+
+
+@pytest.mark.parametrize("workflow_id", ["orin-mailbox", "tofu-mailbox"])
+def test_chain_refresh_failure_keeps_webhook_and_old_tokens(workflow_id):
+    """A failed refresh (invalid_grant etc.) is absorbed; tokens stay."""
+    storage = {**FULL_STORAGE, "hub_recipient": f"agent:{workflow_id.split('-')[0]}"}
+
+    def usage_transport(method, url, headers=None, body=None):
+        if url.endswith("/api/quota/grokbot"):
+            return 401, b'{"error": "token_expired"}', {"content-type": "application/json"}
+        if url.endswith("/api/token/refresh"):
+            return 400, b'{"error": "invalid_grant"}', {"content-type": "application/json"}
+        return 200, b'{"accepted": true}', {"content-type": "application/json"}
+
+    stop, step_outputs, calls, store = _run_chain(workflow_id, storage, usage_transport)
+    assert stop is None
+    assert store["hub_api_token"] == "hub-token"
+    assert store["hub_refresh_token"] == "hub-refresh-token"
+    assert step_outputs["route"]["output"]["branch"] == "else"
+
+
 def test_dev_chain_diverts_but_always_ingests_oncall():
     storage = {**FULL_STORAGE, "hub_recipient": "agent:dev",
                "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
                "oncall_webhook_token": "oncall-token"}
-    stop, step_outputs, calls = _run_chain("dev-mailbox", storage, USAGE_BODY_BELOW)
+    stop, step_outputs, calls, store = _run_chain("dev-mailbox", storage, _usage_ok(USAGE_BODY_BELOW))
     assert stop is None
     assert step_outputs["route"]["output"]["branch"] == "then"
     urls = [c["url"] for c in calls]
@@ -421,7 +561,7 @@ def test_dev_chain_webhook_route_when_usage_fine():
     storage = {**FULL_STORAGE, "hub_recipient": "agent:dev",
                "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
                "oncall_webhook_token": "oncall-token"}
-    stop, step_outputs, calls = _run_chain("dev-mailbox", storage, USAGE_BODY_ABOVE)
+    stop, step_outputs, calls, store = _run_chain("dev-mailbox", storage, _usage_ok(USAGE_BODY_ABOVE))
     assert stop is None
     assert step_outputs["route"]["output"]["branch"] == "else"
     urls = [c["url"] for c in calls]
