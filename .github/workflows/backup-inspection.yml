@@ -1,0 +1,41 @@
+name: Backup inspection
+
+# The deploy workflow already inspects backup health on every deploy; this
+# dispatchable copy re-runs the same checks on demand — e.g. after an alarm
+# fires, to pull the failure's REPORT/timeout log lines, or with --invoke
+# to run one real backup now and verify a fix without waiting for the next
+# 03:00Z run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      invoke:
+        description: 'Run one backup now (verifies the deployed handler end-to-end)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-1
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          role-to-assume: arn:aws:iam::817685572750:role/dapier-github-actions-deploy
+          role-session-name: dapier-backup-inspection
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Inspect DynamoDB backup health
+        run: |
+          args=""
+          if [ "${{ inputs.invoke }}" = "true" ]; then
+            args="--invoke"
+          fi
+          uv run --with boto3 python scripts/inspect_backup.py $args

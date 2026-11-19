@@ -193,6 +193,7 @@ def _load_yaml(path):
 INSPECTION_GRANTS = {
     ("cloudformation", "describe_stack_resource"): "cloudformation:DescribeStackResource",
     ("lambda", "get_function_configuration"): "lambda:GetFunctionConfiguration",
+    ("lambda", "invoke"): "lambda:InvokeFunction",
     ("cloudwatch", "describe_alarms"): "cloudwatch:DescribeAlarms",
     ("cloudwatch", "get_metric_statistics"): "cloudwatch:GetMetricStatistics",
     ("logs", "filter_log_events"): "logs:FilterLogEvents",
@@ -203,28 +204,35 @@ INSPECTION_GRANTS = {
 }
 
 
-def _inspection_step(deploy_workflow):
+def _inspection_step_index(deploy_workflow):
     steps = deploy_workflow["jobs"]["deploy"]["steps"]
     named = {step.get("name"): i for i, step in enumerate(steps) if step.get("name")}
     i = named["Inspect DynamoDB backup health (read-only)"]
     j = named["Deploy backup inspection access policy stack"]
     assert j < i, "the access policy stack must deploy before the inspection step"
-    return steps[i]["run"]
+    return i
 
 
-def test_backup_inspection_grants_match_deploy_step():
-    """The deploy-time backup health step can only verify while its IAM
-    grants cover every boto3 call it makes — until 2026-11-12 they did not,
-    so a failing backup's only evidence line was BACKUP_UNVERIFIED. This
-    fails when the step script and infra/backup-inspection-access.yaml
-    drift apart."""
+def test_backup_inspection_grants_match_inspection_script():
+    """The backup health checks can only verify while their IAM grants cover
+    every boto3 call scripts/inspect_backup.py makes — until 2026-11-12 they
+    did not, so a failing backup's only evidence line was BACKUP_UNVERIFIED.
+    This fails when the script and infra/backup-inspection-access.yaml drift
+    apart. The deploy workflow and the dispatchable backup-inspection
+    workflow both run the same script, so one check covers both."""
     import re
 
-    workflow = _load_yaml(".github/workflows/deploy.yml")
-    script = _inspection_step(workflow)
+    deploy_workflow = _load_yaml(".github/workflows/deploy.yml")
+    step = deploy_workflow["jobs"]["deploy"]["steps"][_inspection_step_index(deploy_workflow)]
+    assert "scripts/inspect_backup.py" in step["run"]
+    dispatch = _load_yaml(".github/workflows/backup-inspection.yml")
+    dispatch_runs = [s.get("run", "") for s in dispatch["jobs"]["inspect"]["steps"]]
+    assert any("scripts/inspect_backup.py" in run for run in dispatch_runs)
+    assert any("--invoke" in run for run in dispatch_runs)
 
+    script = Path("scripts/inspect_backup.py").read_text()
     clients = dict(re.findall(
-        r"^(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
+        r"^\s*(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
     calls = set(re.findall(r"boto3\.client\('([^']+)'\)\.(\w+)\(", script))
     for var, service in clients.items():
         calls.update((service, method) for method in re.findall(rf"\b{var}\.(\w+)\(", script))
@@ -247,7 +255,7 @@ def test_backup_inspection_grants_match_deploy_step():
     unneeded = granted - used
     assert not unneeded, f"grants the inspection step never uses: {sorted(unneeded)}"
     # Snapshot reads stay scoped to the backup bucket's backups/ prefix; the
-    # function-config and log grants name the backup function only.
+    # function-config, invoke and log grants name the backup function only.
     def arns(actions):
         found = []
         for statement in policy["PolicyDocument"]["Statement"]:
@@ -259,8 +267,10 @@ def test_backup_inspection_grants_match_deploy_step():
 
     assert arns(["s3:GetObject"]) == [
         "arn:${AWS::Partition}:s3:::dapier-backups-${AWS::AccountId}/backups/*"]
-    assert arns(["lambda:GetFunctionConfiguration"]) == [
-        "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:dapier-BackupFunction-*"]
+    function_arn = ("arn:${AWS::Partition}:lambda:${AWS::Region}:"
+                    "${AWS::AccountId}:function:dapier-BackupFunction-*")
+    assert arns(["lambda:GetFunctionConfiguration"]) == [function_arn]
+    assert arns(["lambda:InvokeFunction"]) == [function_arn]
     # The physical function/log-group names carry a random CloudFormation
     # suffix (dapier-BackupFunction-XXXXXXXX), so every name pattern must
     # wildcard inside the name. A pattern ending "...BackupFunction:*" only
