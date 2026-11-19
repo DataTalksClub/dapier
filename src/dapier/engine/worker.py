@@ -161,11 +161,16 @@ def _run_id(workflow_id, event):
 
 
 # The trigger envelope every step records as its ``input``: capped higher
-# than step outputs so an ordinary webhook or email event (hook bodies run
-# to 200 KB, email bodies to 60 KB apiece) still replays from run history —
+# than SQS resume envelopes so an ordinary webhook or email event (hook bodies
+# run to 200 KB, email bodies to 60 KB apiece) still replays from run history —
 # api/runs.replay_event refuses a truncated input. Events too big even for
 # this keep that explicit refusal.
 TRIGGER_INPUT_LIMIT = 65_000
+# Step outputs in EXECUTIONS_TABLE are recovered by downstream steps on retry
+# or replay (_quota_pending), so structured extractions (e.g. 20 sponsors with
+# blurbs) must not be clipped at the 6 KB SQS-resume cap; 65 KB + 65 KB input
+# stays well under DynamoDB's 400 KB item limit.
+STEP_OUTPUT_LIMIT = 65_000
 
 
 def _trim(value, limit=6000):
@@ -279,7 +284,7 @@ def _mark_completed(workflow_id, action_id, event, output=None, duration_ms=None
     if output is not None:
         sets.append("#output = :output")
         names["#output"] = "output"
-        values[":output"] = _stored(output)
+        values[":output"] = _stored(output, limit=STEP_OUTPUT_LIMIT)
     if duration_ms is not None:
         sets.append("duration_ms = :duration")
         values[":duration"] = int(duration_ms)
@@ -575,7 +580,7 @@ def _mark_reused(workflow_id, event, *, action_id, action_type=None, output=None
     if action_type:
         item["action_type"] = str(action_type)
     if output is not None:
-        item["output"] = _stored(output)
+        item["output"] = _stored(output, limit=STEP_OUTPUT_LIMIT)
     boto3.resource("dynamodb").Table(os.environ["EXECUTIONS_TABLE"]).put_item(Item=item)
 
 
