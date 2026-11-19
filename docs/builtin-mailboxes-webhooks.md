@@ -157,20 +157,21 @@ trigger:
 
 | Address | Webhook | Workflow | Destination |
 | --- | --- | --- | --- |
-| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Developer bot webhook + direct oncall ingest |
-| `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | Tofu Grok bot webhook |
-| `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | Orin Grok bot webhook |
+| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Developer bot webhook + direct oncall ingest (or Dev sticky Hub session when GrokBot usage < 1%) |
+| `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | Tofu Grok bot webhook (or Tofu sticky Hub session when GrokBot usage < 1%) |
+| `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | Orin Grok bot webhook (or Orin sticky Hub session when GrokBot usage < 1%) |
 
 Notify path: `dev-mailbox` posts every dev@ alert to both the existing
 Developer/Grok webhook and the direct oncall ingest at
 `https://hub.dtcdev.click/webhooks/oncall`. The direct receiver is Hub2, a
 Node server on the GCP VM with a durable SQLite queue. The Hub host polls that
 queue and invokes `~/bin/oncall-send` followed by `~/bin/orch-send`; those
-helpers save to the oncall inbox before waking live sessions. The two HTTP
-actions continue independently, then the workflow fails if either one did
-not complete so Dapier retries the event. A stable delivery ID makes replay
-of the direct ingest idempotent. Developer remains on the path until its hop
-is intentionally removed after the direct path is proven.
+helpers save to the oncall inbox before waking live sessions. The direct
+oncall ingest always runs (it is independent of the GrokBot quota route),
+then the workflow fails if a routed leg or the ingest did not complete so
+Dapier retries the event. A stable delivery ID makes replay of the direct
+ingest idempotent. Developer remains on the path until its hop is
+intentionally removed after the direct path is proven.
 
 `dev-mailbox` reads `webhook_url` / `webhook_token` for the existing
 Developer/Grok endpoint and `oncall_webhook_url` / `oncall_webhook_token` for
@@ -180,6 +181,55 @@ Grok webhooks. Each webhook payload includes `from`, `to`, `subject`,
 `snippet` (first 200 chars of the plain-text body), `text` (full body), `date`,
 `message_id`, and attachments metadata (filename, content_type, size, plus
 checksum/content_id when present).
+
+## GrokBot <1% quota fallback (sticky Hub session)
+
+Intake f28baca0: GrokBot (the Grok-powered bots behind orin / tofu / dev)
+regularly runs out of quota, so a mailbox mail that only reaches its bot
+webhook is lost. Each mailbox workflow therefore checks Hub's GrokBot usage
+export and, when the bot is below threshold, notifies the role's sticky
+interactive Hub session on `DESKTOP-FP4OP26` with "Hey, check your emails."
+instead of posting to the bot webhook.
+
+Hub-side contract (agent-hub intake 408b585e, deployed on the same Hub):
+
+- `GET /api/quota/grokbot` with a Hub bearer token returns
+  `{"account": "grokbot", "provider": "grok", "remaining_percent": <number>,
+  "threshold_percent": 1, "below_threshold": <bool>, "fresh": <bool>,
+  "state": "fresh|stale|exhausted|unknown", "observed_at": ..., "reset_at": ...}`.
+  Hub sets `below_threshold` only on fresh evidence, never on stale/unknown.
+- `POST /api/messages` with `{"recipient": "agent:<role>", "body": "Hey,
+  check your emails.", "key": "dapier-<role>-<delivery sha>"}` enqueues the
+  message for the named agent; Hub forwards it into the live sticky session
+  on Desktop (durable mailbox delivery when none is live) and dedupes on
+  `key`, so workflow retries cannot double-notify.
+
+Workflow behavior (all three mailboxes, `route` condition):
+
+- `grok-fallback-armed` runs the usage check only when all four hub storage
+  keys below are provisioned; otherwise no Hub call is made.
+- `decide-grok-route` diverts only when the check completed with
+  `below_threshold: true` **and** `fresh: true`. Fail-safe by design: a Hub
+  outage (skipped/failed check), stale evidence, or half-provisioned storage
+  keeps the historical webhook delivery — a quota fallback must never
+  divert mailbox mail into the void.
+- When diverted, the webhook leg does not run; when not diverted, the
+  webhook leg runs exactly as before. `dev-mailbox` additionally always runs
+  its direct oncall ingest regardless of the route.
+
+Storage keys per mailbox workflow (all optional; the fallback arms only when
+all are set — provision them to enable the fallback):
+
+```bash
+dapier storage set <wf> hub_usage_url "https://hub.dtcdev.click/api/quota/grokbot"
+dapier storage set <wf> hub_messages_url "https://hub.dtcdev.click/api/messages"
+dapier storage set <wf> hub_api_token "<Hub-bearer-token>"
+dapier storage set <wf> hub_recipient "agent:orin"   # agent:tofu / agent:dev
+```
+
+The delivery idempotency key (`dapier-<role>-<sha256 of message_id>`) is
+stable across queue redeliveries of the same email, so a replay dedupes at
+Hub instead of double-pinging the role's session.
 
 Loop safety: the mailbox workflows contain no email-send step, and the bot's
 own outgoing/notification senders stay off the sender allowlists, so a bot
@@ -222,6 +272,15 @@ dapier storage set tofu-mailbox webhook_url "<tofu-bot-webhook-url>"
 dapier storage set tofu-mailbox webhook_token "<tofu-bot-bearer-token>"
 dapier storage set orin-mailbox webhook_url "<orin-bot-webhook-url>"
 dapier storage set orin-mailbox webhook_token "<orin-bot-bearer-token>"
+# 2c) Arm the GrokBot <1% quota fallback per mailbox (see the section above).
+# Without these keys the fallback stays disarmed and mail goes to the bot
+# webhook exactly as before. hub_api_token is masked in run history (key
+# contains "token"); never commit it.
+dapier storage set dev-mailbox hub_usage_url "https://hub.dtcdev.click/api/quota/grokbot"
+dapier storage set dev-mailbox hub_messages_url "https://hub.dtcdev.click/api/messages"
+dapier storage set dev-mailbox hub_api_token "<Hub-bearer-token>"
+dapier storage set dev-mailbox hub_recipient "agent:dev"
+# repeat for tofu-mailbox (agent:tofu) and orin-mailbox (agent:orin)
 
 # 3) Verify an existing mail delivery through its workflow run.
 dapier runs list --workflow dev-mailbox

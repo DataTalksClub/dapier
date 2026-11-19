@@ -1,6 +1,6 @@
 id: dev-mailbox
 enabled: true
-description: Developer mailbox dev@dtcdev.click -> Developer bot webhook + direct oncall ingest
+description: Developer mailbox dev@dtcdev.click -> Developer bot webhook + direct oncall ingest, or Dev sticky Hub session when GrokBot remaining usage < 1%
 triggers:
   - connector: email
     event: message.received
@@ -28,6 +28,19 @@ actions:
     type: storage_get
     key: oncall_webhook_token
     secret: true
+  - id: get-hub-usage-url
+    type: storage_get
+    key: hub_usage_url
+  - id: get-hub-messages-url
+    type: storage_get
+    key: hub_messages_url
+  - id: get-hub-api-token
+    type: storage_get
+    key: hub_api_token
+    secret: true
+  - id: get-hub-recipient
+    type: storage_get
+    key: hub_recipient
   - id: format-email
     type: code
     code: |
@@ -136,15 +149,6 @@ actions:
       if not _identity:
           _identity = json.dumps(_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
       output = hashlib.sha256(_identity.encode("utf-8")).hexdigest()
-  - id: post-webhook
-    type: http_request
-    method: POST
-    url: "{steps.get-url.output.value}"
-    auth_type: bearer
-    auth_token: "{steps.get-token.output.value}"
-    content_type: application/json
-    body: "{steps.format-email.output.result}"
-    on_error: continue
   - id: post-oncall-ingest
     type: http_request
     method: POST
@@ -156,14 +160,114 @@ actions:
     content_type: application/json
     body: "{steps.format-email.output.result}"
     on_error: continue
-  - id: verify-both-deliveries
+  - id: grok-fallback-armed
+    type: condition
+    when:
+      steps.get-hub-usage-url.output.value:
+        prefix: "http"
+      steps.get-hub-messages-url.output.value:
+        prefix: "http"
+      steps.get-hub-api-token.output.value:
+        exists: true
+      steps.get-hub-recipient.output.value:
+        exists: true
+    then:
+      - id: check-grokbot-usage
+        type: http_request
+        method: GET
+        url: "{steps.get-hub-usage-url.output.value}"
+        auth_type: bearer
+        auth_token: "{steps.get-hub-api-token.output.value}"
+        on_fail: continue
+    else: []
+  - id: decide-grok-route
     type: code
     code: |
+      # Route the formatted email: the Developer (Grok) bot webhook by
+      # default; the Dev role's sticky Hub session (named agent recipient
+      # via Hub's POST /api/messages) when Hub's GrokBot usage export
+      # reports below_threshold on fresh evidence. Fail-safe: missing hub
+      # config, a skipped/failed usage check, or stale evidence keeps the
+      # historical webhook delivery, so a Hub outage or a half-provisioned
+      # fallback can never divert mailbox mail into the void. The direct
+      # oncall ingest above is independent of this route and always runs.
+      def _out(step_id):
+          return ((steps.get(step_id) or {}).get("output") or {})
+
+      usage_url = str(_out("get-hub-usage-url").get("value") or "").strip()
+      messages_url = str(_out("get-hub-messages-url").get("value") or "").strip()
+      recipient = str(_out("get-hub-recipient").get("value") or "").strip()
+      # The usage check runs inside the armed condition's then-branch,
+      # so its run-history id nests under that branch.
+      check = steps.get("grok-fallback-armed.then.check-grokbot-usage") or {}
+
+      divert = False
+      if not (usage_url and messages_url and recipient):
+          reason = "hub_fallback_not_configured"
+      elif check.get("status") != "completed":
+          reason = "grokbot_usage_unavailable"
+      else:
+          data = check.get("output") or {}
+          data = data.get("body") if isinstance(data.get("body"), dict) else {}
+          fresh = data.get("fresh") is True
+          if data.get("below_threshold") is True and fresh:
+              divert = True
+              reason = "grokbot_below_threshold"
+          elif not fresh:
+              reason = "grokbot_usage_not_fresh"
+          else:
+              reason = "grokbot_above_threshold"
+      output = {
+          "route": "hub_session" if divert else "webhook",
+          "reason": reason,
+          "recipient": recipient if divert else "",
+      }
+  - id: route
+    type: condition
+    when:
+      steps.decide-grok-route.output.result.route:
+        equals: hub_session
+    then:
+      - id: notify-hub-session
+        type: http_request
+        method: POST
+        url: "{steps.get-hub-messages-url.output.value}"
+        auth_type: bearer
+        auth_token: "{steps.get-hub-api-token.output.value}"
+        content_type: application/json
+        body: '{"recipient": "{steps.get-hub-recipient.output.value}", "body": "Hey, check your emails.", "key": "dapier-dev-{steps.oncall-delivery-id.output.result}"}'
+    else:
+      - id: post-webhook
+        type: http_request
+        method: POST
+        url: "{steps.get-url.output.value}"
+        auth_type: bearer
+        auth_token: "{steps.get-token.output.value}"
+        content_type: application/json
+        body: "{steps.format-email.output.result}"
+        on_error: continue
+  - id: verify-delivery
+    type: code
+    code: |
+      # Every event must land somewhere: the direct oncall ingest always,
+      # plus whichever leg the GrokBot quota route picked (the Developer
+      # webhook when usage is fine, this role's sticky Hub session when
+      # Hub reported GrokBot below threshold). Any leg that did not
+      # complete fails the run so Dapier retries the event.
+      route_output = ((steps.get("route") or {}).get("output") or {})
+      branch = route_output.get("branch")
+      leg = {"then": "route.then.notify-hub-session",
+             "else": "route.else.post-webhook"}.get(branch)
       failed = []
-      for step_id in ("post-webhook", "post-oncall-ingest"):
-          step = steps.get(step_id) or {}
-          if step.get("status") != "completed":
-              failed.append(step_id)
+      if leg is None:
+          failed.append("route")
+      elif (steps.get(leg) or {}).get("status") != "completed":
+          failed.append(leg)
+      if (steps.get("post-oncall-ingest") or {}).get("status") != "completed":
+          failed.append("post-oncall-ingest")
       if failed:
           raise ValueError("dev-mailbox delivery failed for: " + ", ".join(failed))
-      output = {"developer_webhook": "completed", "oncall_ingest": "completed"}
+      output = {"routed_to": route_output.get("branch"),
+                "decide_reason": ((steps.get("decide-grok-route") or {}).get("output") or {}).get("result", {}).get("reason", ""),
+                "oncall_ingest": "completed"}
+
