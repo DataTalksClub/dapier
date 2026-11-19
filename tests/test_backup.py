@@ -55,6 +55,17 @@ def test_backup_has_explicit_memory_headroom():
     assert template["Resources"]["BackupFunction"]["Properties"]["MemorySize"] >= 512
 
 
+def test_backup_has_timeout_and_tmp_headroom_for_slow_scans():
+    """The 2026-11-17/18 alarm fired because full scans of the 3.7 GB inbox
+    — throttled by its fresh GSI backfill — outgrew the 300 s timeout and
+    the invocation was killed before manifest and failure email. The
+    function must carry explicit headroom against both."""
+    template = _load_yaml("template.yaml")
+    fn = template["Resources"]["BackupFunction"]["Properties"]
+    assert fn["Timeout"] >= 900
+    assert fn["EphemeralStorage"]["Size"] >= 4096
+
+
 def test_backup_alarm_notifies_on_recovery():
     """A fired backup alarm only emails on the way up; without OKActions the
     operator never learns that a scheduled backup went green again."""
@@ -63,6 +74,101 @@ def test_backup_alarm_notifies_on_recovery():
     topic = [{"Ref": "AlarmTopic"}]
     assert alarm["AlarmActions"] == topic
     assert alarm["OKActions"] == topic
+
+
+class MultipartS3:
+    """Reassembles multipart uploads byte-for-byte, like S3 does."""
+
+    def __init__(self):
+        self.objects = {}
+        self.uploads = []
+        self.aborted = []
+        self.put_keys = []
+
+    def _by_id(self, upload_id):
+        return next(u for u in self.uploads if u["id"] == upload_id)
+
+    def put_object(self, Bucket, Key, Body, **kwargs):
+        self.put_keys.append(Key)
+        self.objects[Key] = Body.read() if hasattr(Body, "read") else Body
+
+    def create_multipart_upload(self, Bucket, Key, **kwargs):
+        upload = {"id": f"upload-{len(self.uploads)}", "key": Key, "parts": {}}
+        self.uploads.append(upload)
+        return {"UploadId": upload["id"]}
+
+    def upload_part(self, Bucket, Key, UploadId, PartNumber, Body, **kwargs):
+        body = Body.read() if hasattr(Body, "read") else Body
+        self._by_id(UploadId)["parts"][PartNumber] = body
+        return {"ETag": f"etag-{PartNumber}"}
+
+    def complete_multipart_upload(self, Bucket, Key, UploadId, MultipartUpload):
+        upload = self._by_id(UploadId)
+        self.objects[Key] = b"".join(
+            upload["parts"][part["PartNumber"]] for part in MultipartUpload["Parts"])
+
+    def abort_multipart_upload(self, Bucket, Key, UploadId, **kwargs):
+        self.aborted.append(UploadId)
+
+
+def _blob(n):
+    """Random text: gzip can't crush it, so sizes stay near n/1.33."""
+    import base64
+    import os
+
+    return base64.b64encode(os.urandom(n)).decode("ascii")
+
+
+def test_backup_streams_big_tables_as_multipart_parts(monkeypatch):
+    """A multi-GB snapshot must not have to fit in Lambda's /tmp: once the
+    gzip stream outgrows one part size, finished chunks upload as S3
+    multipart parts and the object reassembles byte-for-byte."""
+    monkeypatch.setattr(backup, "MULTIPART_PART_SIZE", 64 * 1024)
+    items = [{"id": {"S": f"item-{i}"}, "blob": {"S": _blob(4096)}}
+             for i in range(64)]  # distinct random blobs: ~350 KB compressed
+    s3 = MultipartS3()
+    stats = backup.backup_table(FakeDynamo({"big": items}), s3, "big", "bucket", "day")
+
+    assert len(s3.uploads) == 1
+    parts = s3.uploads[0]["parts"]
+    assert len(parts) >= 2
+    # All but the final part ride the part-size minimum.
+    assert all(len(body) == backup.MULTIPART_PART_SIZE
+               for number, body in parts.items() if number < len(parts))
+    assert s3.objects[stats["key"]] == b"".join(
+        parts[number] for number in sorted(parts))
+    assert stats["bytes"] == len(s3.objects[stats["key"]])
+    snapshot = gzip.decompress(s3.objects[stats["key"]])
+    assert [json.loads(line) for line in snapshot.decode().splitlines()] == items
+    assert s3.aborted == []
+
+
+def test_backup_small_tables_skip_multipart(monkeypatch):
+    monkeypatch.setattr(backup, "MULTIPART_PART_SIZE", 64 * 1024)
+    s3 = MultipartS3()
+    stats = backup.backup_table(
+        FakeDynamo({"tiny": [{"id": {"S": "one"}}]}), s3, "tiny", "bucket", "day")
+    assert s3.uploads == []
+    assert stats["key"] in s3.put_keys
+
+
+def test_backup_aborts_the_upload_when_a_scan_dies_mid_table(monkeypatch):
+    monkeypatch.setattr(backup, "MULTIPART_PART_SIZE", 64 * 1024)
+
+    class DiesOnSecondPage:
+        def get_paginator(self, operation):
+            return self
+
+        def paginate(self, **kwargs):
+            yield {"Items": [{"id": {"S": f"i-{i}"}, "blob": {"S": _blob(4096)}}
+                             for i in range(32)]}  # > one part size
+            raise RuntimeError("scan died")
+
+    s3 = MultipartS3()
+    with pytest.raises(RuntimeError, match="scan died"):
+        backup.backup_table(DiesOnSecondPage(), s3, "big", "bucket", "day")
+    assert len(s3.aborted) == 1  # no orphaned upload accruing storage cost
+    assert s3.objects == {}
 
 
 def _load_yaml(path):

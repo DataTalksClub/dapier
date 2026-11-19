@@ -1620,9 +1620,17 @@ Resources:
       Handler: src.dapier.backup.handler
       Runtime: python3.12
       Architectures: [arm64]
-      # SDK/page buffers have headroom; table snapshots stream through /tmp.
+      # The backup full-scans every table, so it needs far more than the
+      # default time and disk: on 2026-11-17/18 the scans of the 3.7 GB
+      # TriggerInboxTable — throttled by that table's fresh GSI backfill —
+      # blew the 300 s timeout three times a day (initial + two async
+      # retries) and died before manifest and failure email. 900 s and 4 GB
+      # of /tmp cover throttled scans and years of inbox growth; snapshots
+      # themselves stream out as S3 multipart parts and never touch /tmp.
       MemorySize: 512
-      Timeout: 300
+      Timeout: 900
+      EphemeralStorage:
+        Size: 4096
       Environment:
         Variables:
           BACKUP_BUCKET: !Ref BackupBucket
