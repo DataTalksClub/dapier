@@ -14,13 +14,15 @@ reconnecting):
 
     https://www.googleapis.com/auth/gmail.readonly   (messages, labels)
     https://www.googleapis.com/auth/gmail.send       (the send action)
+    https://www.googleapis.com/auth/gmail.modify     (mark read, labels)
 
-Those two lines are ``GMAIL_SCOPES`` in
-``connections.providers.oauth_providers`` — the single declaration the
-OAuth flow derives a Gmail connection's grant from (flow-owned glue, so it
-lives in core). The ``GMAIL_SCOPES`` environment variable extends it with
-live-use extras (gmail.modify, gmail.settings, gmail.labels) at consent
-and verification time; see ``effective_gmail_scopes`` there.
+Those lines are ``GMAIL_SCOPES`` in
+``connections.providers.oauth_providers`` — the single Gmail scope
+declaration (flow-owned glue, so it lives in core); the grant itself comes
+from the connection's own scopes, never widened by the flow. The
+``GMAIL_SCOPES`` environment variable lists further live-use extras
+(gmail.settings, gmail.labels) beyond the declaration; see
+``effective_gmail_scopes`` there.
 
 The poll source keys on each message's ``internalDate`` — the drive files
 source's watermark applied to mail: the first fire seeds the watermark at

@@ -140,14 +140,19 @@ def normalize_scopes(provider_name, scopes):
 # The scopes a Gmail connection's calls answer to. This is flow-owned glue,
 # not plugin code: the OAuth flow and the agent API's connect start call
 # :func:`connection_grant_scopes`, and core must not import plugin code (the
-# Gmail chip itself lives in plugins/google).
+# Gmail chip itself lives in plugins/google). ``gmail.modify`` is part of the
+# product default so handled mail can be marked read and labeled; the grant
+# still comes from the connection's own scopes (never widened here) — a
+# connection created before it gains modify by editing its scopes and
+# re-consenting.
 GMAIL_SCOPES = (
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
 )
 
 # The Google scope URL a bare GMAIL_SCOPES environment entry expands to:
-# "gmail.modify" -> "https://www.googleapis.com/auth/gmail.modify".
+# "gmail.settings" -> "https://www.googleapis.com/auth/gmail.settings".
 _GOOGLE_SCOPE_URL_PREFIX = "https://www.googleapis.com/auth/"
 
 # What marks a connection's requested scope as a Gmail one (the shared
@@ -160,7 +165,7 @@ def effective_gmail_scopes():
     """The declared Gmail scopes plus any ``GMAIL_SCOPES`` environment extras.
 
     The environment variable lists live-use extras beyond the declaration
-    (gmail.modify, gmail.settings, gmail.labels) — comma- or
+    (gmail.settings, gmail.labels) — comma- or
     whitespace-separated, each entry a full scope URL or a short name that
     expands to the Google auth URL above. It is read at call time, so a
     deployment extends its Gmail grants without a code change and tests set
@@ -185,7 +190,7 @@ def connection_grant_scopes(provider_name, scopes):
 
     Returns the connection's own requested scopes, normalized like every
     grant. Never widens a connection with extra Gmail scopes (such as
-    ``gmail.modify`` from ``GMAIL_SCOPES``) that the connection did not
+    ``gmail.settings`` from ``GMAIL_SCOPES``) that the connection did not
     request. Raises ``ProviderError`` like ``normalize_scopes`` (a Google
     connection needs at least one scope).
     """

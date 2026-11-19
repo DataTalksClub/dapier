@@ -247,12 +247,12 @@ mailbox. **Send email** (`gmail_send`) posts raw MIME through
 verified alias), so the sender is always the connection itself, resolved
 from `users/me/profile`.
 
-Scope caveat: the chip declares `gmail.readonly` (messages, labels) and
-`gmail.send` in `connectors/gmail.py` — both Google-**Restricted** scopes the
-project does not request yet. Enabling Gmail end to end follows the same
-steps as the YouTube upload scope below: enable the Gmail API in
-`dtcdev-click`, add both scopes to the project's scope table with the owner's
-approval, grant them to the Google connection with
+Scope caveat: the chip declares `gmail.readonly` (messages, labels),
+`gmail.send`, and `gmail.modify` (mark read, label changes) in
+`connectors/gmail.py` — all Google-**Restricted** scopes. Enabling Gmail end
+to end follows the same steps as the YouTube upload scope below: enable the
+Gmail API in `dtcdev-click`, add the scopes to the project's scope table
+with the owner's approval, grant them to the Google connection with
 `dapier connections edit <id> --scopes …`, and re-consent the account.
 Until a connection holds the scopes, its Gmail poll and send fail with the
 API's HTTP 403. The `labels` discovery resource needs only `gmail.readonly`.

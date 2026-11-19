@@ -15,10 +15,10 @@ const CONNECT_SERVICES = {
   llm: { label: 'LLM', blurb: 'Verified language model access with Anthropic OIDC or a stored API key.', provider: 'llm', connectionId: 'llm', scopes: [] },
   gmail: {
     label: 'Gmail',
-    blurb: 'Read mail and send from the connected inbox.',
+    blurb: 'Read mail, send, and mark handled mail read or labeled.',
     provider: 'google',
     connectionId: 'gmail',
-    scopes: ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/userinfo.email'],
+    scopes: ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/userinfo.email'],
   },
   calendar: {
     label: 'Google Calendar',
