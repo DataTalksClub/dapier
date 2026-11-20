@@ -76,11 +76,12 @@ def main():
         states = cw.describe_alarms(AlarmNames=[alarm])['MetricAlarms']
         print('BACKUP_ALARM', json.dumps([{k: a[k] for k in ('AlarmName', 'StateValue', 'StateUpdatedTimestamp')} for a in states], default=str))
     with inspect('alarm-history'):
-        # The verbatim transition reasons name the exact breaching datapoint
-        # (e.g. "Threshold Crossed: 1 datapoint [1.0 (17/11/26 02:56:00)]")
-        # that per-hour error buckets can only bracket. Newest first.
+        # The verbatim state-transition reasons name the exact breaching
+        # datapoint (e.g. "Thresholds Crossed: 1 datapoint [1.0 (17/11/26
+        # 02:56:00)] ...") that per-hour error buckets can only bracket.
+        # Newest first.
         items = []
-        kwargs = {'AlarmName': alarm, 'HistoryItemType': 'Action', 'MaxRecords': 10}
+        kwargs = {'AlarmName': alarm, 'HistoryItemType': 'StateUpdate', 'MaxRecords': 10}
         while True:
             page = cw.describe_alarm_history(**kwargs)
             items.extend(page.get('AlarmHistoryItems', []))
@@ -112,18 +113,24 @@ def main():
                 Statistics=['Sum'])['Datapoints'])
         print('BACKUP_ERROR_METRICS', json.dumps({'hours_with_errors': points}))
         # Per-minute resolution for the hours that had errors: pins each
-        # error to its invocation (the 2026-11-17 alarm datapoint cited
-        # 02:56:00 while the timeouts' REPORT lines said 03:05–03:18 —
-        # Lambda timestamps the invocation, not the timeout kill).
-        minutes = sorted(
-            (str(point['Timestamp']), point['Sum'])
-            for point in cw.get_metric_statistics(
-                Namespace='AWS/Lambda', MetricName='Errors',
-                Dimensions=[{'Name': 'FunctionName', 'Value': fn}],
-                StartTime=datetime.now(timezone.utc) - timedelta(days=4),
-                EndTime=datetime.now(timezone.utc), Period=60,
-                Statistics=['Sum'])['Datapoints']
-            if point['Sum'])
+        # error to its exact minute — the 2026-11-17 alarm cited a
+        # 02:56:00 datapoint while the timeouts' REPORT lines said
+        # 03:05–03:18, and hourly buckets cannot say which minute carried
+        # the error. GetMetricStatistics refuses windows longer than
+        # 1440 datapoints, so day-sized windows.
+        now = datetime.now(timezone.utc)
+        minutes = []
+        for offset in range(4):
+            minutes.extend(
+                (str(point['Timestamp']), point['Sum'])
+                for point in cw.get_metric_statistics(
+                    Namespace='AWS/Lambda', MetricName='Errors',
+                    Dimensions=[{'Name': 'FunctionName', 'Value': fn}],
+                    StartTime=now - timedelta(days=4 - offset),
+                    EndTime=now - timedelta(days=3 - offset), Period=60,
+                    Statistics=['Sum'])['Datapoints']
+                if point['Sum'])
+        minutes.sort()
         print('BACKUP_ERROR_MINUTES', json.dumps({'minutes_with_errors': minutes}))
     logs = boto3.client('logs')
     group = '/aws/lambda/' + fn
