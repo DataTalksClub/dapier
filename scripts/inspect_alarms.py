@@ -4,9 +4,10 @@ The deploy workflow and the dispatchable backup-inspection workflow run this
 after the backup checks. It prints ALARMS_* evidence lines: each alarm's
 current state, its recent state transitions (the verbatim "Threshold
 Crossed" datapoints), the event queue's oldest-message age peaks, the
-dead-letter queue depth, and the browser client-check failure counts the
-operator topic also pages on. An alarm email says when a threshold was
-crossed; these lines say whether it recovered and whether it came back.
+dead-letter queue depth, the telegram webhook-health alarm, and the
+browser client-check failure counts the operator topic also pages on. An
+alarm email says when a threshold was crossed; these lines say whether it
+recovered and whether it came back.
 
 Uses only the cloudformation/cloudwatch grants in
 infra/backup-inspection-access.yaml (tests/test_backup.py keeps the two in
@@ -21,7 +22,8 @@ from botocore.exceptions import ClientError
 
 # Logical alarm ids in the dapier stack, plus alarms other stacks publish to
 # the same operator topic by name.
-STACK_ALARMS = ('EventQueueAgeAlarm', 'EventQueueDepthAlarm', 'EventDeadLetterAlarm')
+STACK_ALARMS = ('EventQueueAgeAlarm', 'EventQueueDepthAlarm', 'EventDeadLetterAlarm',
+                'TelegramWebhookUnhealthyAlarm')
 NAMED_ALARMS = ('dataops-v1-client-check-failed',)
 HISTORY_DAYS = 3
 
