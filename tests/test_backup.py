@@ -595,19 +595,15 @@ def test_backup_failure_email_routes_only_to_dev_inbox():
     since CloudFormation keeps the previous value when an override is
     omitted and the old default was a personal inbox.
 
-    Run-failure and operator mail is the same rule now (t1909u): the
-    operator extras NotifyExtraEmails default to empty, so all operator
-    mail lands on dev@dtcdev.click and forwards to oncall from there —
-    a personal inbox joins only via an explicit NOTIFY_EXTRA_EMAILS
-    override. backup.py must still read only BACKUP_ALERT_EMAIL and never
-    the notify lists."""
+    Run-failure and operator mail is different (intake 779495a8): the
+    operator inboxes NotifyEmail + NotifyExtraEmails deliberately include a
+    human's address, so the personal-address ban is scoped to the backup
+    path instead of the whole template — backup.py must read only
+    BACKUP_ALERT_EMAIL and never the notify lists."""
     template = _load_yaml("template.yaml")
     assert template["Parameters"]["BackupAlertEmail"]["Default"] == "dev@dtcdev.click"
-    assert template["Parameters"]["NotifyExtraEmails"]["Default"] == ""
     deploy = Path("scripts/deploy.sh").read_text()
     assert 'BackupAlertEmail: "${BACKUP_ALERT_EMAIL:-dev@dtcdev.click}"' in deploy
-    assert 'NotifyExtraEmails: "${NOTIFY_EXTRA_EMAILS:-}"' in deploy
-    assert "alexey@datatalks.club" not in deploy
     backup_src = Path("src/dapier/backup.py").read_text()
     assert "DAPIER_NOTIFY_EMAIL" not in backup_src
     assert "DAPIER_NOTIFY_EXTRA_EMAILS" not in backup_src

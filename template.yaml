@@ -111,15 +111,14 @@ Parameters:
       From identity and is not a mailbox anyone reads.
   NotifyExtraEmails:
     Type: String
-    Default: ''
+    Default: 'alexey@datatalks.club'
     Description: >
       Extra operator inboxes (comma-separated) that receive every operator
       email alongside NotifyEmail: failed-run notices, CloudWatch alarm
       emails, the error and connection digests, and Telegram health
-      reports. Empty by default: infrastructure alerts go to the developer
-      inbox dev@dtcdev.click only (they forward to oncall from there), never
-      to a personal inbox unless the operator explicitly names one via the
-      NOTIFY_EXTRA_EMAILS deploy override.
+      reports. The bot mailbox alone is not enough — a human operator must
+      see failures too (the 2026-11 Telegram->Slack outage sat invisible
+      because nothing paged a person).
   EmailSendRegion:
     Type: String
     Default: us-east-1

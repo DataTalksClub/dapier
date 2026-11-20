@@ -67,12 +67,10 @@ OperatorEmails: "$OPERATOR_EMAILS"
 # the live stack — this override is what performs the reroute.
 NotifyEmail: "${NOTIFY_EMAIL:-dev@dtcdev.click}"
 # Extra operator inboxes (template.yaml NotifyExtraEmails): run failures,
-# alarm emails and digests ALSO land here. Empty by default — infra alerts
-# go to dev@dtcdev.click only and forward to oncall from there; a personal
-# inbox joins only when the operator explicitly names one (t1909u). This
-# override is what keeps the live stack matching the default: CloudFormation
-# keeps the previous value for any parameter omitted here.
-NotifyExtraEmails: "${NOTIFY_EXTRA_EMAILS:-}"
+# alarm emails and digests ALSO land here, so the human operator sees
+# them (intake 779495a8) — the bot mailbox alone left the 2026-11
+# Telegram->Slack outage invisible to the person who needed to know.
+NotifyExtraEmails: "${NOTIFY_EXTRA_EMAILS:-alexey@datatalks.club}"
 AlertEmailSender: "${ALERT_EMAIL_SENDER:-DTC Alerts <alerts@dtcdev.click>}"
 # DynamoDB backup failure recipient (template.yaml BackupAlertEmail). Like
 # NotifyEmail, the template default alone never reaches the live stack, so

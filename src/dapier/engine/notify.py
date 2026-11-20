@@ -4,8 +4,7 @@ Every failure notice goes to the workflow's top-level ``notify:`` list
 (managed definition or published designer workflow) *plus* the operator
 inboxes — ``notify.operator_recipients()``: ``DAPIER_NOTIFY_EMAIL``
 (template.yaml ``NotifyEmail``) and ``DAPIER_NOTIFY_EXTRA_EMAILS``
-(template.yaml ``NotifyExtraEmails``, extra inboxes beyond the primary,
-empty unless the operator names one). An
+(template.yaml ``NotifyExtraEmails``, the human operator's inbox). An
 explicit ``notify: []`` opts a workflow out entirely. Failures with no
 workflow behind them (a poll trigger that could not fetch) notify the
 operator inboxes too: the worker hands ``notify_failure`` a minimal
@@ -81,10 +80,9 @@ def operator_recipients():
     The primary address from :func:`operator_recipient` plus the extra
     operator inboxes in ``DAPIER_NOTIFY_EXTRA_EMAILS`` (template.yaml
     ``NotifyExtraEmails``, comma-separated). Deduplicated, order stable.
-    The extras default to empty: infrastructure alerts go to the developer
-    inbox dev@dtcdev.click only, which auto-forwards to oncall (t1909u) —
-    a personal inbox joins only when the operator explicitly names one via
-    the NOTIFY_EXTRA_EMAILS deploy override.
+    A human operator must stay on this list: routing failure mail only
+    to a bot mailbox left the 2026-11 crosspost outage invisible to the
+    person who needed to know.
     """
     addresses = [operator_recipient()]
     for token in str(os.environ.get("DAPIER_NOTIFY_EXTRA_EMAILS") or "").replace(";", ",").split(","):
