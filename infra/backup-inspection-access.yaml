@@ -32,6 +32,10 @@ Resources:
           - Effect: Allow
             Action:
               - cloudwatch:DescribeAlarms
+              # The inspection prints the alarm's verbatim transition
+              # reasons (BACKUP_ALARM_HISTORY), which name the exact
+              # breaching datapoint the hourly error buckets only bracket.
+              - cloudwatch:DescribeAlarmHistory
               - cloudwatch:GetMetricStatistics
             Resource: '*'
           - Effect: Allow

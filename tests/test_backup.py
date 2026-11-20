@@ -197,6 +197,7 @@ INSPECTION_GRANTS = {
     ("lambda", "get_function_configuration"): "lambda:GetFunctionConfiguration",
     ("lambda", "invoke"): "lambda:InvokeFunction",
     ("cloudwatch", "describe_alarms"): "cloudwatch:DescribeAlarms",
+    ("cloudwatch", "describe_alarm_history"): "cloudwatch:DescribeAlarmHistory",
     ("cloudwatch", "get_metric_statistics"): "cloudwatch:GetMetricStatistics",
     ("logs", "filter_log_events"): "logs:FilterLogEvents",
     ("dynamodb", "describe_table"): "dynamodb:DescribeTable",

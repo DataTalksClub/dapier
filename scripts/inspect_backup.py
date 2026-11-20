@@ -3,7 +3,8 @@
 The deploy workflow's "Inspect DynamoDB backup health" step and the
 dispatchable backup-inspection workflow both run this script. It verifies
 the daily snapshots with the grants in infra/backup-inspection-access.yaml
-(alarm state, error metrics, run logs, table sizes, manifest days) and
+(alarm state, alarm history, error metrics,
+run logs, table sizes, manifest days) and
 prints BACKUP_* evidence lines; missing permissions are reported as
 BACKUP_UNVERIFIED without hiding the deployment result. Every boto3 call
 here must stay covered by that policy —
@@ -74,6 +75,29 @@ def main():
     with inspect('alarm'):
         states = cw.describe_alarms(AlarmNames=[alarm])['MetricAlarms']
         print('BACKUP_ALARM', json.dumps([{k: a[k] for k in ('AlarmName', 'StateValue', 'StateUpdatedTimestamp')} for a in states], default=str))
+    with inspect('alarm-history'):
+        # The verbatim transition reasons name the exact breaching datapoint
+        # (e.g. "Threshold Crossed: 1 datapoint [1.0 (17/11/26 02:56:00)]")
+        # that per-hour error buckets can only bracket. Newest first.
+        items = []
+        kwargs = {'AlarmName': alarm, 'HistoryItemType': 'Action', 'MaxResults': 10}
+        while True:
+            page = cw.describe_alarm_history(**kwargs)
+            items.extend(page.get('AlarmHistoryItems', []))
+            if not page.get('NextToken') or len(items) >= 10:
+                break
+            kwargs['NextToken'] = page['NextToken']
+        entries = []
+        for i in items:
+            payload = i.get('HistoryPayload')
+            if isinstance(payload, str):
+                payload = json.loads(payload)
+            entries.append({
+                'timestamp': str(i['AlarmHistoryUpdatedTimestamp']),
+                'summary': i['HistorySummary'],
+                'reason': (payload or {}).get('stateChangeReason'),
+            })
+        print('BACKUP_ALARM_HISTORY', json.dumps({'items': entries}))
     with inspect('error-metrics'):
         # Every hour of the last four days in which the backup function
         # errored at all — absence after a scheduled run is the proof
@@ -87,6 +111,20 @@ def main():
                 EndTime=datetime.now(timezone.utc), Period=3600,
                 Statistics=['Sum'])['Datapoints'])
         print('BACKUP_ERROR_METRICS', json.dumps({'hours_with_errors': points}))
+        # Per-minute resolution for the hours that had errors: pins each
+        # error to its invocation (the 2026-11-17 alarm datapoint cited
+        # 02:56:00 while the timeouts' REPORT lines said 03:05–03:18 —
+        # Lambda timestamps the invocation, not the timeout kill).
+        minutes = sorted(
+            (str(point['Timestamp']), point['Sum'])
+            for point in cw.get_metric_statistics(
+                Namespace='AWS/Lambda', MetricName='Errors',
+                Dimensions=[{'Name': 'FunctionName', 'Value': fn}],
+                StartTime=datetime.now(timezone.utc) - timedelta(days=4),
+                EndTime=datetime.now(timezone.utc), Period=60,
+                Statistics=['Sum'])['Datapoints']
+            if point['Sum'])
+        print('BACKUP_ERROR_MINUTES', json.dumps({'minutes_with_errors': minutes}))
     logs = boto3.client('logs')
     group = '/aws/lambda/' + fn
     start_ms = int((time.time() - args.log_days * 86400) * 1000)
