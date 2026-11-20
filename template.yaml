@@ -937,7 +937,13 @@ Resources:
   EventQueue:
     Type: AWS::SQS::Queue
     Properties:
-      VisibilityTimeout: 1800  # >= 6x WorkerFunction Timeout (300)
+      # 3x the WorkerFunction Timeout (300): a timed-out invocation always
+      # finishes before its message can redeliver, so the serial worker never
+      # sees duplicates. Below 1800, a failure that bypasses the workflow
+      # retry policy waits out 15 minutes of invisibility per redelivery
+      # instead of 30 — 18-20 Nov this stretched EventQueueAgeAlarm flaps
+      # into multi-hour ALARM/OK storms (t1909u).
+      VisibilityTimeout: 900
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
         maxReceiveCount: 5

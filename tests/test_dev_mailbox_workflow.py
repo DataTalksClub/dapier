@@ -493,7 +493,7 @@ def test_dev_mailbox_delivery_verifier_requires_ingest_and_routed_leg():
 def test_dev_mailbox_verifier_counts_oncall_409_as_already_delivered():
     """A retry whose first attempt reached Hub gets 409 delivery_id_conflict
     (same X-Delivery-Id, different body digest): the email is already in
-    Hub's queue, so the run must not fail into 1800s queue redeliveries."""
+    Hub's queue, so the run must not fail into 900s queue redeliveries."""
     _, wf = _load("dev-mailbox")
     verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
     completed = {"status": "completed", "output": {}}
