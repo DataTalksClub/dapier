@@ -93,10 +93,13 @@ def main():
             payload = i.get('HistoryPayload')
             if isinstance(payload, str):
                 payload = json.loads(payload)
+            # Print the payload raw: its shape changed across API versions
+            # (the reason text moved between keys), and it is itself the
+            # evidence — e.g. the verbatim "Thresholds Crossed" datapoint.
             entries.append({
                 'timestamp': str(i.get('AlarmHistoryUpdatedTimestamp') or i.get('Timestamp')),
                 'summary': i['HistorySummary'],
-                'reason': (payload or {}).get('stateChangeReason'),
+                'payload': payload,
             })
         print('BACKUP_ALARM_HISTORY', json.dumps({'items': entries}))
     with inspect('error-metrics'):
