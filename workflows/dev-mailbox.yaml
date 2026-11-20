@@ -1,6 +1,13 @@
 id: dev-mailbox
 enabled: true
 description: Developer mailbox dev@dtcdev.click -> Developer bot webhook + direct oncall ingest, or Dev sticky Hub session when GrokBot remaining usage < 1%
+# A failed delivery leg (Hub briefly unreachable) retries as a fresh queue
+# message two minutes later. Without a policy the event waits out the event
+# queue's 1800s visibility timeout per redelivery, which trips the 900s
+# EventQueueAgeAlarm on every transient outage.
+retry:
+  attempts: 4
+  backoff_seconds: 120
 triggers:
   - connector: email
     event: message.received
@@ -310,11 +317,20 @@ actions:
           failed.append("route")
       elif (steps.get(leg) or {}).get("status") != "completed":
           failed.append(leg)
-      if (steps.get("post-oncall-ingest") or {}).get("status") != "completed":
+      # Hub answers 409 delivery_id_conflict when it already holds a
+      # delivery under this X-Delivery-Id (sha256 of the message id) and the
+      # body digest differs. That happens on a retry: the first attempt
+      # reached Hub but its response timed out, and the retry resends the
+      # format-email output recovered from run history, whose key order is
+      # not preserved. The email is already in Hub's queue, so it counts.
+      ingest = steps.get("post-oncall-ingest") or {}
+      ingest_duplicate = (ingest.get("status") == "failed"
+                          and "HTTP 409" in str(ingest.get("error") or ""))
+      if ingest.get("status") != "completed" and not ingest_duplicate:
           failed.append("post-oncall-ingest")
       if failed:
           raise ValueError("dev-mailbox delivery failed for: " + ", ".join(failed))
       output = {"routed_to": route_output.get("branch"),
                 "decide_reason": ((steps.get("decide-grok-route") or {}).get("output") or {}).get("result", {}).get("reason", ""),
-                "oncall_ingest": "completed"}
+                "oncall_ingest": "already_delivered" if ingest_duplicate else "completed"}
 
