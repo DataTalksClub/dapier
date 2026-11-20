@@ -80,7 +80,7 @@ def main():
         # (e.g. "Threshold Crossed: 1 datapoint [1.0 (17/11/26 02:56:00)]")
         # that per-hour error buckets can only bracket. Newest first.
         items = []
-        kwargs = {'AlarmName': alarm, 'HistoryItemType': 'Action', 'MaxResults': 10}
+        kwargs = {'AlarmName': alarm, 'HistoryItemType': 'Action', 'MaxRecords': 10}
         while True:
             page = cw.describe_alarm_history(**kwargs)
             items.extend(page.get('AlarmHistoryItems', []))
@@ -93,7 +93,7 @@ def main():
             if isinstance(payload, str):
                 payload = json.loads(payload)
             entries.append({
-                'timestamp': str(i['AlarmHistoryUpdatedTimestamp']),
+                'timestamp': str(i.get('AlarmHistoryUpdatedTimestamp') or i.get('Timestamp')),
                 'summary': i['HistorySummary'],
                 'reason': (payload or {}).get('stateChangeReason'),
             })
