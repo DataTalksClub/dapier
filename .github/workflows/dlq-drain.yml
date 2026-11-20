@@ -1,0 +1,43 @@
+name: DLQ drain
+
+# Lists the event dead-letter queue; with event ids, deletes only those
+# events' DLQ copies (replay them first: `dapier runs replay`). The DLQ
+# cannot be redriven from CI — see scripts/drain_dlq.py.
+
+on:
+  workflow_dispatch:
+    inputs:
+      delete:
+        description: 'Space-separated event ids to delete from the DLQ (empty = list only)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dlq-drain
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-1
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          role-to-assume: arn:aws:iam::817685572750:role/dapier-github-actions-deploy
+          role-session-name: dapier-dlq-drain
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Drain event dead-letter queue
+        env:
+          DELETE_IDS: ${{ inputs.delete }}
+        run: |
+          # Word-split on purpose: one argument per event id.
+          # shellcheck disable=SC2086
+          uv run --with boto3 python scripts/drain_dlq.py --delete $DELETE_IDS

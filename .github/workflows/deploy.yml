@@ -113,6 +113,14 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --role-arn arn:aws:iam::817685572750:role/dapier-cloudformation-service \
             --region "$AWS_REGION"
+      - name: Deploy DLQ drain access policy stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/dlq-drain-access.yaml \
+            --stack-name dapier-dlq-drain-access \
+            --capabilities CAPABILITY_IAM \
+            --role-arn arn:aws:iam::817685572750:role/dapier-cloudformation-service \
+            --region "$AWS_REGION"
       - name: Capture renderer ECR recovery evidence (read-only)
         run: |
           echo "Current dapier stack status:"
