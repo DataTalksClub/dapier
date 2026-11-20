@@ -55,6 +55,11 @@ def _run_step(workflow_id, step, index, event, run_action, *,
                         step_outputs[action_id]["secret"] = True
                     if gate.status == "filtered":
                         return "filtered"
+                    return _rehydrate_branch(
+                        workflow_id, step, action_id, gate.output, event, run_action,
+                        before_action=before_action, after_action=after_action,
+                        on_action_error=on_action_error, scope=scope,
+                        step_outputs=step_outputs)
                 else:
                     step_outputs[action_id] = {"status": "skipped"}
                 return None
@@ -144,6 +149,53 @@ def _run_step(workflow_id, step, index, event, run_action, *,
                      output=step_output(step, output or {}, step_outputs),
                      duration_ms=_elapsed(started), status=status)
     return stop
+
+
+def _recorded_branch(step, output):
+    """The (steps, id suffix) of the branch a recovered condition/paths step
+    took, read from its persisted output; None when it took none."""
+    if not isinstance(output, dict):
+        return None
+    branch = output.get("branch")
+    step_type = str(step.get("type"))
+    if step_type == "condition" and branch in ("then", "else"):
+        chain = step.get(branch)
+    elif step_type == "paths" and branch == "default":
+        chain = step.get("default")
+    elif step_type == "paths" and branch:
+        chain = next((path.get("actions") for path in step.get("paths") or []
+                      if isinstance(path, dict)
+                      and (str(path.get("label") or "").strip() or "path") == branch), None)
+    else:
+        return None
+    return (chain, branch) if isinstance(chain, list) and chain else None
+
+
+def _rehydrate_branch(workflow_id, step, action_id, output, event, run_action, *,
+                      before_action, after_action, on_action_error, scope=None,
+                      step_outputs=None):
+    """Re-enter the branch a recovered condition/paths step recorded.
+
+    A redelivered event recovers a completed branching step from run history
+    as a whole, but later steps read the branch's children by their nested
+    ids (``route.else.post-webhook``). Running the recorded branch again —
+    without re-evaluating the predicate — puts each child through the same
+    gate as a top-level step: completed children restore their own records,
+    and children that failed or were skipped run again, like any unfinished
+    top-level step on a redelivery.
+    """
+    recorded = _recorded_branch(step, output)
+    if recorded is None:
+        return None
+    chain, branch = recorded
+    from .chains import run_chain  # lazy: chains imports this module at its top
+
+    return run_chain(
+        workflow_id, chain, event, run_action,
+        before_action=before_action, after_action=after_action,
+        on_action_error=on_action_error, prefix=f"{action_id}.{branch}",
+        scope=scope, step_outputs=step_outputs,
+    )
 
 
 def _handle_error(workflow_id, step, action_id, exc, event, run_action, *,
