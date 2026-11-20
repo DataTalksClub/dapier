@@ -490,6 +490,39 @@ def test_dev_mailbox_delivery_verifier_requires_ingest_and_routed_leg():
     assert result["oncall_ingest"] == "completed"
 
 
+def test_dev_mailbox_verifier_counts_oncall_409_as_already_delivered():
+    """A retry whose first attempt reached Hub gets 409 delivery_id_conflict
+    (same X-Delivery-Id, different body digest): the email is already in
+    Hub's queue, so the run must not fail into 1800s queue redeliveries."""
+    _, wf = _load("dev-mailbox")
+    verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
+    completed = {"status": "completed", "output": {}}
+    steps = {
+        "route": completed | {"output": {"branch": "else"}},
+        "route.else.post-webhook": completed,
+        "post-oncall-ingest": {"status": "failed", "output": {},
+                               "error": "http_request returned HTTP 409"},
+    }
+    result = run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)["result"]
+    assert result["oncall_ingest"] == "already_delivered"
+    # Any other ingest failure still fails the run.
+    steps["post-oncall-ingest"] = {"status": "failed", "output": {},
+                                   "error": "The read operation timed out"}
+    with pytest.raises(RuntimeError, match="post-oncall-ingest"):
+        run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
+
+
+def test_dev_mailbox_retries_failed_delivery_before_queue_redelivery():
+    from src.dapier.engine.worker import retry_policy
+
+    _, wf = _load("dev-mailbox")
+    parse_workflow(yaml.safe_dump(wf))
+    policy = retry_policy(wf)
+    assert policy["attempts"] >= 2
+    # Each retry must re-enqueue well under the 900s EventQueueAgeAlarm.
+    assert policy["backoff_seconds"] < 900
+
+
 @pytest.mark.parametrize("token_value", [
     "secret-token",
     "Bearer secret-token",
