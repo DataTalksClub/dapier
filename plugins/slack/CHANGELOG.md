@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0 — 2026-11-20
+
+`telegram_format` mirrors a post's attachment instead of posting "no text
+in this post, see Telegram for the attachment" (t.me/aidevtoolszoomcamp/81:
+a caption-less photo reached #course-ai-dev-tools-zoomcamp as that
+placeholder). The trigger's own bot (`telegram_connection_id`, else the
+connection of the event's telegram hook) downloads the file via `getFile`.
+A photo, or an image sent as a file, is uploaded to Slack and shown as an
+image block in the channel post under its caption. When the upload is
+refused (the token lacks `files:write`), the public t.me preview image is
+shown instead. Other files are uploaded into the post's thread. A post with
+no text and nothing to show is skipped, never posted as a placeholder. The
+output gains `media` (`{kind, via}`), `media_error` and `skipped`.
+
 ## 1.1.1 — 2026-10-31
 
 The `slack.messages` poll source now resolves the stored OAuth user token
