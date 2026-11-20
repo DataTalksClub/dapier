@@ -46,3 +46,6 @@ jobs:
             args="--invoke"
           fi
           uv run --with boto3 python scripts/inspect_backup.py $args
+      - name: Inspect event-queue and operator alarms
+        if: always()
+        run: uv run --with boto3 python scripts/inspect_alarms.py
