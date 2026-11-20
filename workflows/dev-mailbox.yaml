@@ -3,7 +3,7 @@ enabled: true
 description: Developer mailbox dev@dtcdev.click -> Developer bot webhook + direct oncall ingest, or Dev sticky Hub session when GrokBot remaining usage < 1%
 # A failed delivery leg (Hub briefly unreachable) retries as a fresh queue
 # message two minutes later. Without a policy the event waits out the event
-# queue's 900s visibility timeout per redelivery, which trips the 900s
+# queue's 1800s visibility timeout per redelivery, which trips the 900s
 # EventQueueAgeAlarm on every transient outage.
 retry:
   attempts: 4
