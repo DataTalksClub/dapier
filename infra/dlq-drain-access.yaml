@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Event dead-letter queue drain permissions for the GitHub deploy role. The
+  dispatchable dlq-drain workflow (scripts/drain_dlq.py) lists the DLQ and
+  deletes only the events an operator names, once their run replay is green.
+  Scoped to the dapier event DLQ; the stack name is resolved through the
+  backup inspection policy's cloudformation:DescribeStackResource grant.
+
+Resources:
+  GithubDeployDlqDrainAccess:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DapierDlqDrainAccess
+      Roles:
+        - dapier-github-actions-deploy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            # The physical queue is dapier-DeadLetterQueue-<suffix>.
+            Resource: !Sub arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:dapier-DeadLetterQueue-*
