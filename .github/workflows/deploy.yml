@@ -208,5 +208,11 @@ jobs:
         # the next 03:00Z run).
         continue-on-error: true
         run: uv run --with boto3 python scripts/inspect_backup.py
+      - name: Inspect event-queue and operator alarms (read-only)
+        # Alarm states, transitions, queue-age peaks, DLQ depth: proof that
+        # a paged alarm recovered and has not come back. Same grants as the
+        # backup inspection (infra/backup-inspection-access.yaml).
+        continue-on-error: true
+        run: uv run --with boto3 python scripts/inspect_alarms.py
       - name: Inspect YouTube renewal infrastructure (read-only)
         run: bash scripts/inspect-youtube-renewal.sh

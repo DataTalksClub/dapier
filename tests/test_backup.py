@@ -613,3 +613,31 @@ def test_backup_failure_email_routes_only_to_dev_inbox():
     # The backup recipient parameter itself must never default to a personal inbox.
     assert "alexey@datatalks.club" not in template["Parameters"]["BackupAlertEmail"]["Default"]
     assert "alexey@datatalks.club" not in Path("src/dapier/backup.py").read_text()
+
+
+def test_alarm_inspection_stays_within_inspection_grants():
+    """scripts/inspect_alarms.py runs in the same deploy and dispatch jobs on
+    the same role: every boto3 call it makes must already be granted, and it
+    must run read-only in both workflows."""
+    import re
+
+    script = Path("scripts/inspect_alarms.py").read_text()
+    clients = dict(re.findall(r"^(\w+) = boto3\.client\('([^']+)'\)\s*$", script, re.MULTILINE))
+    calls = {(service, method)
+             for var, service in clients.items()
+             for method in re.findall(rf"\b{var}\.(\w+)\(", script)}
+    assert calls, "no boto3 calls parsed"
+    infra = _load_yaml("infra/backup-inspection-access.yaml")
+    policy = infra["Resources"]["GithubDeployBackupInspectionAccess"]["Properties"]
+    granted = {action
+               for statement in policy["PolicyDocument"]["Statement"]
+               for action in statement["Action"]}
+    for service, method in sorted(calls):
+        assert INSPECTION_GRANTS.get((service, method)) in granted, f"{service}.{method}"
+
+    deploy = _load_yaml(".github/workflows/deploy.yml")["jobs"]["deploy"]["steps"]
+    step = next(s for s in deploy if "inspect_alarms.py" in s.get("run", ""))
+    assert step["run"].strip() == "uv run --with boto3 python scripts/inspect_alarms.py"
+    assert step.get("continue-on-error") is True
+    dispatch = _load_yaml(".github/workflows/backup-inspection.yml")["jobs"]["inspect"]["steps"]
+    assert any("scripts/inspect_alarms.py" in s.get("run", "") for s in dispatch)
