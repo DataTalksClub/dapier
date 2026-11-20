@@ -357,13 +357,12 @@ class SlackTelegramFormatTests(unittest.TestCase):
             self.assertEqual(call["payload"]["thread_ts"], "ts-1")
         self.assertEqual(output["messages"], len(calls))
 
-    def test_media_post_falls_back_to_the_placeholder_text(self):
+    def test_post_without_text_or_attachment_is_skipped_not_placeholdered(self):
         event = {"connector": "telegram", "event": "message.received",
                  "data": {"text": "", "entities": [], "message_id": 5}}
-        calls, _ = self.run_slack(event)
-        self.assertEqual(
-            calls[0]["payload"]["blocks"][0]["text"]["text"],
-            ">no text in this post, see Telegram for the attachment")
+        calls, output = self.run_slack(event)
+        self.assertEqual(calls, [])
+        self.assertTrue(output["skipped"])
 
     def test_slack_rejection_fails_the_action(self):
         event = {"connector": "telegram", "event": "message.received",

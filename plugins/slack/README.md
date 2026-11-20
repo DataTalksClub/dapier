@@ -119,7 +119,7 @@ and `{ts}`.
 
 | action | Slack call | notes |
 | --- | --- | --- |
-| `slack` | `chat.postMessage` | templated message to a channel; `telegram_format` renders Telegram updates as blocks; output `{ok, channel, ts}` |
+| `slack` | `chat.postMessage` | templated message to a channel; `telegram_format` renders Telegram updates as blocks and mirrors a photo/file (downloaded with the trigger's bot or `telegram_connection_id`, uploaded with `files:write`; a photo falls back to the public t.me preview image; a post with nothing to show is skipped); output `{ok, channel, ts}` plus `media`/`media_error`/`skipped` |
 | `slack_dm` | `conversations.open` + `chat.postMessage` | DM one user; chain `slack_find_user` and pass `{steps.<id>.output.user.id}` |
 | `slack_update_message` | `chat.update` | edit one posted message; `channel` + `ts` render from the event (a Slack trigger envelope carries `{channel_id}`, `{ts}`) |
 | `slack_add_reaction` | `reactions.add` | `reaction` is the emoji name without colons; Slack's `already_reacted` counts as success so retried runs stay green |

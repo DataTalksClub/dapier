@@ -70,7 +70,7 @@ register(Action(
     required=frozenset({"channel"}),
     optional=frozenset({"connection_id", "text", "unfurl_links",
                         "unfurl_media", "timeout_seconds", "telegram_format",
-                        "source_link", "thread_ts", "username", "link_names", "reply_broadcast"}),
+                        "source_link", "telegram_connection_id", "thread_ts", "username", "link_names", "reply_broadcast"}),
     fields=(
         {"key": "connection_id", "label": "Connection ID", "placeholder": "resolves the credential"},
         {"key": "channel", "label": "Channel", "placeholder": "#alerts", "required": True,
@@ -92,6 +92,9 @@ register(Action(
          "placeholder": "renders {text}+entities as Slack blocks, splits long posts into a thread"},
         {"key": "source_link", "label": "Source link template",
          "placeholder": "https://t.me/channel/{message_id}"},
+        {"key": "telegram_connection_id", "label": "Telegram connection (attachments)",
+         "placeholder": "defaults to the triggering telegram hook's bot",
+         "help": "Telegram formatting downloads a post's photo/file with this bot and uploads it to Slack (needs files:write)"},
     ),
 ))
 

@@ -691,32 +691,273 @@ def run_slack_upload_file(action, event, *, steps=None, transport=None):
     }
 
 
-def _post_telegram_format(action, event, token):
+# Telegram attachment kinds the crosspost mirrors, in the order a message is
+# checked. ``photo`` is a list of sizes; the others are one file object.
+TELEGRAM_FILE_KINDS = ("document", "video", "animation", "audio", "voice", "video_note")
+
+# The Bot API's getFile serves files up to 20 MB; bigger ones cannot be
+# downloaded by the bot at all.
+TELEGRAM_DOWNLOAD_LIMIT = 20 * 1024 * 1024
+
+# A Slack file is processed asynchronously after completeUploadExternal; an
+# image block that references it can be refused (invalid_blocks) until then.
+SLACK_FILE_BLOCK_RETRY_DELAYS = (1, 2, 4)
+
+# The image of a public channel post, as the t.me embed renders it.
+TELEGRAM_PREVIEW_IMAGE_RE = re.compile(
+    r"tgme_widget_message_photo_wrap[^>]*?background-image:url\('(https://[^']+)'\)")
+
+
+def _telegram_message(data):
+    """The raw Telegram message a crosspost event carries (or {})."""
+    update = data.get("update") if isinstance(data.get("update"), dict) else {}
+    for key in ("channel_post", "edited_channel_post", "message", "edited_message"):
+        if isinstance(update.get(key), dict):
+            return update[key]
+    return {}
+
+
+def _telegram_media(message):
+    """The attachment of a Telegram message: ``{kind, file_id, filename,
+    size, mime_type, image}``, or None for a text-only post.
+
+    A photo arrives as several sizes; the largest one is mirrored.
+    """
+    message_id = message.get("message_id") or "post"
+    photos = message.get("photo")
+    if isinstance(photos, list):
+        sizes = [size for size in photos if isinstance(size, dict) and size.get("file_id")]
+        if sizes:
+            best = max(sizes, key=lambda size: ((size.get("width") or 0) * (size.get("height") or 0),
+                                                size.get("file_size") or 0))
+            return {"kind": "photo", "file_id": best["file_id"],
+                    "filename": f"telegram-{message_id}.jpg", "size": best.get("file_size"),
+                    "mime_type": "image/jpeg", "image": True}
+    for kind in TELEGRAM_FILE_KINDS:
+        item = message.get(kind)
+        if not isinstance(item, dict) or not item.get("file_id"):
+            continue
+        filename = base._safe_filename(str(item.get("file_name") or f"telegram-{message_id}-{kind}"))
+        mime_type = (item.get("mime_type") or mimetypes.guess_type(filename)[0]
+                     or "application/octet-stream")
+        return {"kind": kind, "file_id": item["file_id"], "filename": filename,
+                "size": item.get("file_size"), "mime_type": mime_type,
+                "image": kind == "document" and mime_type.startswith("image/")}
+    return None
+
+
+def _telegram_bot_token(action, data):
+    """The bot token that can download the post's files.
+
+    A file_id only works for the bot that received it, so this is the
+    trigger's own bot: ``telegram_connection_id`` on the action, else the
+    connection of the telegram trigger (``data.hook``) the event came from.
+    """
+    from src.dapier.triggers import hook_triggers
+
+    connection_id = str(action.get("telegram_connection_id") or "").strip()
+    if not connection_id and data.get("hook"):
+        item = hook_triggers.get_item(str(data["hook"])) or {}
+        connection_id = str(item.get("connection_id") or "").strip()
+    if not connection_id:
+        raise RuntimeError("no telegram connection to download the attachment with")
+    connection = base._connected_connection(connection_id)
+    token = credentials.get_credential(connection["credential_id"]).get("token")
+    if not token:
+        raise RuntimeError(f"telegram connection {connection_id!r} has no bot token")
+    return token
+
+
+def _telegram_download(token, media, *, transport):
+    """The attachment's bytes through getFile. Errors never carry the token
+    (the Bot API puts it in the URL path)."""
+    if (media.get("size") or 0) > TELEGRAM_DOWNLOAD_LIMIT:
+        raise RuntimeError("attachment is over the Bot API's 20 MB download limit")
+    query = urlencode({"file_id": media["file_id"]})
+    try:
+        status, raw = transport("GET", f"https://api.telegram.org/bot{token}/getFile?{query}",
+                                headers={}, body=None, timeout=15)
+        info = json.loads(raw.decode() or "{}")
+    except Exception as exc:
+        raise RuntimeError(f"telegram getFile failed: {type(exc).__name__}") from None
+    file_path = ((info.get("result") or {}).get("file_path")
+                 if isinstance(info, dict) and info.get("ok") else None)
+    if status >= 300 or not file_path:
+        description = info.get("description") if isinstance(info, dict) else None
+        raise RuntimeError(f"telegram getFile failed: {description or f'HTTP {status}'}")
+    try:
+        status, body = transport("GET", f"https://api.telegram.org/file/bot{token}/{file_path}",
+                                 headers={}, body=None, timeout=60)
+    except Exception as exc:
+        raise RuntimeError(f"telegram file download failed: {type(exc).__name__}") from None
+    if status >= 300:
+        raise RuntimeError(f"telegram file download returned HTTP {status}")
+    return body
+
+
+def _slack_upload(token, media, body, *, transport, channel_id=None, thread_ts=None):
+    """Upload bytes to Slack (getUploadURLExternal, POST, completeUpload).
+
+    Without ``channel_id`` the file stays unshared, for an image block to
+    reference by id; with it, the file is shared there (under ``thread_ts``).
+    Needs the ``files:write`` scope. Returns the Slack file id.
+    """
+    requested = _slack_rpc(SLACK_UPLOAD_URL_URL, token,
+                           {"filename": media["filename"], "length": len(body)},
+                           transport=transport, method="GET")
+    if not requested.get("ok"):
+        raise RuntimeError(f"Slack upload failed: {requested.get('error', 'unknown_error')}")
+    upload_url = str(requested.get("upload_url") or "")
+    file_id = str(requested.get("file_id") or "")
+    if not upload_url or not file_id:
+        raise RuntimeError("slack upload returned no upload target")
+    try:
+        status, _raw = transport("POST", upload_url,
+                                 headers={"content-type": media["mime_type"]},
+                                 body=body, timeout=60)
+    except Exception as exc:
+        raise RuntimeError(f"slack file upload unreachable: {type(exc).__name__}") from None
+    if status >= 300:
+        raise RuntimeError(f"slack file upload returned HTTP {status}")
+    completion = {"files": json.dumps([{"id": file_id, "title": media["filename"]}])}
+    if channel_id:
+        completion["channel_id"] = channel_id
+    if thread_ts:
+        completion["thread_ts"] = thread_ts
+    try:
+        status, raw = transport(
+            "POST", SLACK_UPLOAD_COMPLETE_URL,
+            headers={"authorization": f"Bearer {token}",
+                     "content-type": "application/x-www-form-urlencoded"},
+            body=urlencode(completion).encode(), timeout=15)
+        finished = json.loads(raw.decode() or "{}")
+    except Exception as exc:
+        raise RuntimeError(f"slack upload completion failed: {type(exc).__name__}") from None
+    if not finished.get("ok"):
+        raise RuntimeError(f"Slack upload failed: {finished.get('error', 'unknown_error')}")
+    return file_id
+
+
+def _telegram_preview_image(data, *, transport):
+    """The post's image as the public t.me embed serves it (a CDN URL Slack
+    can fetch), or None. The fallback when the file cannot be uploaded."""
+    username = str((data.get("chat") or {}).get("username") or "").strip()
+    message_id = data.get("message_id")
+    if not username or message_id is None:
+        return None
+    try:
+        status, raw = transport("GET", f"https://t.me/{username}/{message_id}?embed=1&mode=tme",
+                                headers={}, body=None, timeout=15)
+    except Exception:
+        return None
+    if status >= 300:
+        return None
+    match = TELEGRAM_PREVIEW_IMAGE_RE.search(raw.decode("utf-8", "replace"))
+    return match.group(1) if match else None
+
+
+def _alt_text(text):
+    plain = " ".join(str(text or "").split())
+    return (plain[:200] if plain else "Image from the Telegram post")
+
+
+def _post_telegram_format(action, event, token, *, transport=None, sleep=None):
     """Post a Telegram update as rendered Slack blocks (au-tomator behavior).
 
     The first message goes to the channel; anything that does not fit — plus
     the rendered ``source_link`` — continues in its thread. The body comes
-    from the event's ``text``/``entities`` fields, not the ``text`` template:
-    rendering the raw text through a template would drop the entity markup
-    the blocks are built from.
-    """
-    data = event.get("data", {})
-    text = data.get("text") or "no text in this post, see Telegram for the attachment"
-    messages = telegram_format.build_messages(text, data.get("entities"))
-    link = render(action.get("source_link", ""), event, steps=None).strip()
+    from the event's ``text``/``entities`` fields (the caption for a media
+    post), not the ``text`` template: rendering the raw text through a
+    template would drop the entity markup the blocks are built from.
 
+    A post with an attachment mirrors the attachment itself. An image (a
+    photo, or an image sent as a file) is downloaded with the trigger's bot,
+    uploaded to Slack and shown as an image block in the first message under
+    the caption; when the upload is refused (no ``files:write`` scope) the
+    public t.me preview image is shown instead. Any other file is uploaded
+    into the post's thread. A post with neither text nor an attachment the
+    crosspost can show is skipped: it never posts an empty placeholder.
+    """
+    import time
+
+    transport = transport or base._default_transport
+    sleep = sleep or time.sleep
+    data = event.get("data", {})
+    text = data.get("text") or ""
+    media = _telegram_media(_telegram_message(data))
+    link = render(action.get("source_link", ""), event, steps=None).strip()
     channel = action["channel"]
-    first = _post_blocks(token, action, channel, messages[0])
+    messages = telegram_format.build_messages(text, data.get("entities")) if text else [[]]
+    first_blocks = list(messages[0])
+    output = {"ok": True, "channel": channel}
+
+    body = None
+    media_error = None
+    if media:
+        try:
+            body = _telegram_download(_telegram_bot_token(action, data), media,
+                                      transport=transport)
+        except Exception as exc:  # noqa: BLE001 — reported in the output, then fallback
+            media_error = str(exc)
+
+    first = None
+    if media and media["image"]:
+        alt = _alt_text(text)
+        if body is not None:
+            try:
+                file_id = _slack_upload(token, media, body, transport=transport)
+                image = {"type": "image", "slack_file": {"id": file_id}, "alt_text": alt}
+                for delay in (*SLACK_FILE_BLOCK_RETRY_DELAYS, None):
+                    try:
+                        first = _post_blocks(token, action, channel, first_blocks + [image])
+                        break
+                    except RuntimeError as exc:
+                        if delay is None or "invalid_blocks" not in str(exc):
+                            raise
+                        sleep(delay)
+                output["media"] = {"kind": media["kind"], "via": "upload", "file_id": file_id}
+            except Exception as exc:  # noqa: BLE001 — fall back to the public preview
+                media_error = str(exc)
+        if first is None:
+            preview = _telegram_preview_image(data, transport=transport)
+            if preview:
+                image = {"type": "image", "image_url": preview, "alt_text": alt}
+                first = _post_blocks(token, action, channel, first_blocks + [image])
+                output["media"] = {"kind": media["kind"], "via": "telegram_preview"}
+    elif media and body is not None and not first_blocks:
+        first_blocks = [{"type": "section", "text": {
+            "type": "mrkdwn", "text": f"\U0001f4ce *{telegram_format.escape_mrkdwn(media['filename'])}*"}}]
+
+    if first is None:
+        if not first_blocks:
+            output.update({"ok": True, "skipped": True, "messages": 0,
+                           "reason": "no text and no attachment that could be mirrored"})
+            if media_error:
+                output["media_error"] = media_error
+            return output
+        first = _post_blocks(token, action, channel, first_blocks)
+    if media_error:
+        output["media_error"] = media_error
+
     thread_ts = first.get("ts")
     posted = 1
     for blocks in messages[1:]:
         _post_blocks(token, action, channel, blocks, thread_ts=thread_ts)
         posted += 1
+    if media and not media["image"] and body is not None and thread_ts:
+        try:
+            file_id = _slack_upload(token, media, body, transport=transport,
+                                    channel_id=first.get("channel") or channel,
+                                    thread_ts=thread_ts)
+            output["media"] = {"kind": media["kind"], "via": "upload", "file_id": file_id}
+        except Exception as exc:  # noqa: BLE001 — the text is already posted
+            output["media_error"] = str(exc)
     if link and thread_ts:
         _post_blocks(token, action, channel, telegram_format.link_blocks(link),
                      thread_ts=thread_ts)
         posted += 1
-    return {"ok": True, "channel": channel, "ts": thread_ts, "messages": posted}
+    output.update({"ts": thread_ts, "messages": posted})
+    return output
 
 
 def _post_blocks(token, action, channel, blocks, thread_ts=None):
