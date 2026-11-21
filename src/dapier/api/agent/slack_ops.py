@@ -1,6 +1,7 @@
 """Slack DM/export/post helpers for the agent API (connection token stays server-side)."""
 
 import re
+from urllib.parse import urlencode
 
 from ...connections import discovery as slack_discovery
 from ...connections import tokens
@@ -286,7 +287,18 @@ def post_message(channel, text, *, connection_id=DEFAULT_POST_CONNECTION_ID, thr
     channel_id = _resolve_channel_id(token, channel)
     thread_ts = str(thread_ts).strip() if thread_ts else None
     if dry_run:
-        info = _call(token, "conversations.info", {"channel": channel_id})
+        try:
+            info = slack_discovery._request(
+                "GET",
+                f"{slack_discovery.SLACK_API_URL}/conversations.info?{urlencode({'channel': channel_id})}",
+                token,
+                None,
+            )
+        except slack_discovery.DiscoveryError as exc:
+            raise SlackOpsError(str(exc), status=getattr(exc, "status", 502) or 502) from None
+        if not info.get("ok"):
+            err = info.get("error") or "unknown_error"
+            raise SlackOpsError(f"Slack rejected conversations.info: {err}", status=502)
         ch = info.get("channel") or {}
         auth = _call(token, "auth.test", {})
         return {

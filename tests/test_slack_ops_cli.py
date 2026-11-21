@@ -161,13 +161,17 @@ def test_post_message_dry_run(monkeypatch):
     monkeypatch.setattr(slack_ops.tokens, "get_access_token",
                         FakeTokens("xoxb-" + "b" * 40).get_access_token)
 
+    def fake_request(method, url, token, payload, transport=None):
+        assert method == "GET"
+        assert "conversations.info?channel=C01BQC114P2" in url
+        return {"ok": True, "channel": {"id": "C01BQC114P2", "name": "announcements", "is_member": True}}
+
     def fake_call(method, token, payload, transport=None):
-        if method == "conversations.info":
-            return {"ok": True, "channel": {"id": "C01BQC114P2", "name": "announcements", "is_member": True}}
         if method == "auth.test":
             return {"ok": True, "bot_id": "B123", "user_id": "U123"}
         raise AssertionError(method)
 
+    monkeypatch.setattr(slack_ops.slack_discovery, "_request", fake_request)
     monkeypatch.setattr(slack_ops.slack_discovery, "_slack_call", fake_call)
     res = slack_ops.post_message("C01BQC114P2", "Hello", dry_run=True)
     assert res["dry_run"] is True
