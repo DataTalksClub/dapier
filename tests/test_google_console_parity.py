@@ -8,7 +8,7 @@ from src.dapier.api.admin import dispatch
 
 
 @pytest.mark.parametrize('service,route_name', [
-    ('gmail', 'route_gmail'), ('gdrive', 'route_gdrive'), ('calendar', 'route_calendar')])
+    ('gmail', 'route_gmail'), ('gdrive', 'route_gdrive'), ('calendar', 'route_calendar'), ('gdocs', 'route_gdocs')])
 def test_console_google_dispatch_reuses_handler(monkeypatch, service, route_name):
     seen = []
     module = getattr(agent, service)

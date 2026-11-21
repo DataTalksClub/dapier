@@ -14,7 +14,7 @@ import urllib.request
 
 from .. import api
 
-__all__ = ["gdocs_get", "gdocs_append", "gdocs_replace", "parse_doc_id"]
+__all__ = ["gdocs_get", "gdocs_append", "gdocs_replace", "parse_doc_id", "gdocs_structure", "gdocs_batch_update"]
 
 DEFAULT_REF = "drive datatalks"
 DEFAULT_AGENT = "admin-os"
@@ -111,3 +111,28 @@ def gdocs_replace(api_url, doc, find, text=None, file=None, ref=DEFAULT_REF, age
     body = _read_text(text, file)
     return _batch(api_url, doc, [{"replaceAllText": {
         "containsText": {"text": find, "matchCase": True}, "replaceText": body}}], ref, agent, debug)
+
+
+def gdocs_structure(api_url, doc, account, debug=False):
+    """Print the complete Docs resource, including tabs, tables and revision."""
+    query = urllib.parse.urlencode({"account": account})
+    result = api.call(api_url, "GET", "/api/agent/gdocs/documents/" + parse_doc_id(doc)
+                      + "?" + query, debug=debug)
+    print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
+def gdocs_batch_update(api_url, doc, file, account, revision, debug=False):
+    """Submit Google Docs requests through Dapier, guarded by the read revision."""
+    try:
+        data = json.loads(_read_text(None, file))
+    except ValueError as exc:
+        raise api.ApiError(f"Invalid requests JSON: {exc}") from None
+    requests = data.get("requests") if isinstance(data, dict) else data
+    if not isinstance(requests, list) or not requests:
+        raise api.ApiError("Expected nonempty requests array or object containing requests")
+    result = api.call(api_url, "POST", "/api/agent/gdocs/documents/" + parse_doc_id(doc)
+                      + "/batch-update", body={"account": account, "requests": requests,
+                      "required_revision_id": revision}, debug=debug)
+    print(json.dumps(result, ensure_ascii=False))
+    return 0

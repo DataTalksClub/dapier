@@ -780,3 +780,24 @@ Choose a service and operation, fill in IDs and JSON parameters, attach local
 files when applicable, then Preview or Fetch/Apply. The selected connection ID
 is fixed for the request. Admin routes pass session, CSRF and role checks before
 calling the same handlers as the agent API; provider logic is shared.
+
+## Native Google Docs editing
+
+Operator-authenticated Docs commands keep Google tokens server-side and require
+an explicit connected Google account:
+
+```sh
+dapier gdocs get DOC_ID --account you@example.com --json > document.json
+dapier gdocs batch-update DOC_ID --account you@example.com --file requests.json --revision REVISION_ID
+```
+
+The first command returns the complete Google Docs resource, including tabs,
+tables, indices and `revisionId`. Use that revision for the second command;
+a stale revision is rejected by Google rather than overwriting concurrent edits.
+The request file contains a native Docs requests array or an object with a
+`requests` array. All native batchUpdate operations are supported; account
+selection, operator authorization, credential handling and auditing remain in
+the Dapier API (`GET /api/agent/gdocs/documents/:id` and
+`POST /api/agent/gdocs/documents/:id/batch-update`). The connection must already
+grant Docs access. These commands do not add scopes or grants. Legacy `--as`
+text commands remain available for existing agent-bound integrations.

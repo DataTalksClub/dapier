@@ -36,6 +36,10 @@ const OPERATIONS = {
     ['Trash file', 'POST', 'files/{file_id}/trash', {permanent: false}],
     ['Restore file', 'POST', 'files/{file_id}/restore', {}],
   ],
+  gdocs: [
+    ['Read document structure', 'GET', 'documents/{document_id}', {}],
+    ['Edit document', 'POST', 'documents/{document_id}/batch-update', {required_revision_id: '', requests: []}],
+  ],
   calendar: [
     ['List calendars', 'GET', 'calendars', {max: 25}],
     ['Search or list events', 'GET', 'events', {time_min: '', time_max: '', max: 25}],
@@ -62,7 +66,7 @@ export function openGoogleTools(connection) {
   dialog.innerHTML = `<div class="dialog-head dk-dialog__head"><h2 id="google-tools-title">Google tools</h2></div>
     <div class="dialog-body dk-dialog__body">
       <p>${escapeHtml(connection.verified_account_id || connection.connection_id)}</p>
-      <label>Service<select name="service"><option value="gmail">Gmail</option><option value="gdrive">Drive</option><option value="calendar">Calendar</option></select></label>
+      <label>Service<select name="service"><option value="gmail">Gmail</option><option value="gdrive">Drive</option><option value="calendar">Calendar</option><option value="gdocs">Docs</option></select></label>
       <label>Operation<select name="operation"></select></label>
       <div data-ids></div>
       <label>Parameters (JSON)<textarea name="parameters" rows="9" spellcheck="false"></textarea></label>

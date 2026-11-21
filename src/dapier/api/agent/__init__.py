@@ -9,7 +9,7 @@ shared request plumbing late-binds through it too (see common._LateBinding).
 import re
 from urllib.parse import unquote
 
-from . import access, common, connections, designer, device, ops, triggers, typefully, slack, gmail, gdrive, calendar
+from . import access, common, connections, designer, device, ops, triggers, typefully, slack, gmail, gdrive, calendar, gdocs
 
 # A workflow ref: the managed file name, or a bare id — hook-backed
 # workflows (webhook/telegram/... triggers) have no file and are addressed
@@ -311,6 +311,9 @@ def _route(event, method, path):
     typed_gdrive = gdrive.route_gdrive(event, method, path)
     if typed_gdrive is not None:
         return typed_gdrive
+    typed_gdocs = gdocs.route_gdocs(event, method, path)
+    if typed_gdocs is not None:
+        return typed_gdocs
     typed_calendar = calendar.route_calendar(event, method, path)
     if typed_calendar is not None:
         return typed_calendar

@@ -316,13 +316,13 @@ def route(event, method, path):
 
 def _route_google(event, method, path, operator_payload, operator_subject):
     """Console aliases use the same Google operation handlers as the CLI."""
-    if not re.match(r"^/api/admin/(gmail|gdrive|calendar)/", path):
+    if not re.match(r"^/api/admin/(gmail|gdrive|calendar|gdocs)/", path):
         return None
     console_event = {**event, "_console_google_payload": operator_payload,
                      "_console_google_subject": operator_subject}
     agent_path = path.replace("/api/admin/", "/api/agent/", 1)
     for router in (agent.gmail.route_gmail, agent.gdrive.route_gdrive,
-                   agent.calendar.route_calendar):
+                   agent.calendar.route_calendar, agent.gdocs.route_gdocs):
         response = router(console_event, method, agent_path)
         if response is not None:
             return response

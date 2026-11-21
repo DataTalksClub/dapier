@@ -26,6 +26,12 @@ def register(sub):
     g = sp.add_parser("get", help="Print title, revision and plain text")
     common(g)
     g.add_argument("--json", action="store_true")
+    g.add_argument("--account", help="Operator connection email/id; returns full structure as JSON")
+    b = sp.add_parser("batch-update", help="Apply native Docs requests with a revision guard")
+    b.add_argument("doc", help="Doc URL or id")
+    b.add_argument("--account", required=True)
+    b.add_argument("--file", required=True, help="Requests JSON file, or - for stdin")
+    b.add_argument("--revision", required=True, help="revisionId from gdocs get --account")
     for name, hlp in (("append", "Append text at end of doc"), ("replace", "Replace all occurrences of --find")):
         x = sp.add_parser(name, help=hlp)
         common(x)
@@ -36,6 +42,10 @@ def register(sub):
 
 
 def run(args, api_url, debug, child=None):
+    if args.command == "batch-update":
+        return commands.gdocs_batch_update(api_url, args.doc, args.file, args.account, args.revision, debug)
+    if args.command == "get" and args.account:
+        return commands.gdocs_structure(api_url, args.doc, args.account, debug)
     if args.command == "get":
         return commands.gdocs_get(api_url, args.doc, ref=args.ref, agent=args.agent,
                                   as_json=args.json, debug=debug)
