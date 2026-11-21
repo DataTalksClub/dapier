@@ -56,6 +56,25 @@ def register(sub):
     export.add_argument("--limit", type=int, default=200)
     export.add_argument("--cursor", default=None)
 
+    post = sub_p.add_parser(
+        "post",
+        help="Post a message to a Slack channel or thread (default connection: slack = Au-Tomator bot)",
+    )
+    post.add_argument("--channel", required=True,
+                      help="Channel name (e.g. announcements or #announcements) or id (e.g. C01BQC114P2)")
+    text_group = post.add_mutually_exclusive_group(required=True)
+    text_group.add_argument("--text-file",
+                            help="Path to UTF-8 text file (or '-' for stdin)")
+    text_group.add_argument("--text", help="Inline message text")
+    post.add_argument("--thread-ts", default=None,
+                      help="Thread timestamp to reply in")
+    post.add_argument("--connection", default="slack",
+                      help="Connection id (default slack = Au-Tomator bot)")
+    post.add_argument("--no-unfurl", action="store_true",
+                      help="Disable link and media previews")
+    post.add_argument("--dry-run", action="store_true",
+                      help="Resolve channel and verify bot/channel access without posting")
+
 
 def run(args, api_url, debug, child=None):
     if args.command == "find-user":
@@ -86,4 +105,17 @@ def run(args, api_url, debug, child=None):
         return commands.slack_dm_export(
             api_url, args.user, connection_id=args.connection,
             limit=args.limit, cursor=args.cursor, debug=debug)
+    if args.command == "post":
+        return commands.slack_post(
+            api_url,
+            channel=args.channel,
+            text_file=args.text_file,
+            text=args.text,
+            connection_id=args.connection,
+            thread_ts=args.thread_ts,
+            unfurl_links=not args.no_unfurl,
+            unfurl_media=not args.no_unfurl,
+            dry_run=args.dry_run,
+            debug=debug,
+        )
     return 2

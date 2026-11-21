@@ -119,6 +119,35 @@ def _simple(event, action, fn, build):
     return _json_response(200, payload)
 
 
+def post_api(event):
+    subject, error = require_operator(event, "slack.post")
+    if error:
+        return error
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, TypeError):
+        return _json_response(400, {"error": "Invalid JSON body"})
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Invalid JSON body"})
+    connection_id = str(
+        body.get("connection_id") or slack_ops.DEFAULT_POST_CONNECTION_ID
+    ).strip().lower() or slack_ops.DEFAULT_POST_CONNECTION_ID
+    try:
+        payload = slack_ops.post_message(
+            body.get("channel") or "",
+            body.get("text") or "",
+            connection_id=connection_id,
+            thread_ts=body.get("thread_ts"),
+            unfurl_links=body.get("unfurl_links", True),
+            unfurl_media=body.get("unfurl_media", True),
+            dry_run=bool(body.get("dry_run", False)),
+        )
+    except (slack_ops.SlackOpsError, ValueError) as exc:
+        return _error(exc)
+    audit.emit(payload["connection"], "slack.post", subject, outcome="ok")
+    return _json_response(200, payload)
+
+
 def route_slack(event, method, path):
     """Return a response for Slack agent routes, or None if unmatched."""
     if path == "/api/agent/slack/users" and method == "GET":
@@ -129,6 +158,8 @@ def route_slack(event, method, path):
         return history_api(event)
     if path == "/api/agent/slack/dm-export" and method == "GET":
         return dm_export_api(event)
+    if path == "/api/agent/slack/post" and method == "POST":
+        return post_api(event)
     if path == "/api/agent/slack/replies" and method == "GET":
         return _simple(event, "slack.replies", slack_ops.replies, lambda q, c: {
             "channel": q.get("channel") or "", "thread_ts": q.get("thread_ts") or "",
