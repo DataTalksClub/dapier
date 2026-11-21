@@ -50,7 +50,7 @@ Then `hub intake assign <id> …` to queue a Developer session.
 | Source | How it reaches its bot |
 | --- | --- |
 | Explicit POST to `/hooks/developer` | Hub intake (+ assign when `wake`) |
-| `dev@dtcdev.click` | SES route `dev` → Dapier `dev-mailbox` → Developer bot webhook + direct Hub2 oncall ingest |
+| `dev@dtcdev.click` | SES route `dev` → Dapier `dev-mailbox` → direct Hub2 oncall ingest always; Developer bot webhook only for `[principal-ping]` / user-facing outage mail |
 | `tofu@dtcdev.click` | SES route `tofu` → dapier email event → `tofu-mailbox` workflow → Tofu Grok bot webhook |
 | `orin@dtcdev.click` | SES route `orin` → dapier email event → `orin-mailbox` workflow → Orin Grok bot webhook |
 
@@ -60,19 +60,22 @@ Existing shared routes (`newsletter@`, `invoice@`, `todo@`, `agents@`) are uncha
 
 | Address | SES route label | Destination (workflow) | Lands how |
 | --- | --- | --- | --- |
-| `dev@dtcdev.click` | `dev` | Developer bot webhook and Hub2 oncall inbox (`dev-mailbox`) | MX → SES main → S3 → processor → SNS → Dapier EventQueue → `dev-mailbox` → both HTTP endpoints |
+| `dev@dtcdev.click` | `dev` | Hub2 oncall inbox always; Developer bot webhook for `[principal-ping]` / user-facing outage mail (`dev-mailbox`) | MX → SES main → S3 → processor → SNS → Dapier EventQueue → `dev-mailbox` → classifier picks the wake legs |
 | `tofu@dtcdev.click` | `tofu` | Tofu Grok bot webhook (`tofu-mailbox`) | same chain → `tofu-mailbox` → Tofu Grok bot webhook |
 | `orin@dtcdev.click` | `orin` | Orin Grok bot webhook (`orin-mailbox`) | same chain → `orin-mailbox` → Orin Grok bot webhook |
 
 SES recipient map lives in `aws-infra` / `aws-infra-opmcp` `main/email-intake` `locals.routes`. Add the two addresses there and apply (does not change MX). Publish the workflows with `dapier workflows save` / `publish` after deploy.
 
-The `dev-mailbox` Developer webhook remains active while the direct oncall
-path is verified. Dapier also posts the same alert to
-`https://hub.dtcdev.click/webhooks/oncall`; this is served by Hub2, the Node
-server on the GCP VM. Hub2 persists the message in its SQLite queue, then the
-Hub host invokes `~/bin/oncall-send` and `~/bin/orch-send` so the inbox copy
-does not depend on Developer forwarding it. See
-[builtin-mailboxes-webhooks.md](builtin-mailboxes-webhooks.md) for the two
+`dev-mailbox` classifies every mail (the `classify-email` step) and always
+posts it to the direct oncall ingest `https://hub.dtcdev.click/webhooks/oncall`;
+this is served by Hub2, the Node server on the GCP VM. Hub2 persists the
+message in its SQLite queue, then the Hub host invokes `~/bin/oncall-send`
+and `~/bin/orch-send` so the inbox copy does not depend on Developer
+forwarding it. The Developer bot webhook is woken only for `[principal-ping]`
+mail from Hub and alerts that explicitly say prod is down for users; routine
+alerts reach oncall alone. If the oncall ingest fails, the webhook is woken
+as a fallback and the run still fails so the failure notice reaches dev@.
+See [builtin-mailboxes-webhooks.md](builtin-mailboxes-webhooks.md) for the
 storage keys and token provisioning.
 
 ## How to test
