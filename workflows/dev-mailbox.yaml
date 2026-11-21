@@ -156,7 +156,7 @@ actions:
     type: code
     code: |
       # Classify the mail into delivery buckets. Wake the Developer (Grok)
-      # bot webhook only for Hub principal-pings and alerts that explicitly
+      # bot webhook only for Hub principal-pings, [bot-msg] bot protocol mail and alerts that explicitly
       # say prod is down for users (user-facing outage); everything else is
       # routine and rides the direct oncall ingest only — infra/CMP
       # workers/release follower/poller alerts, deadman FAIL/RECOVERED,
@@ -172,6 +172,10 @@ actions:
 
       if "[principal-ping]" in lowered_subject:
           output = {"wake": True, "reason": "principal_ping"}
+      elif "[bot-msg]" in lowered_subject:
+          # Bot-to-bot protocol mail (Hermes relay, hermes-relay-dev): push-wake
+          # the Developer bot, or the sticky agent:dev session on low GrokBot quota.
+          output = {"wake": True, "reason": "bot_msg"}
       else:
           markers = (
               "prod is down",

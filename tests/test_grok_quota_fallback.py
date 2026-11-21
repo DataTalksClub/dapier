@@ -709,3 +709,31 @@ def test_dev_chain_ingest_failure_falls_back_to_webhook_and_fails_loud():
     urls = [c["url"] for c in calls]
     assert urls.count("https://bot.example.invalid/hook") == 1
     assert urls.count("https://hub.dtcdev.click/webhooks/oncall") == 1
+
+
+BOT_MSG_SUBJECT = "[bot-msg] H-0001 v1 hermes->dev ping (protocol test, no task)"
+
+
+def _dev_storage():
+    return {**FULL_STORAGE, "hub_recipient": "agent:dev",
+            "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
+            "oncall_webhook_token": "oncall-token"}
+
+
+def test_dev_chain_bot_msg_webhook_route_when_usage_fine():
+    stop, step_outputs, calls, store = _run_chain(
+        "dev-mailbox", _dev_storage(), _usage_ok(USAGE_BODY_ABOVE), subject=BOT_MSG_SUBJECT)
+    assert stop is None
+    urls = [c["url"] for c in calls]
+    assert urls.count("https://bot.example.invalid/hook") == 1
+    assert step_outputs["verify-delivery"]["output"]["result"]["routed_to"] == "webhook"
+
+
+def test_dev_chain_bot_msg_diverts_to_hub_session_when_grok_below_threshold():
+    stop, step_outputs, calls, store = _run_chain(
+        "dev-mailbox", _dev_storage(), _usage_ok(USAGE_BODY_BELOW), subject=BOT_MSG_SUBJECT)
+    assert stop is None
+    urls = [c["url"] for c in calls]
+    assert "https://bot.example.invalid/hook" not in urls
+    assert urls.count("https://hub.dtcdev.click/api/messages") == 1
+    assert step_outputs["verify-delivery"]["output"]["result"]["routed_to"] == "hub_session"

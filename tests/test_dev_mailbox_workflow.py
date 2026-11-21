@@ -583,6 +583,15 @@ def test_dev_classifier_wakes_on_principal_ping():
     assert result == {"wake": True, "reason": "principal_ping"}
 
 
+@pytest.mark.parametrize("subject", [
+    "[bot-msg] H-0001 v1 hermes->dev ping (protocol test, no task)",
+    "Re: [BOT-MSG] H-0002 v1 hermes->dev",
+])
+def test_dev_classifier_wakes_on_bot_msg(subject):
+    """[bot-msg] mail (Hermes relay) wakes like a principal-ping."""
+    assert _classify(subject, "ping", from_="hermes@dtcdev.click") == {"wake": True, "reason": "bot_msg"}
+
+
 @pytest.mark.parametrize("subject,text", [
     ("[infra] prod is down: API returns 502 for all users", ""),
     ("[infra] production release follower failed",
@@ -791,3 +800,17 @@ def test_empty_bearer_header_fails_before_transport(token):
     with pytest.raises(ValueError, match="bearer auth needs"):
         run_http_request({"url": "https://example.invalid/hook", "auth_type": "bearer",
                           "auth_token": token}, {}, transport=transport)
+
+
+def test_hermes_relay_dev_workflow_is_fixed_sender_recipient_and_forces_prefix():
+    _, wf = _load("hermes-relay-dev")
+    assert wf["enabled"] is True
+    assert wf["trigger"]["filters"] == {"hook": {"equals": "hermes-relay-dev"}}
+    assert [a["id"] for a in wf["actions"]] == ["send"]
+    send = wf["actions"][0]
+    assert send["type"] == "email_send"
+    assert send["sender"] == "hermes@dtcdev.click"
+    assert send["to"] == "dev@dtcdev.click"
+    assert send["subject"].startswith("[bot-msg] ")
+    assert not any(k in send for k in ("cc", "bcc", "reply_to"))
+    parse_workflow(yaml.safe_dump(wf))
