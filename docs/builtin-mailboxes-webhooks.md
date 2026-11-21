@@ -157,7 +157,7 @@ trigger:
 
 | Address | Webhook | Workflow | Destination |
 | --- | --- | --- | --- |
-| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Direct oncall ingest always; Developer bot webhook (or Dev sticky Hub session when GrokBot usage < 1%) only for `[principal-ping]` and user-facing outage mail |
+| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Direct oncall ingest always; Developer bot webhook (or Dev sticky Hub session when GrokBot usage < 1%) only for `[principal-ping]`, `[bot-msg]` and user-facing outage mail |
 | `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | Tofu Grok bot webhook (or Tofu sticky Hub session when GrokBot usage < 1%) |
 | `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | Orin Grok bot webhook (or Orin sticky Hub session when GrokBot usage < 1%) |
 
@@ -177,8 +177,9 @@ the run still fails so the failure notice reaches dev@. A stable delivery ID
 makes replay of the direct ingest idempotent.
 
 Classifier (the `classify-email` code step): the Developer webhook wakes only
-for (1) mail whose subject contains `[principal-ping]` (Hub pings), and (2)
-alerts that explicitly say prod is down for users — explicit wording in the
+for (1) mail whose subject contains `[principal-ping]` (Hub pings), (2) mail
+whose subject contains `[bot-msg]` (bot-to-bot protocol mail, reason `bot_msg`;
+sent by the Hermes relay below), and (3) alerts that explicitly say prod is down for users — explicit wording in the
 subject or body such as "prod is down", "production is down", "site is down",
 "down for users", `[user-facing]`, or `[outage]`. Everything else is routine.
 Markers are deliberately narrow: a false wake pages the Developer bot, while
@@ -192,6 +193,20 @@ Grok webhooks. Each webhook payload includes `from`, `to`, `subject`,
 `snippet` (first 200 chars of the plain-text body), `text` (full body), `date`,
 `message_id`, and attachments metadata (filename, content_type, size, plus
 checksum/content_id when present).
+
+### Hermes → Developer relay (`hermes-relay-dev`)
+
+Lets Hermes (Telegram gateway on DESKTOP-FP4OP26) push-wake Grok Developer,
+even when Grok has no quota. Webhook `hermes-relay-dev` starts workflow
+`hermes-relay-dev` (`workflows/hermes-relay-dev.yaml`): one SES mail, fixed
+sender `hermes@dtcdev.click`, fixed recipient `dev@dtcdev.click`, subject
+forced to start with `[bot-msg] `. `dev-mailbox` classifies that as a wake, so
+it reaches the Developer webhook, or the sticky `agent:dev` Hub session when
+GrokBot usage is below 1% (the existing fallback below). Send with
+bots-management `scripts/hermes-relay-mail.py --subject "..." --text "..."`;
+it authenticates with the local dapier login (no secret printed) and refuses
+any Alexey mailbox, any other sender or recipient, and cc/bcc/reply-to
+(intake a7a0e545).
 
 ## GrokBot <1% quota fallback (sticky Hub session)
 

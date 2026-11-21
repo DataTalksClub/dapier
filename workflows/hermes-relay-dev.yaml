@@ -1,0 +1,20 @@
+# Hermes -> Developer push-wake relay (bot-to-bot protocol, intake a68018bd).
+# Webhook `hermes-relay-dev` (bearer-authenticated by the local dapier login)
+# sends one SES mail: fixed sender hermes@dtcdev.click, fixed recipient
+# dev@dtcdev.click, subject always starts with [bot-msg] so dev-mailbox
+# classifies it as a wake. Never sends from or to Alexey's mailboxes.
+id: hermes-relay-dev
+enabled: true
+trigger:
+  connector: webhook
+  event: request.received
+  filters:
+    hook:
+      equals: hermes-relay-dev
+actions:
+  - id: send
+    type: email_send
+    sender: hermes@dtcdev.click
+    to: dev@dtcdev.click
+    subject: "[bot-msg] {body.subject | truncate:200}"
+    text: "{body.text | truncate:20000}"
