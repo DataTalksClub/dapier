@@ -123,6 +123,145 @@ def test_cli_help_registers():
     assert args.command == "find-user"
 
 
+def test_post_message_resolves_channel_name_and_posts(monkeypatch):
+    monkeypatch.setattr(slack_ops.discovery_api, "_load",
+                        lambda cid, table: (_connection(cid), None))
+    monkeypatch.setattr(slack_ops.tokens, "get_access_token",
+                        FakeTokens("xoxb-" + "b" * 40).get_access_token)
+    calls = []
+
+    def fake_call(method, token, payload, transport=None):
+        calls.append((method, payload))
+        if method == "conversations.list":
+            return {
+                "ok": True,
+                "channels": [{"id": "C01BQC114P2", "name": "announcements"}],
+                "response_metadata": {},
+            }
+        if method == "chat.postMessage":
+            return {"ok": True, "channel": "C01BQC114P2", "ts": "1700000000.000100"}
+        raise AssertionError(method)
+
+    monkeypatch.setattr(slack_ops.slack_discovery, "_slack_call", fake_call)
+    res = slack_ops.post_message(
+        "#announcements", "Hello world", thread_ts="1699999999.000100",
+        unfurl_links=False, unfurl_media=False,
+    )
+    assert res["ok"] is True
+    assert res["channel"] == "C01BQC114P2"
+    assert res["ts"] == "1700000000.000100"
+    assert calls[1][0] == "chat.postMessage"
+    assert calls[1][1]["thread_ts"] == "1699999999.000100"
+    assert calls[1][1]["unfurl_links"] is False
+
+
+def test_post_message_dry_run(monkeypatch):
+    monkeypatch.setattr(slack_ops.discovery_api, "_load",
+                        lambda cid, table: (_connection(cid), None))
+    monkeypatch.setattr(slack_ops.tokens, "get_access_token",
+                        FakeTokens("xoxb-" + "b" * 40).get_access_token)
+
+    def fake_call(method, token, payload, transport=None):
+        if method == "conversations.info":
+            return {"ok": True, "channel": {"id": "C01BQC114P2", "name": "announcements", "is_member": True}}
+        if method == "auth.test":
+            return {"ok": True, "bot_id": "B123", "user_id": "U123"}
+        raise AssertionError(method)
+
+    monkeypatch.setattr(slack_ops.slack_discovery, "_slack_call", fake_call)
+    res = slack_ops.post_message("C01BQC114P2", "Hello", dry_run=True)
+    assert res["dry_run"] is True
+    assert res["is_member"] is True
+    assert res["bot_id"] == "B123"
+
+
+def test_post_message_loud_errors(monkeypatch):
+    monkeypatch.setattr(slack_ops.discovery_api, "_load",
+                        lambda cid, table: (_connection(cid), None))
+    monkeypatch.setattr(slack_ops.tokens, "get_access_token",
+                        FakeTokens("xoxb-" + "b" * 40).get_access_token)
+
+    def fake_not_in_channel(method, token, payload, transport=None):
+        raise slack_ops.slack_discovery.DiscoveryError(
+            "Slack rejected chat.postMessage: not_in_channel", status=502)
+
+    monkeypatch.setattr(slack_ops.slack_discovery, "_slack_call", fake_not_in_channel)
+    with pytest.raises(slack_ops.SlackOpsError, match="not_in_channel"):
+        slack_ops.post_message("C01BQC114P2", "Hello")
+
+
+def test_route_slack_post(monkeypatch):
+    calls = {}
+
+    def require_operator(event, action):
+        calls["action"] = action
+        return "subject-1", None
+
+    monkeypatch.setattr(slack_api, "require_operator", require_operator)
+    monkeypatch.setattr(slack_api, "audit", type("A", (), {
+        "emit": staticmethod(lambda *a, **k: None)
+    })())
+    monkeypatch.setattr(
+        slack_api.slack_ops, "post_message",
+        lambda channel, text, **kw: {
+            "ok": True, "connection": kw["connection_id"],
+            "channel": channel, "ts": "1.2", "thread_ts": kw.get("thread_ts"),
+        },
+    )
+    resp = slack_api.route_slack(
+        {"body": json.dumps({"channel": "C01BQC114P2", "text": "Hi"})},
+        "POST", "/api/agent/slack/post",
+    )
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert body["connection"] == "slack"
+    assert calls["action"] == "slack.post"
+
+
+def test_cli_post_parses_and_reads_file(tmp_path, monkeypatch):
+    from dapier_cli.cli import build_parser
+    from dapier_cli import commands
+
+    msg_file = tmp_path / "msg.txt"
+    msg_file.write_text("Line 1\nLine 2\n", encoding="utf-8")
+
+    parser = build_parser()
+    args = parser.parse_args([
+        "slack", "post", "--channel", "announcements",
+        "--text-file", str(msg_file), "--no-unfurl", "--dry-run",
+    ])
+    assert args.group == "slack"
+    assert args.command == "post"
+    assert args.connection == "slack"
+
+    captured = {}
+
+    def fake_api_call(api_url, method, path, body=None, debug=False):
+        captured["method"] = method
+        captured["path"] = path
+        captured["body"] = body
+        return {"ok": True, "dry_run": True, "channel": "C01BQC114P2"}
+
+    monkeypatch.setattr(commands.slack.api, "call", fake_api_call)
+    rc = commands.slack_post(
+        "https://example.com", args.channel, text_file=args.text_file,
+        connection_id=args.connection, unfurl_links=not args.no_unfurl,
+        unfurl_media=not args.no_unfurl, dry_run=args.dry_run,
+    )
+    assert rc == 0
+    assert captured["path"] == "/api/agent/slack/post"
+    assert captured["body"]["text"] == "Line 1\nLine 2\n"
+    assert captured["body"]["unfurl_links"] is False
+    assert captured["body"]["dry_run"] is True
+
+    # Missing file returns non-zero loudly
+    rc_missing = commands.slack_post(
+        "https://example.com", "announcements",
+        text_file=str(tmp_path / "missing.txt"),
+    )
+    assert rc_missing != 0
+
+
 def _fake_slack(monkeypatch, handler):
     monkeypatch.setattr(slack_ops.discovery_api, "_load",
                         lambda cid, table: (_connection(cid), None))

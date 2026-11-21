@@ -1,4 +1,6 @@
-"""Slack DM/export helpers for the agent API (connection token stays server-side)."""
+"""Slack DM/export/post helpers for the agent API (connection token stays server-side)."""
+
+import re
 
 from ...connections import discovery as slack_discovery
 from ...connections import tokens
@@ -6,6 +8,8 @@ from ...connections.providers import oauth_providers
 from .. import discovery as discovery_api
 
 DEFAULT_CONNECTION_ID = "slack-alexey"
+DEFAULT_POST_CONNECTION_ID = "slack"
+_CHANNEL_ID_RE = re.compile(r"^[CGD][A-Z0-9]+$")
 
 
 class SlackOpsError(Exception):
@@ -243,3 +247,75 @@ def dm_export(user, *, connection_id=DEFAULT_CONNECTION_ID, limit=200, cursor=No
     hist = history(
         opened["channel"], connection_id=connection_id, limit=limit, cursor=cursor)
     return {**opened, **hist, "user_id": opened["user_id"]}
+
+
+def _resolve_channel_id(token, channel):
+    """Return a Slack channel ID, resolving #name via conversations.list when needed."""
+    raw = str(channel or "").strip()
+    if not raw:
+        raise SlackOpsError("channel is required")
+    if _CHANNEL_ID_RE.fullmatch(raw):
+        return raw
+    target = raw.lstrip("#").strip().lower()
+    if not target:
+        raise SlackOpsError("channel is required")
+    cursor = None
+    for _ in range(5):
+        payload = {"limit": 200, "exclude_archived": True, "types": "public_channel,private_channel"}
+        if cursor:
+            payload["cursor"] = cursor
+        data = _call(token, "conversations.list", payload)
+        for item in data.get("channels") or []:
+            if isinstance(item, dict) and str(item.get("name") or "").lower() == target:
+                cid = item.get("id")
+                if cid:
+                    return cid
+        cursor = (data.get("response_metadata") or {}).get("next_cursor") or None
+        if not cursor:
+            break
+    raise SlackOpsError(f"Slack channel {channel!r} not found", status=404)
+
+
+def post_message(channel, text, *, connection_id=DEFAULT_POST_CONNECTION_ID, thread_ts=None,
+                 unfurl_links=True, unfurl_media=True, dry_run=False):
+    """Post a message (or dry-run check) to a Slack channel/thread via chat.postMessage."""
+    connection_id, _connection, token = _connection_and_token(connection_id)
+    text = str(text or "")
+    if not text.strip():
+        raise SlackOpsError("text is required")
+    channel_id = _resolve_channel_id(token, channel)
+    thread_ts = str(thread_ts).strip() if thread_ts else None
+    if dry_run:
+        info = _call(token, "conversations.info", {"channel": channel_id})
+        ch = info.get("channel") or {}
+        auth = _call(token, "auth.test", {})
+        return {
+            "ok": True,
+            "dry_run": True,
+            "connection": connection_id,
+            "channel": channel_id,
+            "channel_name": ch.get("name"),
+            "is_member": ch.get("is_member"),
+            "bot_id": auth.get("bot_id"),
+            "user_id": auth.get("user_id"),
+            "thread_ts": thread_ts,
+            "unfurl_links": bool(unfurl_links),
+            "unfurl_media": bool(unfurl_media),
+            "text_length": len(text),
+        }
+    payload = {
+        "channel": channel_id,
+        "text": text,
+        "unfurl_links": bool(unfurl_links),
+        "unfurl_media": bool(unfurl_media),
+    }
+    if thread_ts:
+        payload["thread_ts"] = thread_ts
+    data = _call(token, "chat.postMessage", payload)
+    return {
+        "ok": True,
+        "connection": connection_id,
+        "channel": data.get("channel") or channel_id,
+        "ts": data.get("ts"),
+        "thread_ts": thread_ts,
+    }
