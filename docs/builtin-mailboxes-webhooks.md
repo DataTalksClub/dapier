@@ -157,21 +157,32 @@ trigger:
 
 | Address | Webhook | Workflow | Destination |
 | --- | --- | --- | --- |
-| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Developer bot webhook + direct oncall ingest (or Dev sticky Hub session when GrokBot usage < 1%) |
+| `dev@dtcdev.click` | `/hooks/webhook/dev` | `dev-mailbox` | Direct oncall ingest always; Developer bot webhook (or Dev sticky Hub session when GrokBot usage < 1%) only for `[principal-ping]` and user-facing outage mail |
 | `tofu@dtcdev.click` | `/hooks/webhook/tofu` | `tofu-mailbox` | Tofu Grok bot webhook (or Tofu sticky Hub session when GrokBot usage < 1%) |
 | `orin@dtcdev.click` | `/hooks/webhook/orin` | `orin-mailbox` | Orin Grok bot webhook (or Orin sticky Hub session when GrokBot usage < 1%) |
 
-Notify path: `dev-mailbox` posts every dev@ alert to both the existing
-Developer/Grok webhook and the direct oncall ingest at
-`https://hub.dtcdev.click/webhooks/oncall`. The direct receiver is Hub2, a
-Node server on the GCP VM with a durable SQLite queue. The Hub host polls that
-queue and invokes `~/bin/oncall-send` followed by `~/bin/orch-send`; those
-helpers save to the oncall inbox before waking live sessions. The direct
-oncall ingest always runs (it is independent of the GrokBot quota route),
-then the workflow fails if a routed leg or the ingest did not complete so
-Dapier retries the event. A stable delivery ID makes replay of the direct
-ingest idempotent. Developer remains on the path until its hop is
-intentionally removed after the direct path is proven.
+Notify path: `dev-mailbox` classifies every dev@ mail and always posts it to
+the direct oncall ingest at `https://hub.dtcdev.click/webhooks/oncall`. The
+direct receiver is Hub2, a Node server on the GCP VM with a durable SQLite
+queue. The Hub host polls that queue and invokes `~/bin/oncall-send` followed
+by `~/bin/orch-send`; those helpers save to the oncall inbox before waking
+live sessions. The Developer/Grok webhook is woken only for two buckets
+(see the classifier below); routine alerts — infra/CMP workers/release
+follower/poller, deadman FAIL/RECOVERED, telegram relay heartbeat, disk
+WARN, GitHub Actions failures, digests, dapier failure notices, and ordinary
+human mail — ride the oncall ingest alone. The workflow fails if a routed
+leg or the ingest did not complete so Dapier retries the event; when the
+ingest fails, the webhook is woken as a fallback (never silently drop) and
+the run still fails so the failure notice reaches dev@. A stable delivery ID
+makes replay of the direct ingest idempotent.
+
+Classifier (the `classify-email` code step): the Developer webhook wakes only
+for (1) mail whose subject contains `[principal-ping]` (Hub pings), and (2)
+alerts that explicitly say prod is down for users — explicit wording in the
+subject or body such as "prod is down", "production is down", "site is down",
+"down for users", `[user-facing]`, or `[outage]`. Everything else is routine.
+Markers are deliberately narrow: a false wake pages the Developer bot, while
+a false routine still reaches oncall through the ingest.
 
 `dev-mailbox` reads `webhook_url` / `webhook_token` for the existing
 Developer/Grok endpoint and `oncall_webhook_url` / `oncall_webhook_token` for
@@ -215,7 +226,12 @@ Workflow behavior (all three mailboxes, `route` condition):
   divert mailbox mail into the void.
 - When diverted, the webhook leg does not run; when not diverted, the
   webhook leg runs exactly as before. `dev-mailbox` additionally always runs
-  its direct oncall ingest regardless of the route.
+  its direct oncall ingest regardless of the route. dev-only: when its
+  classifier marks the mail routine, `decide-grok-route` answers
+  `route: none` and neither Hub leg runs; when the oncall ingest failed, it
+  answers `route: webhook` with reason `oncall_ingest_failed_fallback`,
+  bypassing the quota check so the Developer webhook is woken as the
+  fail-loud fallback.
 
 Token rotation: Hub bearers are human device credentials whose access tokens
 expire hourly. Each mailbox stores `hub_refresh_token` alongside

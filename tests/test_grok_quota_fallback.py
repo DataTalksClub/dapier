@@ -100,13 +100,20 @@ def _one(wf, step_id):
     return next(a for a in _steps(wf) if a.get("id") == step_id)
 
 
-def _decide(workflow_id, *, check=None, hub_keys=True):
+def _decide(workflow_id, *, check=None, hub_keys=True, wake=True,
+            ingest_status="completed", ingest_error=""):
     wf = _load(workflow_id)
     decide = _one(wf, "decide-grok-route")
     steps = {k: dict(v) for k, v in HUB_KEYS_CONFIGURED.items()}
     if not hub_keys:
         for key in ARMED_GETTERS:
             steps[key] = {"status": "completed", "output": {"key": key, "value": "", "found": False}}
+    # Only dev-mailbox's decide reads these; tofu/orin ignore them.
+    steps["classify-email"] = {"status": "completed", "output": {
+        "result": {"wake": wake, "reason": "principal_ping" if wake else "routine_alert"}}}
+    steps["post-oncall-ingest"] = {"status": ingest_status, "output": {}}
+    if ingest_error:
+        steps["post-oncall-ingest"]["error"] = ingest_error
     if check is not None:
         status, body, error = check
         output = {"body": body} if body is not None else {}
@@ -149,6 +156,14 @@ def test_fallback_definition(workflow_id, role, recipient):
     assert '"recipient": "{steps.get-hub-recipient.output.value}"' in body
     assert f'"key": "dapier-{role}-' + "{steps." in body
     webhook = (route.get("else") or [])
+    if workflow_id == "dev-mailbox":
+        # dev gates the webhook behind the classifier: route=webhook only
+        # wakes for principal-ping / user-facing outage / ingest fallback.
+        assert [a.get("id") for a in webhook] == ["wake-webhook"]
+        assert webhook[0]["type"] == "condition"
+        assert webhook[0]["when"] == {"steps.decide-grok-route.output.result.route": {"equals": "webhook"}}
+        assert webhook[0]["else"] == []
+        webhook = webhook[0]["then"]
     assert [a.get("id") for a in webhook] == ["post-webhook"]
     assert webhook[0]["body"] == "{steps.format-email.output.result}"
 
@@ -272,9 +287,56 @@ def test_decide_keeps_webhook_without_recipient(workflow_id, role, recipient):
     steps = {**HUB_KEYS_CONFIGURED,
              "get-hub-recipient": {"status": "completed", "output": {"value": "", "found": False}},
              "grok-fallback-armed.then.check-grokbot-usage": {"status": "completed", "output": {"body": USAGE_BODY_BELOW}}}
+    # Only dev-mailbox's decide reads these; tofu/orin ignore them.
+    steps["classify-email"] = {"status": "completed", "output": {"result": {"wake": True, "reason": "principal_ping"}}}
+    steps["post-oncall-ingest"] = {"status": "completed", "output": {}}
     result = run_code(decide, {"connector": "email", "data": {}}, steps=steps)["result"]
     assert result["route"] == "webhook"
     assert result["reason"] == "hub_fallback_not_configured"
+
+
+# --- dev-mailbox only: classifier gate and oncall-ingest fallback ------------
+
+
+def test_dev_decide_keeps_routine_alert_off_the_webhook():
+    """Routine alerts ride the oncall ingest only: no webhook, no Hub."""
+    result = _decide("dev-mailbox", wake=False, check=("completed", USAGE_BODY_BELOW, ""))
+    assert result == {"route": "none", "reason": "routine_oncall_only:routine_alert",
+                      "recipient": "", "refresh_needed": False}
+
+
+def test_dev_decide_wakes_on_classifier_flag():
+    result = _decide("dev-mailbox", wake=True, check=("completed", USAGE_BODY_ABOVE, ""))
+    assert result["route"] == "webhook"
+    assert result["reason"] == "grokbot_above_threshold"
+
+
+def test_dev_decide_falls_back_to_webhook_when_ingest_fails():
+    """A failed oncall ingest wakes the webhook regardless of classification
+    so the mail is never silently dropped."""
+    result = _decide("dev-mailbox", wake=False, ingest_status="failed",
+                     ingest_error="http_request returned HTTP 503",
+                     check=("completed", USAGE_BODY_BELOW, ""))
+    assert result == {"route": "webhook", "reason": "oncall_ingest_failed_fallback",
+                      "recipient": "", "refresh_needed": False}
+
+
+def test_dev_decide_treats_ingest_409_duplicate_as_delivered():
+    result = _decide("dev-mailbox", wake=False, ingest_status="failed",
+                     ingest_error="http_request returned HTTP 409",
+                     check=("completed", USAGE_BODY_BELOW, ""))
+    assert result == {"route": "none", "reason": "routine_oncall_only:routine_alert",
+                      "recipient": "", "refresh_needed": False}
+
+
+def test_dev_decide_ingest_failure_does_not_mask_wake_route():
+    """Even on ingest failure the usage evidence is ignored — the fallback
+    goes straight to the webhook instead of the sticky Hub session."""
+    result = _decide("dev-mailbox", wake=True, ingest_status="failed",
+                     ingest_error="http_request returned HTTP 503",
+                     check=("completed", USAGE_BODY_BELOW, ""))
+    assert result["route"] == "webhook"
+    assert result["reason"] == "oncall_ingest_failed_fallback"
 
 
 # --- delivery: usage GET, sticky-session POST, token refresh -----------------
@@ -345,7 +407,7 @@ def test_delivery_id_stable_across_retries():
 # --- full-chain behavior through the real engine -----------------------------
 
 
-def _run_chain(workflow_id, storage, usage_transport):
+def _run_chain(workflow_id, storage, usage_transport, subject="Quota fallback chain test"):
     wf = _load(workflow_id)
     calls = []
     store = dict(storage)
@@ -378,7 +440,7 @@ def _run_chain(workflow_id, storage, usage_transport):
             "route": workflow_id.split("-")[0],
             "from": "alexey@datatalks.club",
             "to": f"{workflow_id.split('-')[0]}@dtcdev.click",
-            "subject": "Quota fallback chain test",
+            "subject": subject,
             "date": "2026-11-19T00:00:00Z",
             "message_id": f"<chain-{workflow_id}@mail.test>",
             "body": {"text": "Hello there"},
@@ -547,7 +609,9 @@ def test_dev_chain_diverts_but_always_ingests_oncall():
     storage = {**FULL_STORAGE, "hub_recipient": "agent:dev",
                "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
                "oncall_webhook_token": "oncall-token"}
-    stop, step_outputs, calls, store = _run_chain("dev-mailbox", storage, _usage_ok(USAGE_BODY_BELOW))
+    stop, step_outputs, calls, store = _run_chain(
+        "dev-mailbox", storage, _usage_ok(USAGE_BODY_BELOW),
+        subject="[principal-ping] Hub could not recover intake 82ce8bb6")
     assert stop is None
     assert step_outputs["route"]["output"]["branch"] == "then"
     urls = [c["url"] for c in calls]
@@ -557,17 +621,91 @@ def test_dev_chain_diverts_but_always_ingests_oncall():
     oncall = next(c for c in calls if c["url"] == "https://hub.dtcdev.click/webhooks/oncall")
     assert oncall["headers"]["X-Delivery-Id"] == step_outputs["oncall-delivery-id"]["output"]["result"]
     assert step_outputs["verify-delivery"]["status"] == "completed"
-    assert step_outputs["verify-delivery"]["output"]["result"]["routed_to"] == "then"
+    assert step_outputs["verify-delivery"]["output"]["result"]["routed_to"] == "hub_session"
 
 
 def test_dev_chain_webhook_route_when_usage_fine():
     storage = {**FULL_STORAGE, "hub_recipient": "agent:dev",
                "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
                "oncall_webhook_token": "oncall-token"}
-    stop, step_outputs, calls, store = _run_chain("dev-mailbox", storage, _usage_ok(USAGE_BODY_ABOVE))
+    stop, step_outputs, calls, store = _run_chain(
+        "dev-mailbox", storage, _usage_ok(USAGE_BODY_ABOVE),
+        subject="[principal-ping] Hub could not recover intake 82ce8bb6")
     assert stop is None
     assert step_outputs["route"]["output"]["branch"] == "else"
+    assert step_outputs["route.else.wake-webhook"]["output"]["branch"] == "then"
     urls = [c["url"] for c in calls]
     assert urls.count("https://bot.example.invalid/hook") == 1
     assert urls.count("https://hub.dtcdev.click/webhooks/oncall") == 1
     assert step_outputs["verify-delivery"]["status"] == "completed"
+    assert step_outputs["verify-delivery"]["output"]["result"]["routed_to"] == "webhook"
+
+
+def test_dev_chain_routine_alert_ingests_oncall_only():
+    """A routine alert never wakes the Developer webhook nor Hub: it rides
+    the direct oncall ingest and the run completes."""
+    storage = {**FULL_STORAGE, "hub_recipient": "agent:dev",
+               "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
+               "oncall_webhook_token": "oncall-token"}
+    stop, step_outputs, calls, store = _run_chain(
+        "dev-mailbox", storage, _usage_ok(USAGE_BODY_BELOW),
+        subject="[infra] production release follower failed")
+    assert stop is None
+    assert step_outputs["route"]["output"]["branch"] == "else"
+    assert step_outputs["route.else.wake-webhook"]["output"]["branch"] == "else"
+    urls = [c["url"] for c in calls]
+    assert "https://bot.example.invalid/hook" not in urls
+    assert "https://hub.dtcdev.click/api/messages" not in urls
+    assert urls.count("https://hub.dtcdev.click/webhooks/oncall") == 1
+    assert step_outputs["verify-delivery"]["status"] == "completed"
+    assert step_outputs["verify-delivery"]["output"]["result"]["routed_to"] == "none"
+    assert step_outputs["verify-delivery"]["output"]["result"]["decide_reason"] == \
+        "routine_oncall_only:routine_alert"
+
+
+def test_dev_chain_ingest_failure_falls_back_to_webhook_and_fails_loud():
+    """Hub2 oncall ingest returning 503 must not silently drop the mail:
+    the Developer webhook is woken as a fallback, and the run still fails
+    so Dapier retries and the failure notice reaches dev@."""
+    wf = _load("dev-mailbox")
+    calls = []
+    store = {**FULL_STORAGE, "hub_recipient": "agent:dev",
+             "oncall_webhook_url": "https://hub.dtcdev.click/webhooks/oncall",
+             "oncall_webhook_token": "oncall-token"}
+
+    def transport(method, url, headers=None, body=None, timeout=None):
+        calls.append({"method": method, "url": url, "headers": headers, "body": body})
+        if url.endswith("/webhooks/oncall"):
+            return 503, b'{"error": "oncall queue unavailable"}', {"content-type": "application/json"}
+        return 200, b'{"accepted": true}', {"content-type": "application/json"}
+
+    def run_action(step, event, workflow_id, steps=None):
+        kind = step.get("type")
+        if kind == "storage_get":
+            key = step.get("key")
+            return {"key": key, "value": store.get(key, ""), "found": key in store}
+        if kind == "storage_set":
+            from src.dapier.engine.actions.templating import render
+            return {"key": step.get("key"), "stored": True,
+                    "rendered": render(step.get("value"), event, steps)}
+        if kind == "code":
+            return run_code(step, event, steps=steps)
+        if kind == "http_request":
+            return run_http_request(step, event, steps=steps, transport=transport)
+        raise AssertionError(kind)
+
+    event = {"connector": "email", "data": {
+        "route": "dev", "from": "alerts@dtcdev.click", "to": "dev@dtcdev.click",
+        "subject": "[infra] CMP release poller failed",
+        "date": "2026-11-21T00:00:00Z", "message_id": "<ingest-down@mail.test>",
+        "body": {"text": "poller error"}, "attachments": []}}
+    step_outputs = {}
+    with pytest.raises(RuntimeError, match="post-oncall-ingest"):
+        run_chain("dev-mailbox", wf["actions"], event, run_action, step_outputs=step_outputs)
+    assert step_outputs["decide-grok-route"]["output"]["result"]["reason"] == \
+        "oncall_ingest_failed_fallback"
+    assert step_outputs["route.else.wake-webhook"]["output"]["branch"] == "then"
+    assert step_outputs["route.else.wake-webhook.then.post-webhook"]["status"] == "completed"
+    urls = [c["url"] for c in calls]
+    assert urls.count("https://bot.example.invalid/hook") == 1
+    assert urls.count("https://hub.dtcdev.click/webhooks/oncall") == 1

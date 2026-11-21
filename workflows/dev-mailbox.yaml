@@ -1,6 +1,6 @@
 id: dev-mailbox
 enabled: true
-description: Developer mailbox dev@dtcdev.click -> Developer bot webhook + direct oncall ingest, or Dev sticky Hub session when GrokBot remaining usage < 1%
+description: Developer mailbox dev@dtcdev.click -> direct oncall ingest always; Developer bot webhook (or Dev sticky Hub session when GrokBot remaining usage < 1%) only for [principal-ping] mail and explicit user-facing outage alerts
 # A failed delivery leg (Hub briefly unreachable) retries as a fresh queue
 # message two minutes later. Without a policy the event waits out the event
 # queue's 900s visibility timeout per redelivery, which trips the 900s
@@ -152,6 +152,50 @@ actions:
           "text_body": text,
           "attachments": attachments,
       }
+  - id: classify-email
+    type: code
+    code: |
+      # Classify the mail into delivery buckets. Wake the Developer (Grok)
+      # bot webhook only for Hub principal-pings and alerts that explicitly
+      # say prod is down for users (user-facing outage); everything else is
+      # routine and rides the direct oncall ingest only — infra/CMP
+      # workers/release follower/poller alerts, deadman FAIL/RECOVERED,
+      # telegram relay heartbeats, disk WARN, GitHub Actions failures,
+      # digests, dapier failure notices, and ordinary human mail included.
+      # The outage markers are deliberately narrow and explicit: a false
+      # "wake" pages the Developer bot, while a false "routine" still
+      # reaches oncall through the ingest.
+      payload = ((steps.get("format-email") or {}).get("output") or {}).get("result") or {}
+      subject = str(payload.get("subject") or "")
+      text = str(payload.get("text") or "")[:4000]
+      lowered_subject = subject.lower()
+
+      if "[principal-ping]" in lowered_subject:
+          output = {"wake": True, "reason": "principal_ping"}
+      else:
+          markers = (
+              "prod is down",
+              "production is down",
+              "prod down",
+              "production down",
+              "site is down",
+              "site down",
+              "website is down",
+              "down for users",
+              "user-facing outage",
+              "[user-facing]",
+              "[outage]",
+          )
+          haystack = (subject + "\n" + text).lower()
+          hit = ""
+          for marker in markers:
+              if marker in haystack:
+                  hit = marker
+                  break
+          if hit:
+              output = {"wake": True, "reason": "user_facing_outage:" + hit}
+          else:
+              output = {"wake": False, "reason": "routine_alert"}
   - id: oncall-delivery-id
     type: code
     code: |
@@ -201,16 +245,27 @@ actions:
   - id: decide-grok-route
     type: code
     code: |
-      # Route the formatted email: the Developer (Grok) bot webhook by
-      # default; the Dev role's sticky Hub session (named agent recipient
-      # via Hub's POST /api/messages) when Hub's GrokBot usage export
-      # reports below_threshold on fresh evidence. Fail-safe: missing hub
-      # config, a skipped/failed usage check, or stale evidence keeps the
-      # historical webhook delivery, so a Hub outage or a half-provisioned
-      # fallback can never divert mailbox mail into the void. The direct
-      # oncall ingest above is independent of this route and always runs.
+      # Route the formatted email. The direct oncall ingest is the primary
+      # delivery for every event. The Developer (Grok) bot webhook is woken
+      # only when the classifier flagged the mail (Hub principal-ping or an
+      # explicit user-facing outage) — via the webhook by default, or via
+      # the Dev role's sticky Hub session (named agent recipient via Hub's
+      # POST /api/messages) when Hub's GrokBot usage export reports
+      # below_threshold on fresh evidence. When the oncall ingest failed
+      # (and is not the 409 already-delivered duplicate), fall back to the
+      # webhook regardless of classification: the mail must never be
+      # silently dropped; verify-delivery still fails the run so Dapier
+      # retries the event and the failure notice reaches dev@. Fail-safe:
+      # missing hub config or a skipped/failed usage check keeps the
+      # historical webhook delivery for wake events, so a Hub outage or a
+      # half-provisioned fallback can never divert mailbox mail into the
+      # void. The direct oncall ingest above is independent of this route
+      # and always runs.
       def _out(step_id):
           return ((steps.get(step_id) or {}).get("output") or {})
+
+      classification = _out("classify-email").get("result") or {}
+      wake = classification.get("wake") is True
 
       usage_url = str(_out("get-hub-usage-url").get("value") or "").strip()
       messages_url = str(_out("get-hub-messages-url").get("value") or "").strip()
@@ -219,8 +274,19 @@ actions:
       # so its run-history id nests under that branch.
       check = steps.get("grok-fallback-armed.then.check-grokbot-usage") or {}
 
-      divert = False
-      if not (usage_url and messages_url and recipient):
+      ingest = steps.get("post-oncall-ingest") or {}
+      ingest_duplicate = (ingest.get("status") == "failed"
+                          and "HTTP 409" in str(ingest.get("error") or ""))
+      ingest_failed = ingest.get("status") != "completed" and not ingest_duplicate
+
+      route = "webhook"
+      reason = "routine_oncall_only"
+      if ingest_failed:
+          reason = "oncall_ingest_failed_fallback"
+      elif not wake:
+          route = "none"
+          reason = "routine_oncall_only:" + str(classification.get("reason") or "unclassified")
+      elif not (usage_url and messages_url and recipient):
           reason = "hub_fallback_not_configured"
       elif check.get("status") != "completed":
           reason = "grokbot_usage_unavailable"
@@ -229,7 +295,7 @@ actions:
           data = data.get("body") if isinstance(data.get("body"), dict) else {}
           fresh = data.get("fresh") is True
           if data.get("below_threshold") is True and fresh:
-              divert = True
+              route = "hub_session"
               reason = "grokbot_below_threshold"
           elif not fresh:
               reason = "grokbot_usage_not_fresh"
@@ -239,12 +305,14 @@ actions:
       # expired (they rotate hourly). Report it so the rotate branch can
       # trade the stored refresh token for a fresh pair; this run still
       # delivers via the webhook (fail-safe) and the next email uses the
-      # fresh token.
-      expired = check.get("status") == "skipped" and "HTTP 401" in str(check.get("error") or "")
+      # fresh token. Routine-only events never touch Hub, so no rotation.
+      expired = (wake and not ingest_failed
+                 and check.get("status") == "skipped"
+                 and "HTTP 401" in str(check.get("error") or ""))
       output = {
-          "route": "hub_session" if divert else "webhook",
+          "route": route,
           "reason": reason,
-          "recipient": recipient if divert else "",
+          "recipient": recipient if route == "hub_session" else "",
           "refresh_needed": expired,
       }
   - id: hub-token-rotate
@@ -291,31 +359,43 @@ actions:
         content_type: application/json
         body: '{"recipient": "{steps.get-hub-recipient.output.value}", "body": "Hey, check your emails.", "key": "dapier-dev-{steps.oncall-delivery-id.output.result}"}'
     else:
-      - id: post-webhook
-        type: http_request
-        method: POST
-        url: "{steps.get-url.output.value}"
-        auth_type: bearer
-        auth_token: "{steps.get-token.output.value}"
-        content_type: application/json
-        body: "{steps.format-email.output.result}"
-        on_error: continue
+      - id: wake-webhook
+        type: condition
+        when:
+          steps.decide-grok-route.output.result.route:
+            equals: webhook
+        then:
+          - id: post-webhook
+            type: http_request
+            method: POST
+            url: "{steps.get-url.output.value}"
+            auth_type: bearer
+            auth_token: "{steps.get-token.output.value}"
+            content_type: application/json
+            body: "{steps.format-email.output.result}"
+            on_error: continue
+        else: []
   - id: verify-delivery
     type: code
     code: |
-      # Every event must land somewhere: the direct oncall ingest always,
-      # plus whichever leg the GrokBot quota route picked (the Developer
-      # webhook when usage is fine, this role's sticky Hub session when
-      # Hub reported GrokBot below threshold). Any leg that did not
-      # complete fails the run so Dapier retries the event.
+      # Every event must land in the direct oncall ingest; events the
+      # classifier woke additionally land in the routed leg (the Developer
+      # webhook, or the Dev role's sticky Hub session when GrokBot usage
+      # was below threshold). Any leg that did not complete fails the run
+      # so Dapier retries the event — and once retries are exhausted, the
+      # failure notice reaches dev@. A webhook fired only as the ingest
+      # fallback (route=webhook with reason oncall_ingest_failed_fallback)
+      # does not mask the ingest failure: the ingest leg is still required
+      # here, so the run stays loud.
       route_output = ((steps.get("route") or {}).get("output") or {})
-      branch = route_output.get("branch")
-      leg = {"then": "route.then.notify-hub-session",
-             "else": "route.else.post-webhook"}.get(branch)
+      decide = ((steps.get("decide-grok-route") or {}).get("output") or {}).get("result") or {}
+      route = str(decide.get("route") or "")
+      leg = {"hub_session": "route.then.notify-hub-session",
+             "webhook": "route.else.wake-webhook.then.post-webhook"}.get(route)
       failed = []
-      if leg is None:
-          failed.append("route")
-      elif (steps.get(leg) or {}).get("status") != "completed":
+      if route not in ("hub_session", "webhook", "none"):
+          failed.append("decide-grok-route")
+      elif leg is not None and (steps.get(leg) or {}).get("status") != "completed":
           failed.append(leg)
       # Hub answers 409 delivery_id_conflict when it already holds a
       # delivery under this X-Delivery-Id (sha256 of the message id) and the
@@ -330,7 +410,7 @@ actions:
           failed.append("post-oncall-ingest")
       if failed:
           raise ValueError("dev-mailbox delivery failed for: " + ", ".join(failed))
-      output = {"routed_to": route_output.get("branch"),
-                "decide_reason": ((steps.get("decide-grok-route") or {}).get("output") or {}).get("result", {}).get("reason", ""),
+      output = {"routed_to": route,
+                "decide_reason": str(decide.get("reason") or ""),
                 "oncall_ingest": "already_delivered" if ingest_duplicate else "completed"}
 

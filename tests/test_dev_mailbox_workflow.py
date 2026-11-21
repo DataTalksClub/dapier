@@ -157,6 +157,27 @@ def test_dev_mailbox_definition():
     verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
     assert verify_action["type"] == "code"
 
+    # The classifier sits between payload formatting and delivery, and the
+    # webhook leg is gated on it (route=webhook only wakes for principal-
+    # ping / user-facing outage / oncall-ingest fallback; routine alerts
+    # ride the ingest alone via route=none).
+    step_ids = [a["id"] for a in steps]
+    assert "classify-email" in step_ids
+    assert step_ids.index("format-email") < step_ids.index("classify-email") \
+        < step_ids.index("post-oncall-ingest")
+    classify = next(a for a in steps if a.get("id") == "classify-email")
+    assert "[principal-ping]" in classify["code"]
+    route_action = next(a for a in wf["actions"] if a.get("id") == "route")
+    assert route_action["when"] == {
+        "steps.decide-grok-route.output.result.route": {"equals": "hub_session"}}
+    nested = route_action.get("else") or []
+    assert [a.get("id") for a in nested] == ["wake-webhook"]
+    assert nested[0]["type"] == "condition"
+    assert nested[0]["when"] == {
+        "steps.decide-grok-route.output.result.route": {"equals": "webhook"}}
+    assert [a.get("id") for a in nested[0]["then"]] == ["post-webhook"]
+    assert nested[0]["else"] == []
+
     # Ensure no secrets or tokens are committed in the YAML
     assert "crsr_" not in raw_yaml
     assert "https://api2.cursor.sh" not in raw_yaml
@@ -451,65 +472,155 @@ def test_dev_mailbox_oncall_http_request_delivery():
     assert "delivery_id" not in sent_data
 
 
-def test_dev_mailbox_delivery_verifier_requires_ingest_and_routed_leg():
-    """The verifier fails the run unless oncall ingest AND the routed leg
-    (webhook or sticky-session notify) both completed."""
+def _verify_dev(steps):
     _, wf = _load("dev-mailbox")
     verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
+    return run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
+
+
+def _decide_step(route, reason="grokbot_above_threshold"):
+    return {"status": "completed", "output": {"result": {"route": route, "reason": reason}}}
+
+
+def test_dev_mailbox_delivery_verifier_requires_ingest_and_routed_leg():
+    """The verifier fails the run unless oncall ingest AND the routed leg
+    (webhook or sticky-session notify) both completed; a classifier-driven
+    ``none`` route needs only the ingest."""
     completed = {"status": "completed", "output": {}}
     failed = {"status": "failed", "output": {}}
     # Webhook route taken, webhook leg failed.
     steps = {
         "route": completed | {"output": {"branch": "else"}},
-        "route.else.post-webhook": failed,
+        "route.else.wake-webhook.then.post-webhook": failed,
+        "decide-grok-route": _decide_step("webhook"),
         "post-oncall-ingest": completed,
     }
     with pytest.raises(RuntimeError, match="post-oncall-ingest|post-webhook") as exc_info:
-        run_code(verify_action, {"connector": "email", "data": {}}, steps=dict(steps))
+        _verify_dev(dict(steps))
     assert "post-webhook" in str(exc_info.value)
     # Sticky-session route taken, notify leg completed, ingest failed.
     steps = {
         "route": completed | {"output": {"branch": "then"}},
         "route.then.notify-hub-session": completed,
+        "decide-grok-route": _decide_step("hub_session"),
         "post-oncall-ingest": failed,
     }
     with pytest.raises(RuntimeError, match="post-oncall-ingest"):
-        run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
-    # No route branch recorded at all.
+        _verify_dev(steps)
+    # No decide output recorded at all.
     steps = {"post-oncall-ingest": completed}
-    with pytest.raises(RuntimeError, match="route"):
-        run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
+    with pytest.raises(RuntimeError, match="decide-grok-route"):
+        _verify_dev(steps)
     # Everything completed on the webhook route.
     steps = {
         "route": completed | {"output": {"branch": "else"}},
-        "route.else.post-webhook": completed,
+        "route.else.wake-webhook.then.post-webhook": completed,
+        "decide-grok-route": _decide_step("webhook", "oncall_ingest_failed_fallback"),
         "post-oncall-ingest": completed,
     }
-    result = run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)["result"]
-    assert result["routed_to"] == "else"
+    result = _verify_dev(steps)["result"]
+    assert result["routed_to"] == "webhook"
+    assert result["decide_reason"] == "oncall_ingest_failed_fallback"
     assert result["oncall_ingest"] == "completed"
+    # Routine alert: no routed leg runs, only the ingest is required.
+    steps = {
+        "route": completed | {"output": {"branch": "else"}},
+        "decide-grok-route": _decide_step("none", "routine_oncall_only:routine_alert"),
+        "post-oncall-ingest": completed,
+    }
+    result = _verify_dev(steps)["result"]
+    assert result["routed_to"] == "none"
+    # The ingest fallback (webhook fired because ingest failed) does not
+    # mask the ingest failure: the run still fails loudly.
+    steps = {
+        "route": completed | {"output": {"branch": "else"}},
+        "route.else.wake-webhook.then.post-webhook": completed,
+        "decide-grok-route": _decide_step("webhook", "oncall_ingest_failed_fallback"),
+        "post-oncall-ingest": failed | {"error": "http_request returned HTTP 503"},
+    }
+    with pytest.raises(RuntimeError, match="post-oncall-ingest"):
+        _verify_dev(steps)
 
 
 def test_dev_mailbox_verifier_counts_oncall_409_as_already_delivered():
     """A retry whose first attempt reached Hub gets 409 delivery_id_conflict
     (same X-Delivery-Id, different body digest): the email is already in
     Hub's queue, so the run must not fail into 900s queue redeliveries."""
-    _, wf = _load("dev-mailbox")
-    verify_action = next(a for a in wf["actions"] if a.get("id") == "verify-delivery")
     completed = {"status": "completed", "output": {}}
     steps = {
         "route": completed | {"output": {"branch": "else"}},
-        "route.else.post-webhook": completed,
+        "route.else.wake-webhook.then.post-webhook": completed,
+        "decide-grok-route": _decide_step("webhook"),
         "post-oncall-ingest": {"status": "failed", "output": {},
                                "error": "http_request returned HTTP 409"},
     }
-    result = run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)["result"]
+    result = _verify_dev(steps)["result"]
     assert result["oncall_ingest"] == "already_delivered"
     # Any other ingest failure still fails the run.
     steps["post-oncall-ingest"] = {"status": "failed", "output": {},
                                    "error": "The read operation timed out"}
     with pytest.raises(RuntimeError, match="post-oncall-ingest"):
-        run_code(verify_action, {"connector": "email", "data": {}}, steps=steps)
+        _verify_dev(steps)
+
+
+# --- classify-email: wake vs routine buckets ---------------------------------
+
+
+def _classify(subject, text="", from_="alerts@dtcdev.click"):
+    _, wf = _load("dev-mailbox")
+    action = next(a for a in _iter_steps(wf) if a.get("id") == "classify-email")
+    payload = {"from": from_, "to": "dev@dtcdev.click", "subject": subject,
+               "snippet": " ".join(str(text).split())[:200], "text": text,
+               "message_id": "<classify-1@test>", "attachments": []}
+    steps = {"format-email": {"status": "completed", "output": {"result": payload}}}
+    return run_code(action, {"connector": "email", "data": {}}, steps=steps)["result"]
+
+
+def test_dev_classifier_wakes_on_principal_ping():
+    """[principal-ping] mail from Hub always wakes the Developer webhook."""
+    result = _classify("[principal-ping] Hub could not recover intake 82ce8bb6",
+                       "Intake c993dc0a exhausted its retries; check hub.dtcdev.click.")
+    assert result == {"wake": True, "reason": "principal_ping"}
+
+
+@pytest.mark.parametrize("subject,text", [
+    ("[infra] prod is down: API returns 502 for all users", ""),
+    ("[infra] production release follower failed",
+     "the follower cannot reach production: prod down for users"),
+    ("Site is down — dtcdev.click unreachable", "healthcheck returns 503"),
+    ("website is down again", "status page: full outage"),
+    ("[outage] checkout unavailable", "users cannot complete orders"),
+    ("[user-facing] course signup broken", "prod is down for students"),
+])
+def test_dev_classifier_wakes_on_user_facing_outage(subject, text):
+    result = _classify(subject, text)
+    assert result["wake"] is True
+    assert result["reason"].startswith("user_facing_outage:")
+
+
+@pytest.mark.parametrize("subject,text", [
+    ("[infra] production release follower failed",
+     "release follower poller failed after 3 attempts: HTTP 503 from cms"),
+    ("[infra] CMP release poller failed", "poller run 123 failed"),
+    ("CMP workers alarm", "5 CMP workers failed their liveness probes"),
+    ("[hetzner-disk-check] WARN (disk-data)", "disk-data usage at 91%"),
+    ("[contabo-deadman] FAIL (svc-contabo)", "heartbeat missed for 15 minutes"),
+    ("[contabo-deadman] RECOVERED (svc-contabo)", "heartbeat resumed"),
+    ("[telegram-relay] heartbeat missed", "relay deadman fired"),
+    ("[infra] GitHub Actions failed: deploy.yml run 4210", "job test failed on main"),
+    ("[digest] daily alert digest", "6 routine alerts in the last 24 hours"),
+    ("[dapier] Run failed: dev-mailbox", "A dapier run failed."),
+    ("[telegram-relay] heartbeat OK", "relay alive"),
+    ("Confirm your email to get the materials: Slides and recording",
+     "click the link to confirm"),
+    ("Re: question about the course", "thanks for the details"),
+])
+def test_dev_classifier_keeps_routine_alerts_off_the_webhook(subject, text):
+    """Routine alerts (infra/CMP workers/release follower/poller, deadman
+    FAIL/RECOVERED, telegram relay heartbeat, disk WARN, GitHub Actions
+    failures, digests, dapier failure notices) and ordinary mail stay in
+    the routine bucket: oncall ingest only, no Developer webhook wake."""
+    assert _classify(subject, text) == {"wake": False, "reason": "routine_alert"}
 
 
 def test_dev_mailbox_retries_failed_delivery_before_queue_redelivery():
