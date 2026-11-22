@@ -1,4 +1,4 @@
-"""The `dapier slack` noun: find users, open DMs, export history."""
+"""The `dapier slack` noun: find users, open DMs, export history, post (with images)."""
 
 from .. import commands
 
@@ -66,14 +66,44 @@ def register(sub):
     text_group.add_argument("--text-file",
                             help="Path to UTF-8 text file (or '-' for stdin)")
     text_group.add_argument("--text", help="Inline message text")
-    post.add_argument("--thread-ts", default=None,
+    post.add_argument("--thread-ts", "--thread", dest="thread_ts", default=None,
                       help="Thread timestamp to reply in")
     post.add_argument("--connection", default="slack",
                       help="Connection id (default slack = Au-Tomator bot)")
     post.add_argument("--no-unfurl", action="store_true",
                       help="Disable link and media previews")
     post.add_argument("--dry-run", action="store_true",
-                      help="Resolve channel and verify bot/channel access without posting")
+                      help="Resolve channel and verify bot/channel access (and token scopes) "
+                           "without posting")
+    post.add_argument("--image", default=None, metavar="PATH",
+                      help="Attach a local image (files.uploadV2); the text becomes its "
+                           "comment. Needs the files:write scope")
+
+    attach = sub_p.add_parser(
+        "attach-image",
+        help="Attach an image to an existing message: thread reply, or --replace "
+             "(repost text+image, delete the old bot message)",
+        description=(
+            "Slack cannot add a file to a message that is already posted. By default "
+            "the image is posted as a reply in the message's thread. With --replace "
+            "the message (it must be this bot's own, without files or thread replies) "
+            "is reposted as text+image in the same place and the old message is "
+            "deleted; the new ts is printed. The repost happens before the delete, so "
+            "a failure never loses the text."),
+    )
+    attach.add_argument("--channel", required=True, help="Channel id or name")
+    attach.add_argument("--ts", required=True, help="ts of the existing message")
+    attach.add_argument("--image", required=True, metavar="PATH", help="Local image file")
+    attach.add_argument("--replace", action="store_true",
+                        help="Repost text+image and delete the old message (returns new ts)")
+    attach_text = attach.add_mutually_exclusive_group()
+    attach_text.add_argument("--text", default=None,
+                             help="Comment for the reply, or replacement text with --replace "
+                                  "(default: the original text)")
+    attach_text.add_argument("--text-file", default=None,
+                             help="Path to UTF-8 text file (or '-' for stdin)")
+    attach.add_argument("--connection", default="slack",
+                        help="Connection id (default slack = Au-Tomator bot)")
 
 
 def run(args, api_url, debug, child=None):
@@ -116,6 +146,19 @@ def run(args, api_url, debug, child=None):
             unfurl_links=not args.no_unfurl,
             unfurl_media=not args.no_unfurl,
             dry_run=args.dry_run,
+            image=args.image,
+            debug=debug,
+        )
+    if args.command == "attach-image":
+        return commands.slack_attach_image(
+            api_url,
+            channel=args.channel,
+            ts=args.ts,
+            image=args.image,
+            replace=args.replace,
+            text_file=args.text_file,
+            text=args.text,
+            connection_id=args.connection,
             debug=debug,
         )
     return 2

@@ -173,8 +173,10 @@ def test_post_message_dry_run(monkeypatch):
 
     monkeypatch.setattr(slack_ops.slack_discovery, "_request", fake_request)
     monkeypatch.setattr(slack_ops.slack_discovery, "_slack_call", fake_call)
+    monkeypatch.setattr(slack_ops, "_token_scopes", lambda token: ["chat:write", "files:write"])
     res = slack_ops.post_message("C01BQC114P2", "Hello", dry_run=True)
     assert res["dry_run"] is True
+    assert res["files_write"] is True
     assert res["is_member"] is True
     assert res["bot_id"] == "B123"
 
