@@ -119,32 +119,93 @@ def _simple(event, action, fn, build):
     return _json_response(200, payload)
 
 
+def _json_body(event):
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except (ValueError, TypeError):
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _post_connection_id(body):
+    return str(
+        body.get("connection_id") or slack_ops.DEFAULT_POST_CONNECTION_ID
+    ).strip().lower() or slack_ops.DEFAULT_POST_CONNECTION_ID
+
+
 def post_api(event):
     subject, error = require_operator(event, "slack.post")
     if error:
         return error
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except (ValueError, TypeError):
+    body = _json_body(event)
+    if body is None:
         return _json_response(400, {"error": "Invalid JSON body"})
-    if not isinstance(body, dict):
-        return _json_response(400, {"error": "Invalid JSON body"})
-    connection_id = str(
-        body.get("connection_id") or slack_ops.DEFAULT_POST_CONNECTION_ID
-    ).strip().lower() or slack_ops.DEFAULT_POST_CONNECTION_ID
+    connection_id = _post_connection_id(body)
     try:
-        payload = slack_ops.post_message(
-            body.get("channel") or "",
-            body.get("text") or "",
-            connection_id=connection_id,
-            thread_ts=body.get("thread_ts"),
-            unfurl_links=body.get("unfurl_links", True),
-            unfurl_media=body.get("unfurl_media", True),
-            dry_run=bool(body.get("dry_run", False)),
-        )
+        if body.get("file_id"):
+            if body.get("dry_run"):
+                raise slack_ops.SlackOpsError("dry_run cannot share an uploaded file")
+            payload = slack_ops.post_image(
+                body.get("channel") or "",
+                body.get("text") or "",
+                body.get("file_id"),
+                connection_id=connection_id,
+                thread_ts=body.get("thread_ts"),
+                title=body.get("title"),
+            )
+        else:
+            payload = slack_ops.post_message(
+                body.get("channel") or "",
+                body.get("text") or "",
+                connection_id=connection_id,
+                thread_ts=body.get("thread_ts"),
+                unfurl_links=body.get("unfurl_links", True),
+                unfurl_media=body.get("unfurl_media", True),
+                dry_run=bool(body.get("dry_run", False)),
+            )
     except (slack_ops.SlackOpsError, ValueError) as exc:
         return _error(exc)
     audit.emit(payload["connection"], "slack.post", subject, outcome="ok")
+    return _json_response(200, payload)
+
+
+def image_upload_url_api(event):
+    subject, error = require_operator(event, "slack.image_upload_url")
+    if error:
+        return error
+    body = _json_body(event)
+    if body is None:
+        return _json_response(400, {"error": "Invalid JSON body"})
+    try:
+        payload = slack_ops.image_upload_url(
+            body.get("filename") or "", body.get("length"),
+            connection_id=_post_connection_id(body))
+    except (slack_ops.SlackOpsError, ValueError) as exc:
+        return _error(exc)
+    audit.emit(payload["connection"], "slack.image_upload_url", subject, outcome="ok")
+    return _json_response(200, payload)
+
+
+def attach_image_api(event):
+    subject, error = require_operator(event, "slack.attach_image")
+    if error:
+        return error
+    body = _json_body(event)
+    if body is None:
+        return _json_response(400, {"error": "Invalid JSON body"})
+    try:
+        payload = slack_ops.attach_image(
+            body.get("channel") or "",
+            body.get("ts") or "",
+            body.get("file_id"),
+            replace=bool(body.get("replace", False)),
+            text=body.get("text"),
+            connection_id=_post_connection_id(body),
+            title=body.get("title"),
+        )
+    except (slack_ops.SlackOpsError, ValueError) as exc:
+        return _error(exc)
+    audit.emit(payload["connection"], "slack.attach_image", subject, outcome="ok")
     return _json_response(200, payload)
 
 
@@ -160,6 +221,10 @@ def route_slack(event, method, path):
         return dm_export_api(event)
     if path == "/api/agent/slack/post" and method == "POST":
         return post_api(event)
+    if path == "/api/agent/slack/image-upload-url" and method == "POST":
+        return image_upload_url_api(event)
+    if path == "/api/agent/slack/attach-image" and method == "POST":
+        return attach_image_api(event)
     if path == "/api/agent/slack/replies" and method == "GET":
         return _simple(event, "slack.replies", slack_ops.replies, lambda q, c: {
             "channel": q.get("channel") or "", "thread_ts": q.get("thread_ts") or "",
