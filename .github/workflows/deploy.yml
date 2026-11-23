@@ -29,22 +29,29 @@ jobs:
         run: uv run --with pytest pytest --noconftest -q tests/test_private_files.py tests/test_cli_encoding.py
 
   test:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, contabo]
     steps:
       - uses: actions/checkout@v6
+      # RUNNER_TEMP is emptied after every job; /tmp persists on the
+      # self-hosted runner, so a fixed /tmp clone would collide next run.
       - name: Checkout shared device login
-        run: git clone --depth 1 https://github.com/DataTalksClub/auth.git /tmp/dtc-auth
+        run: git clone --depth 1 https://github.com/DataTalksClub/auth.git "$RUNNER_TEMP/dtc-auth"
       - name: Point the CLI at the shared device login
-        run: echo DTC_AUTH_HOME=/tmp/dtc-auth >> "$GITHUB_ENV"
+        run: echo "DTC_AUTH_HOME=$RUNNER_TEMP/dtc-auth" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - uses: aws-actions/setup-sam@v2
       # Avoid the slow Azure archive without changing APT trust policy.
+      # Hosted runners only: the self-hosted runner has no sudo, and the
+      # Chromium system packages are preinstalled on it.
       - name: Configure bounded Ubuntu dependency downloads
+        if: runner.environment == 'github-hosted'
         run: sudo python scripts/configure-ci-apt.py
       - name: Install Chromium system dependencies
+        if: runner.environment == 'github-hosted'
         timeout-minutes: 10
         run: uv run --with playwright python -m playwright install-deps chromium
       - name: Install Chromium for the console boot test
@@ -69,7 +76,8 @@ jobs:
   # Per-plugin lanes: fast feedback on a plugin's own tests. The deploy
   # gate stays the full `make test` above, which includes every lane.
   plugin-lanes:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, contabo]
     strategy:
       matrix:
         plugin: [slack, telegram, dropbox, aws, zoom, google, dataops, cmp, llm, typefully, hub]
@@ -81,7 +89,7 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request'
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, contabo]
     permissions:
       contents: read
       id-token: write
