@@ -10,11 +10,12 @@ def run_zoom_meeting_artifact(action, event, *, endpoint, steps=None, transport=
     if not meeting_id:
         raise ValueError("Zoom transcript and summary lookups require meeting_id")
     access_token = _access_token(action, transport=transport)
-    if meeting_id.isascii() and meeting_id.isdecimal():
+    resolve_instance = meeting_id.isascii() and meeting_id.isdecimal()
+    if resolve_instance:
         meeting_id = _past_meeting_uuid(access_token, meeting_id, transport=transport)
     encoded = quote(meeting_id, safe="")
     # The transcript endpoint documents double encoding for any slash.
-    if meeting_id.startswith("/") or "//" in meeting_id or (
+    if resolve_instance or meeting_id.startswith("/") or "//" in meeting_id or (
         endpoint == "transcript" and "/" in meeting_id
     ):
         encoded = quote(encoded, safe="")

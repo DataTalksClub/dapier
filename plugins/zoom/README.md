@@ -362,7 +362,7 @@ list action returns one page for the connected user. A failed request
 includes the HTTP status and any Zoom error code and message.
 
 For a numeric meeting ID, both lookup actions use the most recent ended
-instance returned by Zoom. If the instance list has no usable UUID, the
+instance returned by Zoom and double-encode its UUID. If the instance list has no usable UUID, the
 actions look up the past meeting details. These requests require
 `meeting:read:list_past_instances` and `meeting:read:past_meeting`. Supply
 an occurrence UUID directly to select a specific instance.

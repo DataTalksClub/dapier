@@ -39,17 +39,23 @@ def test_meeting_artifact_dispatch(zoom, kind, endpoint, meeting_id, encoded):
     ("zoom_get_meeting_transcript", "transcript"),
     ("zoom_get_meeting_summary", "meeting_summary"),
 ])
-def test_numeric_id_resolves_latest_past_instance(zoom, kind, endpoint):
+@pytest.mark.parametrize(("uuid", "encoded"), [
+    ("/latest==", "%252Flatest%253D%253D"),
+    ("a+b==", "a%252Bb%253D%253D"),
+])
+def test_numeric_id_resolves_latest_past_instance(zoom, kind, endpoint, uuid, encoded):
     zoom.side_effect = [
-        (200, b'{"meetings":[{"start_time":"2026-11-23T12:00:00Z","uuid":"/latest=="},'
-              b'{"start_time":"2026-11-22T12:00:00Z","uuid":"older=="}]}'),
+        (200, json.dumps({"meetings": [
+            {"start_time": "2026-11-23T12:00:00Z", "uuid": uuid},
+            {"start_time": "2026-11-22T12:00:00Z", "uuid": "older=="},
+        ]}).encode()),
         (200, b'{"meeting_topic":"Latest meeting"}'),
     ]
     action = {"connection_id": "zoom-api", "meeting_id": 86574830782}
     assert ACTIONS[kind].run(action, {}, "flow") == {"meeting_topic": "Latest meeting"}
     assert [call.args for call in zoom.call_args_list] == [
         ("GET", "https://api.zoom.us/v2/past_meetings/86574830782/instances"),
-        ("GET", f"https://api.zoom.us/v2/meetings/%252Flatest%253D%253D/{endpoint}"),
+        ("GET", f"https://api.zoom.us/v2/meetings/{encoded}/{endpoint}"),
     ]
 
 
