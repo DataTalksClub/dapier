@@ -347,3 +347,20 @@ webhook intake maps them with the same builders as the meeting events, and
 each publishes the same metadata-only payload under its own event name —
 subscribe to them on the Webhook Only app's event subscription like the
 recording events above.
+
+### Meeting transcripts and AI Companion summaries
+
+| Workflow action | Inputs besides `connection_id` | Zoom scope |
+| --- | --- | --- |
+| `zoom_get_meeting_transcript` | `meeting_id` (numeric ID or occurrence UUID) | `cloud_recording:read:meeting_transcript` |
+| `zoom_get_meeting_summary` | `meeting_id` (numeric ID or occurrence UUID) | `meeting:read:summary` |
+| `zoom_list_meeting_summaries` | Optional `next_page_token` from the previous response | `meeting:read:list_summaries` |
+
+These actions return Zoom's JSON response. The transcript response includes
+`download_url` when Zoom makes the transcript available for download. The
+list action returns one page for the connected user. A failed request
+includes the HTTP status and any Zoom error code and message.
+
+New API connections request all three scopes by default. For an existing
+connection, enable them on the Marketplace app, add them alongside its
+existing requested scopes, and reconnect.

@@ -23,9 +23,12 @@ KINDS = (KIND_API, KIND_WEBHOOK)
 # write and webinar scopes are opt-in (Manage → Advanced, or
 # ``dapier connections edit --scopes``).
 API_DEFAULT_SCOPES = (
+    "cloud_recording:read:meeting_transcript",
     "cloud_recording:read:recording",
     "meeting:read:list_meetings",
+    "meeting:read:list_summaries",
     "meeting:read:meeting",
+    "meeting:read:summary",
     "user:read:user",
 )
 

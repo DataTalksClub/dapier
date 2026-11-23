@@ -19407,6 +19407,36 @@
       ]
     },
     {
+      type: "zoom_get_meeting_transcript",
+      label: "Zoom: get meeting transcript",
+      icon: Video,
+      description: "Get transcript metadata and the download URL when available.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "meeting_id", label: "Meeting ID or UUID", required: true }
+      ]
+    },
+    {
+      type: "zoom_get_meeting_summary",
+      label: "Zoom: get meeting summary",
+      icon: Video,
+      description: "Get the AI Companion summary for a meeting.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "meeting_id", label: "Meeting ID or UUID", required: true }
+      ]
+    },
+    {
+      type: "zoom_list_meeting_summaries",
+      label: "Zoom: list meeting summaries",
+      icon: Video,
+      description: "Get one page of the connected user's AI Companion summaries.",
+      fields: [
+        { key: "connection_id", label: "Zoom connection", placeholder: "zoom", required: true, provider: "zoom" },
+        { key: "next_page_token", label: "Next page token" }
+      ]
+    },
+    {
       type: "zoom_delete_recording",
       label: "Zoom: delete recording",
       icon: Video,
