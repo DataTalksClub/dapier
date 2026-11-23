@@ -92,3 +92,6 @@ The ts lookup and `--replace` read history (`channels:history`, and
 false, add the scope to the Slack app (OAuth & Permissions → Bot Token
 Scopes) and reinstall the app to the workspace. The bot token usually stays
 the same. If Slack shows a new one, re-import it with `dapier connections import`.
+
+To read or download files attached to Slack messages, see
+[slack-attachments.md](slack-attachments.md).

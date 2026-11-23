@@ -1,5 +1,7 @@
 """Implementation of the `dapier slack` commands."""
 
+import base64
+import hashlib
 import os
 import sys
 import urllib.error
@@ -13,7 +15,7 @@ from .shared import print_json
 __all__ = [
     "slack_find_user", "slack_open_dm", "slack_history", "slack_dm_export",
     "slack_replies", "slack_channels", "slack_search", "slack_post",
-    "slack_attach_image",
+    "slack_attach_image", "slack_file_info", "slack_download",
 ]
 
 DEFAULT_CONNECTION_ID = "slack-alexey"
@@ -246,3 +248,70 @@ def slack_attach_image(api_url, channel, ts, image, replace=False, text_file=Non
     data = api.call(api_url, "POST", "/api/agent/slack/attach-image", body=payload,
                     timeout=60, debug=debug)
     return _report_ts(data)
+
+
+DEFAULT_FILE_CONNECTION_ID = DEFAULT_POST_CONNECTION_ID  # the bot
+
+
+def _file_params(file_id, connection_id, channel, ts):
+    params = {"file_id": file_id, "connection_id": connection_id}
+    if channel:
+        params["channel"] = channel
+    if ts:
+        params["ts"] = ts
+    return "?" + urlencode(params)
+
+
+def slack_file_info(api_url, file_id, connection_id=DEFAULT_FILE_CONNECTION_ID, channel=None,
+                    ts=None, debug=False):
+    """Print a Slack file's minimal metadata (no URLs) and whether it can be downloaded."""
+    data = api.call(api_url, "GET",
+                    "/api/agent/slack/file" + _file_params(file_id, connection_id, channel, ts),
+                    debug=debug)
+    print_json(data)
+    return 0
+
+
+def _safe_filename(name, fallback):
+    """A plain basename: no directories, no leading dots, no control characters."""
+    base = str(name or "").replace("\\", "/").rsplit("/", 1)[-1]
+    base = "".join(ch for ch in base if ch.isprintable()).strip().lstrip(".")
+    return base or fallback
+
+
+def slack_download(api_url, file_id, output=None, connection_id=DEFAULT_FILE_CONNECTION_ID,
+                   channel=None, ts=None, force=False, debug=False):
+    """Download one Slack file to disk through the API; print only its metadata.
+
+    The file content is never printed. ``output`` is a file path or an
+    existing directory (default: the current directory, named after the file).
+    """
+    data = api.call(api_url, "GET",
+                    "/api/agent/slack/file/content"
+                    + _file_params(file_id, connection_id, channel, ts),
+                    timeout=90, debug=debug)
+    try:
+        content = base64.b64decode(data.get("content_base64") or "", validate=True)
+    except ValueError:
+        raise api.ApiError("API returned unreadable file content") from None
+    if hashlib.sha256(content).hexdigest() != data.get("sha256") or \
+            len(content) != data.get("bytes"):
+        raise api.ApiError("downloaded content failed its size/sha256 check; nothing written")
+    meta = data.get("file") or {}
+    name = _safe_filename(meta.get("name"), file_id)
+    target = Path(output) if output else Path(name)
+    if output and target.is_dir():
+        target = target / name
+    if target.exists() and not force and not target.is_char_device():
+        print(f"Error: {target} exists; pass --force to overwrite", file=sys.stderr)
+        return 1
+    try:
+        with open(target, "wb") as handle:
+            handle.write(content)
+    except OSError as exc:
+        print(f"Error: cannot write {target}: {exc.strerror or exc}", file=sys.stderr)
+        return 1
+    summary = {k: v for k, v in data.items() if k != "content_base64"}
+    summary["path"] = str(target)
+    print_json(summary)
+    return 0
