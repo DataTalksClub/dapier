@@ -14,6 +14,10 @@ from plugins.zoom.runners import (
     run_zoom_list_past_participants,
     run_zoom_update_meeting,
 )
+from plugins.zoom.runners.artifacts import (
+    run_zoom_list_meeting_summaries,
+    run_zoom_meeting_artifact,
+)
 from src.dapier.connectors.registry import Action, register
 
 register(Action(
@@ -240,3 +244,43 @@ register(Action(
     ),
 ))
 
+
+
+def _register_meeting_artifact(action_type, label, description, endpoint):
+    register(Action(
+        type=action_type,
+        label=label,
+        description=description,
+        icon="zoom",
+        run=lambda action, event, workflow_id, steps=None: run_zoom_meeting_artifact(
+            action, event, endpoint=endpoint, steps=steps),
+        required=frozenset({"connection_id", "meeting_id"}),
+        fields=(
+            {"key": "connection_id", "label": "Zoom connection", "required": True},
+            {"key": "meeting_id", "label": "Meeting ID or UUID", "required": True},
+        ),
+    ))
+
+
+_register_meeting_artifact(
+    "zoom_get_meeting_transcript", "Zoom: get meeting transcript",
+    "Get transcript metadata and the download URL when available.", "transcript",
+)
+_register_meeting_artifact(
+    "zoom_get_meeting_summary", "Zoom: get meeting summary",
+    "Get the AI Companion summary for a meeting.", "meeting_summary",
+)
+register(Action(
+    type="zoom_list_meeting_summaries",
+    label="Zoom: list meeting summaries",
+    description="Get one page of the connected user's AI Companion summaries.",
+    icon="zoom",
+    run=lambda action, event, workflow_id, steps=None: run_zoom_list_meeting_summaries(
+        action, event, steps=steps),
+    required=frozenset({"connection_id"}),
+    optional=frozenset({"next_page_token"}),
+    fields=(
+        {"key": "connection_id", "label": "Zoom connection", "required": True},
+        {"key": "next_page_token", "label": "Next page token"},
+    ),
+))

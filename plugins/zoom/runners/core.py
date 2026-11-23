@@ -60,7 +60,9 @@ def _get_json(access_token, path, *, transport=None):
 
 def _raise_zoom_error(what, status, data):
     detail = str(data.get("message") or "")[:200]
-    raise RuntimeError(f"{what} returned HTTP {status}{': ' + detail if detail else ''}")
+    code = data.get("code")
+    code_label = f" (Zoom code {code})" if code is not None else ""
+    raise RuntimeError(f"{what} returned HTTP {status}{code_label}{': ' + detail if detail else ''}")
 
 
 def _meeting_view(meeting):
