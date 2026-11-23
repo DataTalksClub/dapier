@@ -1,4 +1,5 @@
-"""The `dapier slack` noun: find users, open DMs, export history, post (with images)."""
+"""The `dapier slack` noun: find users, open DMs, export history, post (with images),
+read and download attachments."""
 
 from .. import commands
 
@@ -9,7 +10,8 @@ DEFAULT_CONNECTION_ID = "slack-alexey"
 def register(sub):
     p = sub.add_parser(
         "slack",
-        help="Slack user lookup and DM/history export (uses stored connection server-side)")
+        help="Slack user lookup, DM/history export, posting, and attachment download "
+             "(uses stored connection server-side)")
     sub_p = p.add_subparsers(dest="command", required=True)
 
     find_user = sub_p.add_parser("find-user", help="Find workspace users by name, handle, email, or id")
@@ -105,6 +107,28 @@ def register(sub):
     attach.add_argument("--connection", default="slack",
                         help="Connection id (default slack = Au-Tomator bot)")
 
+    file_help = (
+        "The file is resolved from Slack's metadata: files.info (needs files:read) or, "
+        "with --channel and --ts, the message that carries it (needs only channel "
+        "history access). Default connection: slack (bot); use --connection "
+        "slack-alexey for channels the bot cannot read.")
+    file_info = sub_p.add_parser(
+        "file-info", help="Show a Slack file's metadata (no URLs) and if it can be downloaded",
+        description=file_help)
+    download = sub_p.add_parser(
+        "download", help="Download a Slack file (read-only) to disk; content is never printed",
+        description=file_help + " Files over 4 MiB are refused (API response limit).")
+    for parser in (file_info, download):
+        parser.add_argument("file_id", help="Slack file id (F…), e.g. from `slack replies` files")
+        parser.add_argument("--channel", default=None,
+                            help="Channel id or name of the message carrying the file")
+        parser.add_argument("--ts", default=None, help="ts of the message carrying the file")
+        parser.add_argument("--connection", default="slack",
+                            help="Connection id (default slack = Au-Tomator bot)")
+    download.add_argument("--output", "-o", default=None, metavar="PATH",
+                          help="File path or existing directory (default: ./<file name>)")
+    download.add_argument("--force", action="store_true", help="Overwrite an existing file")
+
 
 def run(args, api_url, debug, child=None):
     if args.command == "find-user":
@@ -161,4 +185,12 @@ def run(args, api_url, debug, child=None):
             connection_id=args.connection,
             debug=debug,
         )
+    if args.command == "file-info":
+        return commands.slack_file_info(
+            api_url, args.file_id, connection_id=args.connection, channel=args.channel,
+            ts=args.ts, debug=debug)
+    if args.command == "download":
+        return commands.slack_download(
+            api_url, args.file_id, output=args.output, connection_id=args.connection,
+            channel=args.channel, ts=args.ts, force=args.force, debug=debug)
     return 2

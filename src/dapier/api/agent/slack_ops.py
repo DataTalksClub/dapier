@@ -1,7 +1,12 @@
 """Slack DM/export/post helpers for the agent API (connection token stays server-side)."""
 
+import base64
+import hashlib
 import json
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 from urllib.parse import urlencode
 
 from ...connections import discovery as slack_discovery
@@ -101,6 +106,26 @@ def open_dm(user, *, connection_id=DEFAULT_CONNECTION_ID):
     }
 
 
+# Attachment metadata safe to return: identifiers, type, size, dimensions.
+# Never URLs (url_private*, permalinks, thumbnails), previews, or the uploader.
+_FILE_META_KEYS = (
+    "id", "name", "title", "mimetype", "filetype", "pretty_type", "size", "mode",
+    "is_external", "original_w", "original_h",
+)
+
+
+def file_meta(item):
+    """Minimal, URL-free metadata for one Slack file object (None if unusable)."""
+    if not isinstance(item, dict) or not item.get("id"):
+        return None
+    return {key: item.get(key) for key in _FILE_META_KEYS if item.get(key) is not None}
+
+
+def message_files(message):
+    """The ``files`` of a Slack message as minimal metadata (always a list)."""
+    return [meta for meta in (file_meta(f) for f in (message.get("files") or [])) if meta]
+
+
 def history(channel, *, connection_id=DEFAULT_CONNECTION_ID, limit=100, cursor=None,
             oldest=None, latest=None):
     """Dump conversations.history for a channel/DM (paginated)."""
@@ -133,6 +158,7 @@ def history(channel, *, connection_id=DEFAULT_CONNECTION_ID, limit=100, cursor=N
                 "thread_ts": m.get("thread_ts"),
                 "reply_count": m.get("reply_count"),
                 "latest_reply": m.get("latest_reply"),
+                "files": message_files(m),
             }
             for m in (data.get("messages") or [])
             if isinstance(m, dict) and m.get("ts")
@@ -161,6 +187,7 @@ def _message(m):
         "text": m.get("text") or "",
         "thread_ts": m.get("thread_ts"),
         "reply_count": m.get("reply_count"),
+        "files": message_files(m),
     }
 
 
@@ -235,7 +262,7 @@ def search(query, *, connection_id=DEFAULT_CONNECTION_ID, count=20, page=1):
         {"ts": m.get("ts"), "channel_id": (m.get("channel") or {}).get("id"),
          "channel_name": (m.get("channel") or {}).get("name"),
          "user": m.get("user") or m.get("username"), "text": m.get("text") or "",
-         "permalink": m.get("permalink")}
+         "permalink": m.get("permalink"), "files": message_files(m)}
         for m in block.get("matches") or [] if isinstance(m, dict)]
     paging = block.get("paging") or {}
     return {"connection": connection_id, "query": query, "items": items,
@@ -619,3 +646,198 @@ def _token_scopes(token):
             f"Slack rejected auth.test: {oauth_providers.redact(str(data.get('error')))}",
             status=502)
     return sorted(s.strip() for s in header.split(",") if s.strip())
+
+
+# --- Attachments: read-only file info + download through a named connection ---
+#
+# The file is always resolved from Slack's own metadata — files.info (needs
+# files:read) or the message that carries it (channel + ts; needs only the
+# history scope) — never from a caller-supplied URL. The API fetches the bytes
+# with the connection token from https://files.slack.com only (redirects are
+# followed only within that host) and returns them base64-encoded. The cap
+# keeps the base64 JSON response under the 6 MB Lambda/HTTP API payload limit.
+# URLs and tokens never appear in responses or errors.
+
+DEFAULT_FILE_CONNECTION_ID = DEFAULT_POST_CONNECTION_ID  # the bot; --connection overrides
+MAX_DOWNLOAD_BYTES = 4 * 1024 * 1024
+_DOWNLOAD_HOST = "files.slack.com"
+_DOWNLOAD_TIMEOUT = 20
+_MAX_REDIRECTS = 3
+_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+_UNDOWNLOADABLE_MODES = ("tombstone", "hidden_by_limit", "external")
+
+
+def _download_file_id(value):
+    fid = str(value or "").strip()
+    if not _FILE_ID_RE.fullmatch(fid):
+        raise SlackOpsError("file_id must be a Slack file id like F0123ABCD")
+    return fid
+
+
+def _resolve_file(token, file_id, channel=None, ts=None):
+    """(Slack file object, channel id or None, ts or None) from provider metadata."""
+    if channel or ts:
+        if not (channel and ts):
+            raise SlackOpsError("pass both channel and ts to resolve a file from its message")
+        channel_id = _resolve_channel_id(token, channel)
+        ts = _ts(ts, "ts")
+        message = _fetch_message(token, channel_id, ts)
+        files = [f for f in message.get("files") or [] if isinstance(f, dict)]
+        for item in files:
+            if item.get("id") == file_id:
+                return item, channel_id, ts
+        ids = ", ".join(str(f.get("id")) for f in files if f.get("id")) or "none"
+        raise SlackOpsError(
+            f"file {file_id} is not attached to message {ts} in {channel_id} "
+            f"(files on that message: {ids})", status=404)
+    try:
+        data = _rpc(token, "files.info", {"file": file_id}, http_method="GET")
+    except SlackOpsError as exc:
+        if exc.status == 403:
+            raise SlackOpsError(
+                f"{exc} Without files:read, pass the message's channel and ts "
+                "(--channel/--ts) to resolve the file from the message instead.",
+                status=403) from None
+        raise
+    item = data.get("file")
+    if not isinstance(item, dict) or item.get("id") != file_id:
+        raise SlackOpsError(f"Slack files.info returned no file {file_id}", status=502)
+    return item, None, None
+
+
+def _downloadable(item):
+    """(True, None) or (False, reason) for a resolved file."""
+    mode = str(item.get("mode") or "")
+    if item.get("is_external") or mode in _UNDOWNLOADABLE_MODES:
+        return False, f"file mode {mode or 'external'} has no Slack-hosted content"
+    if not (item.get("url_private_download") or item.get("url_private")):
+        return False, "Slack returned no download location for this file"
+    size = item.get("size")
+    if isinstance(size, int) and size > MAX_DOWNLOAD_BYTES:
+        return False, (f"file is {size} bytes, over the {MAX_DOWNLOAD_BYTES}-byte "
+                       "API download limit")
+    return True, None
+
+
+def _result_base(connection_id, item, channel_id, ts):
+    result = {"connection": connection_id, "file": file_meta(item)}
+    if channel_id:
+        result["channel"] = channel_id
+        result["ts"] = ts
+    return result
+
+
+def file_info(file_id, *, connection_id=DEFAULT_FILE_CONNECTION_ID, channel=None, ts=None):
+    """Minimal metadata for one Slack file, and whether the API can download it."""
+    connection_id, _connection, token = _connection_and_token(connection_id)
+    file_id = _download_file_id(file_id)
+    item, channel_id, ts = _resolve_file(token, file_id, channel, ts)
+    ok, reason = _downloadable(item)
+    result = _result_base(connection_id, item, channel_id, ts)
+    result.update({"downloadable": ok, "max_download_bytes": MAX_DOWNLOAD_BYTES})
+    if reason:
+        result["not_downloadable_reason"] = reason
+    return result
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _http_get(url, headers, limit, timeout=_DOWNLOAD_TIMEOUT):
+    """GET without following redirects; returns (status, headers, body[:limit+1])."""
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            return response.status, dict(response.headers.items()), response.read(limit + 1)
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read(limit + 1)
+        except Exception:  # noqa: BLE001
+            body = b""
+        return exc.code, dict((exc.headers or {}).items()), body
+
+
+def _scope_hint(token):
+    try:
+        scopes = _token_scopes(token)
+    except SlackOpsError:
+        return ""
+    has = "files:read" in scopes
+    return (f" Token has files:read: {'yes' if has else 'no'}."
+            + ("" if has else " Slack requires files:read to download file content; "
+               "use a connection whose token has it, or add files:read to the Slack "
+               "app and reinstall it."))
+
+
+def _on_download_host(url):
+    parsed = urllib.parse.urlsplit(url)
+    return parsed.scheme == "https" and parsed.hostname == _DOWNLOAD_HOST and not parsed.username
+
+
+def _fetch_bytes(token, item):
+    url = str(item.get("url_private_download") or item.get("url_private") or "")
+    if not _on_download_host(url):
+        raise SlackOpsError("Slack returned a file location outside files.slack.com; refusing",
+                            status=502)
+    headers = {"authorization": f"Bearer {token}"}
+    for _hop in range(_MAX_REDIRECTS + 1):
+        try:
+            status, response_headers, body = _http_get(url, headers, MAX_DOWNLOAD_BYTES)
+        except Exception as exc:  # noqa: BLE001 — never echo the URL
+            raise SlackOpsError(f"Slack file download failed: {type(exc).__name__}",
+                                status=502) from None
+        lowered = {str(k).lower(): v for k, v in response_headers.items()}
+        if status in _REDIRECT_STATUSES:
+            target = urllib.parse.urljoin(url, str(lowered.get("location") or ""))
+            if not _on_download_host(target):
+                raise SlackOpsError(
+                    "Slack redirected the file download away from files.slack.com "
+                    "(usually a sign-in page: the token may not read this file)."
+                    + _scope_hint(token), status=403)
+            url = target
+            continue
+        break
+    else:
+        raise SlackOpsError("Slack file download redirected too many times", status=502)
+    if status != 200:
+        message = f"Slack file download failed (HTTP {status})."
+        if status in (401, 403, 404):
+            message += _scope_hint(token)
+        raise SlackOpsError(message, status=403 if status in (401, 403) else 502)
+    content_type = str(lowered.get("content-type") or "").split(";")[0].strip().lower()
+    mimetype = str(item.get("mimetype") or "").lower()
+    if content_type == "text/html" and mimetype != "text/html":
+        raise SlackOpsError(
+            "Slack served an HTML page instead of the file (usually a sign-in page)."
+            + _scope_hint(token), status=403)
+    if len(body) > MAX_DOWNLOAD_BYTES:
+        raise SlackOpsError(
+            f"file is over the {MAX_DOWNLOAD_BYTES}-byte API download limit", status=413)
+    size = item.get("size")
+    if isinstance(size, int) and size != len(body):
+        raise SlackOpsError(
+            f"Slack served {len(body)} bytes but the file metadata says {size}", status=502)
+    return body
+
+
+def file_download(file_id, *, connection_id=DEFAULT_FILE_CONNECTION_ID, channel=None,
+                  ts=None):
+    """Read-only download of one Slack file's bytes (base64) via a named connection."""
+    connection_id, _connection, token = _connection_and_token(connection_id)
+    file_id = _download_file_id(file_id)
+    item, channel_id, ts = _resolve_file(token, file_id, channel, ts)
+    ok, reason = _downloadable(item)
+    if not ok:
+        raise SlackOpsError(f"cannot download {file_id}: {reason}",
+                            status=413 if "limit" in reason else 409)
+    body = _fetch_bytes(token, item)
+    result = _result_base(connection_id, item, channel_id, ts)
+    result.update({
+        "bytes": len(body),
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "content_base64": base64.b64encode(body).decode("ascii"),
+    })
+    return result

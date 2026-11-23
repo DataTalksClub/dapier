@@ -1,4 +1,5 @@
-"""Operator Slack proxy: DM open + history export via a named connection."""
+"""Operator Slack proxy: DM open, history export, posting, and read-only
+attachment access via a named connection."""
 
 import json
 import re
@@ -209,6 +210,16 @@ def attach_image_api(event):
     return _json_response(200, payload)
 
 
+def _file_build(query, _default_connection):
+    # File reads default to the bot connection, not the user default above.
+    connection_id = str(
+        query.get("connection_id") or slack_ops.DEFAULT_FILE_CONNECTION_ID
+    ).strip().lower() or slack_ops.DEFAULT_FILE_CONNECTION_ID
+    return {"file_id": query.get("file_id") or query.get("file") or "",
+            "connection_id": connection_id,
+            "channel": query.get("channel") or None, "ts": query.get("ts") or None}
+
+
 def route_slack(event, method, path):
     """Return a response for Slack agent routes, or None if unmatched."""
     if path == "/api/agent/slack/users" and method == "GET":
@@ -238,4 +249,8 @@ def route_slack(event, method, path):
         return _simple(event, "slack.search", slack_ops.search, lambda q, c: {
             "query": q.get("q") or q.get("query") or "", "connection_id": c,
             "count": int(q.get("count") or 20), "page": int(q.get("page") or 1)})
+    if path == "/api/agent/slack/file" and method == "GET":
+        return _simple(event, "slack.file_info", slack_ops.file_info, _file_build)
+    if path == "/api/agent/slack/file/content" and method == "GET":
+        return _simple(event, "slack.file_download", slack_ops.file_download, _file_build)
     return None
