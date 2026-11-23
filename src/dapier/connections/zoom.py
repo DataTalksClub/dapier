@@ -26,8 +26,10 @@ API_DEFAULT_SCOPES = (
     "cloud_recording:read:meeting_transcript",
     "cloud_recording:read:recording",
     "meeting:read:list_meetings",
+    "meeting:read:list_past_instances",
     "meeting:read:list_summaries",
     "meeting:read:meeting",
+    "meeting:read:past_meeting",
     "meeting:read:summary",
     "user:read:user",
 )

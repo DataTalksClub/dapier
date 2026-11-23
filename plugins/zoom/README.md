@@ -361,6 +361,12 @@ These actions return Zoom's JSON response. The transcript response includes
 list action returns one page for the connected user. A failed request
 includes the HTTP status and any Zoom error code and message.
 
-New API connections request all three scopes by default. For an existing
+For a numeric meeting ID, both lookup actions use the most recent ended
+instance returned by Zoom. If the instance list has no usable UUID, the
+actions look up the past meeting details. These requests require
+`meeting:read:list_past_instances` and `meeting:read:past_meeting`. Supply
+an occurrence UUID directly to select a specific instance.
+
+New API connections request these five scopes by default. For an existing
 connection, enable them on the Marketplace app, add them alongside its
 existing requested scopes, and reconnect.
