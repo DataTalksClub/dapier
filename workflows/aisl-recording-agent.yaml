@@ -24,6 +24,8 @@ actions:
     }
     if not all(payload.values()):
         raise ValueError("Zoom recording intake requires meeting_id, meeting_uuid and start_time")
+    if not input.get("available_at"):
+        raise ValueError("Zoom producer available_at is required; replay a normalized signed recording event")
     # A JSON fragment keeps untrusted Zoom values escaped in the HTTP body.
     output = json.dumps(payload)[1:-1]
 - id: aisl-intake
@@ -34,7 +36,7 @@ actions:
   auth_key_name: Authorization
   auth_key_value: '{steps.aisl-authorization.output.value}'
   timeout_seconds: 15
-  body: '{"event":"{trigger.event}","available_at":"{trigger.occurred_at}",{steps.aisl-payload.output.result}}'
+  body: '{"event":"{trigger.event}","available_at":"{available_at}",{steps.aisl-payload.output.result}}'
 - id: aisl-response
   type: code
   code: |
