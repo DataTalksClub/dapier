@@ -340,11 +340,13 @@ def test_migrated_repo_workflows_use_hub_session_and_fit_hub_limits(monkeypatch)
     assert len(relay_req["create"]["text"].encode("utf-8")) <= 8000
 
     aisl_wf = parse_workflow((root / "aisl-recording-agent.yaml").read_text(encoding="utf-8"))
-    cases = {c["choice"]: c["actions"][0] for c in aisl_wf["actions"][1]["cases"] if c["actions"]}
+    # AISL processing is a deterministic platform intake, not a Hub action
+    # owned by Dapier. The unmatched one-on-one branch still uses this plugin.
+    classifier = aisl_wf["actions"][-1]["default"][0]
+    cases = {c["choice"]: c["actions"][0] for c in classifier["cases"] if c["actions"]}
     assert cases["one-on-one"]["type"] == "hub_session"
     assert cases["one-on-one"]["workspace"] == "zoom-calls"
-    assert cases["ai-shipping-labs"]["type"] == "hub_session"
-    assert cases["ai-shipping-labs"]["workspace"] == "ai-shipping-labs"
+    assert "ai-shipping-labs" not in cases
     for yaml_path in root.glob("*.yaml"):
         assert "type: agent" not in yaml_path.read_text(encoding="utf-8")
     assert '"type": "agent"' not in (repo_root / "docs" / "agents-workflow.json").read_text(encoding="utf-8")
