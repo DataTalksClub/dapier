@@ -30,7 +30,7 @@ def test_archive_selects_only_transcripts_and_keeps_recordings_separate():
         uploads.append(action)
         return {}
 
-    logic.run_chain(workflow["id"], workflow["actions"][:1], event, runner)
+    logic.run_chain(workflow["id"], [next(action for action in workflow["actions"] if action["id"] == "recording-files")], event, runner)
     assert len(uploads) == 1
     upload = uploads[0]
     assert upload["type"] == "s3_upload"
