@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import datetime, timezone
 
 from ...connections import credentials
 from ...connections import records
@@ -88,6 +89,18 @@ def recording_data(payload, *, file_types=RECORDING_FILE_TYPES):
         "video_files": videos,
     }
 
+
+
+def recording_available_at(event_ts, *, now=None):
+    """Zoom event_ts is epoch milliseconds; the signature header uses seconds."""
+    if type(event_ts) is not int or event_ts <= 0:
+        raise ValueError("recording event_ts must be positive integer epoch milliseconds")
+    observed = time.time()
+    if now is not None:
+        observed = now
+    if event_ts > observed * 1000:
+        raise ValueError("recording event_ts must not be in the future")
+    return datetime.fromtimestamp(event_ts / 1000, tz=timezone.utc).isoformat()
 
 def meeting_data(payload):
     """Metadata-only flatten of a meeting lifecycle delivery (started/ended).
@@ -221,6 +234,13 @@ def handle(connection_id, headers, body, *, connections_table, publish, now=None
             if refuse:
                 refuse("incomplete Zoom recording event", message)
             return 400, {"error": "incomplete Zoom recording event"}
+        try:
+            data["available_at"] = recording_available_at(message.get("event_ts"), now=now)
+        except (ValueError, OverflowError, OSError) as exc:
+            reason = f"invalid Zoom recording timestamp: {exc}"
+            if refuse:
+                refuse(reason)
+            return 400, {"error": reason}
         # recording.completed keeps its original dedup identity (no event
         # name); the newer events name themselves so one meeting can complete
         # and transcript-complete at the same timestamp without colliding.

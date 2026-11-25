@@ -19,7 +19,8 @@ def workflow():
 
 def event(kind):
     return {"id": "zoom:stable-delivery", "connector": "zoom", "event": kind,
-            "occurred_at": "2026-11-25T10:00:00Z", "data": {
+            "occurred_at": "2026-11-25T10:20:00Z", "data": {
+                "available_at": "2026-11-25T10:00:00Z",
                 "meeting_id": 123, "meeting_uuid": 'instance/+"quoted',
                 "start_time": "2026-11-25T09:00:00Z", "video_files": []}}
 

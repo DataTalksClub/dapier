@@ -499,3 +499,51 @@ def test_zoom_handle_reports_unconfigured_and_binding_refusals(monkeypatch):
         publish=lambda *a, **k: None, refuse=refuse) == (400, {"error": "incomplete Zoom recording event"})
     assert refusals[-1][0] == "incomplete Zoom recording event"
     assert refusals[-1][1]["event"] == "recording.transcript_completed"
+
+
+def test_recording_source_timestamp_is_milliseconds_not_signature_seconds(monkeypatch):
+    table, _ = setup(monkeypatch)
+    produced_ms = 1795600800123  # 2026-11-25T10:00:00.123Z
+    receipt_seconds = 1795602000  # local delivery is twenty minutes later
+    for kind in ("recording.completed", "recording.transcript_completed"):
+        published = []
+        payload = {"event": kind, "event_ts": produced_ms,
+                   "payload": {"account_id": "account-1", "object": {
+                       "id": 123, "uuid": "recording-instance",
+                       "start_time": "2026-11-25T09:00:00Z",
+                       "recording_files": [{"id": "video", "file_type": "MP4"}]}}}
+        body, headers = signed(payload, timestamp=receipt_seconds)
+        publish = lambda *args, **kwargs: published.append((args, kwargs))
+        for delay in (0, 60):
+            assert zoom_webhooks.handle(
+                "zoom", headers, body, connections_table=table, publish=publish,
+                now=receipt_seconds + delay)[0] == 200
+        first, second = published
+        assert first[0][2]["available_at"] == "2026-11-25T10:00:00.123000+00:00"
+        assert second[0][2]["available_at"] == first[0][2]["available_at"]
+        assert second[1]["event_id"] == first[1]["event_id"]
+
+
+def test_invalid_recording_source_time_is_refused_without_queueing(monkeypatch):
+    table, _ = setup(monkeypatch)
+    receipt_seconds = 1795602000
+    for source_time in (None, "1795600800123", True, -1, 1.5,
+                        (receipt_seconds + 1) * 1000, 10 ** 100):
+        payload = {"event": "recording.completed", "event_ts": source_time,
+                   "payload": {"account_id": "account-1", "object": {
+                       "id": 123, "uuid": "recording-instance",
+                       "recording_files": [{"id": "video", "file_type": "MP4"}]}}}
+        body, headers = signed(payload, timestamp=receipt_seconds)
+        published = []
+        refusals = []
+        status, response = zoom_webhooks.handle(
+            "zoom", headers, body, connections_table=table,
+            publish=lambda *args, **kwargs: published.append(args), now=receipt_seconds,
+            refuse=lambda reason, *args: refusals.append(reason))
+        assert status == 400
+        if source_time is None:
+            assert response["error"] == "incomplete Zoom recording event"
+        else:
+            assert "timestamp" in response["error"]
+        assert published == []
+        assert len(refusals) == 1

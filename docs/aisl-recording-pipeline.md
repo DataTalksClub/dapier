@@ -3,9 +3,14 @@
 `aisl-recording-agent` sends both Zoom recording events directly to the
 platform's authenticated `POST /api/recording-intake`, before transcript
 archival, classification, or agent launch. It sends the recording instance
-UUID, meeting ID, start time, event type, and the Dapier receipt timestamp
-(`trigger.occurred_at`). A delayed queue retry retains that original receipt;
-it must not reset the platform's deadline. The platform re-lists Zoom with its
+UUID, meeting ID, start time, event type, and the signed Zoom producer timestamp
+(`data.available_at`, normalized from integer epoch-millisecond `event_ts`).
+The signature header `x-zm-request-timestamp` uses epoch seconds and is only
+for request freshness; it is not recording availability. Dapier
+`trigger.occurred_at` is local queue receipt and must not start the deadline.
+Delayed queue processing or retries retain the original producer time.
+Missing, malformed, or future recording timestamps fail closed with a visible
+webhook refusal/workflow error; there is no receipt-now fallback. The platform re-lists Zoom with its
 own credentials rather than trusting download URLs supplied in the event.
 
 The website owns recording-instance matching, durable idempotency, S3 upload,
@@ -18,7 +23,7 @@ The normal workflow failure notice goes to the existing developer mailbox.
 
 ## Stage contracts
 
-| Trigger | Action | Bound from producer receipt |
+| Trigger | Action | Bound from Zoom producer availability |
 | --- | --- | --- |
 | `recording.completed` | Website queues MP4 upload and one host notice per person; no transcript dependency | S3 and host delivery within 60 minutes |
 | `recording.transcript_completed` | Website syncs transcript and invokes its configured restored Hub inbound webhook | Hetzner draft job running within 5 minutes; finished within 60 minutes |
@@ -55,3 +60,5 @@ platform intake so an archive outage cannot delay recording acceptance.
 The operator's Dapier CLI session must be valid to configure or publish. If
 `dapier workflows show aisl-recording-agent` says `Not signed in`, use the
 supported device login; do not bypass authentication with AWS/DynamoDB writes.
+
+Timestamp reference: [Zoom Meetings webhook event schemas](https://developers.zoom.us/docs/api/meetings/events/) (`event_ts`).
