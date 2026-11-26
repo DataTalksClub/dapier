@@ -61,6 +61,7 @@ def data_from_message(message, pointer, limit=BODY_LIMIT):
         "route": _route_label(to),
         "subject": message.get("Subject"),
         "message_id": message.get("Message-ID"),
+        "date": message.get("Date"),
         "text": _body(message, "plain", limit=limit),
         "html": _body(message, "html", limit=limit),
         "s3": pointer,
@@ -111,10 +112,10 @@ def contract_fields(data, event_id):
         "sender": {"header": sender, "addresses": _addresses(sender)},
         "recipients": {"addresses": _addresses(to)},
         "subject": data.get("subject"),
-        # The email's own Date header when the record kept it, so a replayed
-        # event reports the original receipt time rather than the replay
-        # moment. Flat rebuilds have no date and fall back to occurred_at
-        # in the worker's normalizer.
+        # The email's own Date header, so a replayed event reports the
+        # original receipt time rather than the replay moment. Legacy flat
+        # records without a date fall back to occurred_at in the worker's
+        # normalizer.
         "date": data.get("date"),
     }
     pointer = data.get("s3") or data.get("raw_mime")
