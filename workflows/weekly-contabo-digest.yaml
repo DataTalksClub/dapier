@@ -1,0 +1,33 @@
+id: weekly-contabo-digest
+enabled: true
+description: Deliver the weekly Contabo backup and alert report to its configured private recipient
+notify: []
+trigger:
+  connector: webhook
+  event: request.received
+  filters:
+    hook:
+      equals: weekly-contabo-digest
+actions:
+  - id: recipient
+    type: storage_get
+    key: private_chat_id
+  - id: verify-private
+    type: telegram_find_chat
+    connection_id: alexey-dataops-assistant
+    chat_id: '{steps.recipient.output.value}'
+  - id: only-private
+    type: condition
+    when:
+      steps.verify-private.output.found:
+        equals: true
+      steps.verify-private.output.chat.type:
+        equals: private
+    then:
+      - id: send-digest
+        type: run_workflow
+        workflow_id: weekly-contabo-telegram
+        output_field: telegram
+        payload:
+          chat_id: '{steps.verify-private.output.chat.id}'
+          text: '{body.text}'

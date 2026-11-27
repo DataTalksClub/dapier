@@ -1,0 +1,15 @@
+id: weekly-contabo-telegram
+enabled: true
+description: Internal Telegram delivery action for the weekly Contabo digest workflow
+notify: []
+trigger:
+  connector: webhook
+  event: request.received
+  filters:
+    hook:
+      equals: weekly-contabo-telegram-internal
+actions:
+  - id: telegram
+    type: telegram_send
+    connection_id: alexey-dataops-assistant
+    text: '{text}'
